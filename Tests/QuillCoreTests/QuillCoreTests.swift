@@ -1,5 +1,5 @@
-import Testing
 import QuillCore
+import Testing
 
 @Test func quillCoreIsAccessible() {
     // This test running via `swift test` proves ARCH-01:

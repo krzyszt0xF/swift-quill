@@ -1,5 +1,5 @@
-import Testing
 import QuillKit
+import Testing
 
 @Test func quillKitDependencyChain() {
     // Verifies QuillKit correctly depends on QuillCore.

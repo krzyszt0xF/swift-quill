@@ -1,5 +1,5 @@
-import Testing
 import QuillSwiftUI
+import Testing
 
 @Test func quillSwiftUIDependencyChain() {
     // Verifies QuillSwiftUI -> QuillKit -> QuillCore chain.
