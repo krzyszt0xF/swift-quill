@@ -36,7 +36,7 @@ let package = Package(
         ),
         .testTarget(
             name: "QuillKitTests",
-            dependencies: ["QuillKit"]
+            dependencies: ["QuillKit", "QuillCore"]
         ),
         .testTarget(
             name: "QuillSwiftUITests",
