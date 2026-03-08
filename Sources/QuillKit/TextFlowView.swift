@@ -51,6 +51,15 @@ final class TextFlowView: UIView {
         textContentStorage.attributedString = attributedString
         setNeedsDisplay()
     }
+
+    func updateRawText(_ text: String) {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 16),
+            .foregroundColor: UIColor.label,
+        ]
+        textContentStorage.attributedString = NSAttributedString(string: text, attributes: attributes)
+        setNeedsDisplay()
+    }
 }
 
 private extension TextFlowView {

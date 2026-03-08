@@ -47,6 +47,11 @@ final class CodeBlockView: UIView {
             languagePill.isHidden = true
         }
     }
+
+    func updateCode(_ code: String) {
+        let trimmed = code.hasSuffix("\n") ? String(code.dropLast()) : code
+        textView.text = trimmed
+    }
 }
 
 private extension CodeBlockView {
