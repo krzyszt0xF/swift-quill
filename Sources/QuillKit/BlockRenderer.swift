@@ -26,29 +26,20 @@ public enum BlockRenderer {
 }
 
 private extension BlockRenderer {
-    static func placeholder(_ text: String) -> UIView {
-        let label = UILabel()
-        label.backgroundColor = UIColor.systemGray6
-        label.font = .systemFont(ofSize: 14)
-        label.text = text
-        label.textAlignment = .center
-        label.textColor = .secondaryLabel
-
-        return label
-    }
-
     static func view(for node: RenderNode) -> UIView {
         switch node {
-        case .codeBlock:
-            return placeholder("Code block (Phase 4)")
+        case let .codeBlock(language, code):
+            let view = CodeBlockView()
+            view.configure(language: language, code: code)
+            return view
         case let .flow(segment):
             let view = TextFlowView()
             view.configure(with: AttributedStringBuilder.build(from: segment))
             return view
-        case .image:
-            return placeholder("Image (Phase 4)")
-        case .table:
-            return placeholder("Table (Phase 4)")
+        case let .image(_, title):
+            return PlaceholderBlockView.image(title: title)
+        case let .table(_, header, rows):
+            return PlaceholderBlockView.table(header: header, rowCount: rows.count)
         }
     }
 }

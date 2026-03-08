@@ -246,8 +246,12 @@ private extension AttributedStringBuilder {
                 result.addAttribute(.font, value: current.withTraits(.traitItalic), range: range)
             }
             return result
-        case .image:
-            return NSAttributedString()
+        case let .image(_, _, alt):
+            let text = alt.isEmpty ? "image" : plainText(from: alt)
+            return NSAttributedString(string: "[\(text)]", attributes: [
+                .font: baseFont,
+                .foregroundColor: UIColor.secondaryLabel,
+            ])
         case .inlineHTML:
             return NSAttributedString()
         case .lineBreak:
@@ -288,6 +292,33 @@ private extension AttributedStringBuilder {
 // MARK: - Helpers
 
 private extension AttributedStringBuilder {
+    static func plainText(from inlines: [Inline]) -> String {
+        inlines.map { plainText(from: $0) }.joined()
+    }
+
+    static func plainText(from inline: Inline) -> String {
+        switch inline {
+        case let .code(text):
+            return text
+        case let .emphasis(children):
+            return plainText(from: children)
+        case let .image(_, _, alt):
+            return plainText(from: alt)
+        case .inlineHTML:
+            return ""
+        case .lineBreak:
+            return " "
+        case let .link(_, children):
+            return plainText(from: children)
+        case let .strikethrough(children):
+            return plainText(from: children)
+        case let .strong(children):
+            return plainText(from: children)
+        case let .text(string):
+            return string
+        }
+    }
+
     struct NestingContext {
         let blockquoteDepth: Int
         let listLevel: Int
