@@ -10,7 +10,7 @@ struct BlockFlowContentTests {
         let testDescription: String
     }
 
-    @Test("classifies all Block cases correctly", arguments: [
+    @Test("Classifies all Block cases correctly", arguments: [
         BlockFlowCase(
             block: .blockquote(children: []),
             expected: true,

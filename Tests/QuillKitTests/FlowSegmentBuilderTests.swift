@@ -4,13 +4,13 @@ import Testing
 
 @Suite("FlowSegmentBuilder")
 struct FlowSegmentBuilderTests {
-    @Test("empty input produces empty output")
+    @Test("Empty input produces empty output")
     func emptyInput() {
         let result = FlowSegmentBuilder.build(from: [])
         #expect(result == [])
     }
 
-    @Test("all flow blocks produce a single flow segment")
+    @Test("All flow blocks produce a single flow segment")
     func allFlowBlocks() {
         let blocks: [Block] = [simpleParagraph(), simpleHeading(), simpleParagraph("end")]
         let result = FlowSegmentBuilder.build(from: blocks)
@@ -19,7 +19,7 @@ struct FlowSegmentBuilderTests {
         #expect(flowBlocks(result[0]) == blocks)
     }
 
-    @Test("structural block splits surrounding flow blocks")
+    @Test("Structural block splits surrounding flow blocks")
     func structuralBlockSplitsFlow() {
         let blocks: [Block] = [simpleParagraph(), simpleCodeBlock(), simpleParagraph("after")]
         let result = FlowSegmentBuilder.build(from: blocks)
@@ -30,7 +30,7 @@ struct FlowSegmentBuilderTests {
         #expect(flowBlocks(result[2]) == [simpleParagraph("after")])
     }
 
-    @Test("consecutive structural blocks produce individual nodes")
+    @Test("Consecutive structural blocks produce individual nodes")
     func consecutiveStructuralBlocks() {
         let blocks: [Block] = [simpleCodeBlock("a"), simpleCodeBlock("b")]
         let result = FlowSegmentBuilder.build(from: blocks)
@@ -40,7 +40,7 @@ struct FlowSegmentBuilderTests {
         #expect(result[1] == .codeBlock(language: "swift", code: "b"))
     }
 
-    @Test("soft cap splits long run at 10 blocks")
+    @Test("Soft cap splits long run at 10 blocks")
     func softCapSplitsLongRun() {
         let blocks = (0..<12).map { simpleParagraph("p\($0)") }
         let result = FlowSegmentBuilder.build(from: blocks)
@@ -50,7 +50,7 @@ struct FlowSegmentBuilderTests {
         #expect(flowBlocks(result[1])?.count == 2)
     }
 
-    @Test("mixed document groups flow blocks correctly")
+    @Test("Mixed document groups flow blocks correctly")
     func mixedDocument() {
         let blocks: [Block] = [
             simpleHeading("intro"),
@@ -67,14 +67,14 @@ struct FlowSegmentBuilderTests {
         #expect(flowBlocks(result[2]) == [simpleParagraph("after"), .thematicBreak])
     }
 
-    @Test("single structural block produces one node")
+    @Test("Single structural block produces one node")
     func singleStructuralBlock() {
         let result = FlowSegmentBuilder.build(from: [simpleCodeBlock()])
         #expect(result.count == 1)
         #expect(result[0] == .codeBlock(language: "swift", code: "let x = 1"))
     }
 
-    @Test("flow blocks after structural block group together")
+    @Test("Flow blocks after structural block group together")
     func flowBlocksOnlyAtEnd() {
         let blocks: [Block] = [simpleCodeBlock(), simpleParagraph("a"), simpleParagraph("b")]
         let result = FlowSegmentBuilder.build(from: blocks)
@@ -87,7 +87,10 @@ struct FlowSegmentBuilderTests {
 
 private extension FlowSegmentBuilderTests {
     func flowBlocks(_ node: RenderNode) -> [Block]? {
-        if case .flow(let segment) = node { return segment.blocks }
+        if case let .flow(segment) = node {
+            return segment.blocks
+        }
+        
         return nil
     }
 
