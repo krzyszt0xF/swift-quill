@@ -11,7 +11,12 @@ public enum BlockRenderer {
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         for node in nodes {
-            stack.addArrangedSubview(view(for: node))
+            let subview = view(for: node)
+            stack.addArrangedSubview(subview)
+
+            if subview is CodeBlockView || subview is PlaceholderBlockView {
+                stack.setCustomSpacing(12, after: subview)
+            }
         }
 
         return stack
