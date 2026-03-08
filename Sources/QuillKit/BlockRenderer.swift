@@ -2,6 +2,7 @@ import QuillCore
 import UIKit
 
 /// Assembles RenderNodes into a vertical UIView hierarchy.
+@MainActor
 public enum BlockRenderer {
     public static func render(_ nodes: [RenderNode]) -> UIView {
         let stack = UIStackView()
