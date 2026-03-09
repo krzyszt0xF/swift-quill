@@ -92,7 +92,7 @@ private extension StreamBuffer {
         if let marker = parseListMarker(trimmed) {
             let content = extractListItemContent(trimmed, marker: marker)
             state = .list(ordered: marker.ordered)
-            return [.startList(ordered: marker.ordered), .startListItem, .text(content)]
+            return [.startList(ordered: marker.ordered), .startListItem, .startParagraph, .text(content)]
         }
 
         if trimmed.hasPrefix(">") {
@@ -137,7 +137,7 @@ private extension StreamBuffer {
         if let marker = parseListMarker(trimmed) {
             let content = extractListItemContent(trimmed, marker: marker)
             state = .list(ordered: marker.ordered)
-            return [.endParagraph, .startList(ordered: marker.ordered), .startListItem, .text(content)]
+            return [.endParagraph, .startList(ordered: marker.ordered), .startListItem, .startParagraph, .text(content)]
         }
 
         if trimmed.hasPrefix(">") {
@@ -161,7 +161,7 @@ private extension StreamBuffer {
             return [.endCodeBlock]
         }
 
-        return [.codeBlockText(line)]
+        return [.codeBlockText(line + "\n")]
     }
 
     mutating func processHeadingLine(_ line: String) -> [ParserEvent] {
@@ -174,12 +174,12 @@ private extension StreamBuffer {
 
         if trimmed.isEmpty {
             state = .idle
-            return [.endListItem, .endList]
+            return [.endParagraph, .endListItem, .endList]
         }
 
         if let marker = parseListMarker(trimmed) {
             let content = extractListItemContent(trimmed, marker: marker)
-            return [.endListItem, .startListItem, .text(content)]
+            return [.endParagraph, .endListItem, .startListItem, .startParagraph, .text(content)]
         }
 
         return [.text(trimmed)]
@@ -252,7 +252,7 @@ private extension StreamBuffer {
         case .idle:
             return []
         case .list:
-            return [.endListItem, .endList]
+            return [.endParagraph, .endListItem, .endList]
         case .paragraph:
             return [.endParagraph]
         case .table:

@@ -1,10 +1,16 @@
 import UIKit
 
 final class TextFlowView: UIView {
+    private(set) var lastRevealedIndex = 0
+    private(set) var originalAttributedString: NSAttributedString?
+
+    var totalCharacterCount: Int { originalAttributedString?.length ?? 0 }
+
     private let textContentStorage = NSTextContentStorage()
     private let textContainer = NSTextContainer()
     private let textLayoutManager = NSTextLayoutManager()
     private var heightConstraint: NSLayoutConstraint?
+    private var workingAttributedString: NSMutableAttributedString?
 
     override var intrinsicContentSize: CGSize {
         CGSize(width: UIView.noIntrinsicMetric, height: heightConstraint?.constant ?? 0)
@@ -49,15 +55,50 @@ final class TextFlowView: UIView {
 
     func configure(with attributedString: NSAttributedString) {
         textContentStorage.attributedString = attributedString
+        setNeedsLayout()
         setNeedsDisplay()
     }
 
-    func updateRawText(_ text: String) {
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 16),
-            .foregroundColor: UIColor.label,
-        ]
-        textContentStorage.attributedString = NSAttributedString(string: text, attributes: attributes)
+    func finishReveal() {
+        guard let original = originalAttributedString else { return }
+        textContentStorage.attributedString = original
+        lastRevealedIndex = original.length
+        originalAttributedString = nil
+        workingAttributedString = nil
+        setNeedsDisplay()
+    }
+
+    func prepareForReveal() {
+        guard originalAttributedString == nil,
+              let attrString = textContentStorage.attributedString,
+              attrString.length > 0 else { return }
+
+        originalAttributedString = NSAttributedString(attributedString: attrString)
+
+        let working = NSMutableAttributedString(attributedString: attrString)
+        let fullRange = NSRange(location: 0, length: working.length)
+        working.addAttribute(.foregroundColor, value: UIColor.clear, range: fullRange)
+        working.removeAttribute(.link, range: fullRange)
+
+        workingAttributedString = working
+        textContentStorage.attributedString = working
+        textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
+        lastRevealedIndex = 0
+    }
+
+    func revealCharacters(upTo index: Int) {
+        guard let original = originalAttributedString,
+              let working = workingAttributedString,
+              index > lastRevealedIndex,
+              index <= original.length else { return }
+
+        let revealRange = NSRange(location: lastRevealedIndex, length: index - lastRevealedIndex)
+        original.enumerateAttributes(in: revealRange) { attrs, range, _ in
+            working.setAttributes(attrs, range: range)
+        }
+
+        textContentStorage.attributedString = working
+        lastRevealedIndex = index
         setNeedsDisplay()
     }
 }

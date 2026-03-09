@@ -198,4 +198,47 @@ struct StreamingRendererTests {
         #expect(renderer.stackView.arrangedSubviews.count == 3)
         #expect(renderer.stackView.arrangedSubviews[0] === flowView)
     }
+
+    @Test("Mixed reducer snapshots grow renderer and keep non-empty flow")
+    func mixedReducerSnapshotsGrowRenderer() {
+        let renderer = StreamingBlockRenderer()
+        var state = BlockReducer.ReducerState()
+
+        let events: [ParserEvent] = [
+            .startHeading(level: 1), .text("Mixed"), .endHeading,
+            .startParagraph, .text("Intro"), .endParagraph,
+            .startList(ordered: false),
+            .startListItem, .startParagraph, .text("one"), .endParagraph, .endListItem,
+            .endList,
+            .startCodeBlock(language: "swift"),
+            .codeBlockText("let x = 1\n"),
+            .endCodeBlock,
+            .startParagraph, .text("Tail"), .endParagraph,
+        ]
+
+        var maxViewCount = 0
+        var sawCodeBlockView = false
+
+        for event in events {
+            BlockReducer.apply(event, to: &state)
+            renderer.update(blocks: state.blocks, frozenCount: state.frozenCount)
+
+            maxViewCount = max(maxViewCount, renderer.stackView.arrangedSubviews.count)
+            if renderer.stackView.arrangedSubviews.contains(where: { $0 is CodeBlockView }) {
+                sawCodeBlockView = true
+            }
+        }
+
+        #expect(maxViewCount >= 2)
+        #expect(sawCodeBlockView)
+
+        guard let flow = renderer.stackView.arrangedSubviews.first(where: { $0 is TextFlowView }) as? TextFlowView else {
+            Issue.record("Expected at least one TextFlowView in mixed snapshots")
+            return
+        }
+
+        flow.frame = CGRect(x: 0, y: 0, width: 320, height: 0)
+        flow.layoutIfNeeded()
+        #expect(flow.intrinsicContentSize.height > 0)
+    }
 }

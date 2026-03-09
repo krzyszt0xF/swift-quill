@@ -1,6 +1,10 @@
 /// Converts a sequence of ParserEvents into the Block/Inline AST.
 public enum BlockReducer {
     public static func apply(_ event: ParserEvent, to state: inout ReducerState) {
+        while state.blocks.count > state.frozenCount {
+            state.blocks.removeLast()
+        }
+
         switch event {
         case .codeBlockText(let text):
             handleCodeBlockText(text, state: &state)
@@ -59,6 +63,10 @@ public enum BlockReducer {
             appendInline(.text(string), state: &state)
         case .thematicBreak:
             emitBlock(.thematicBreak, state: &state)
+        }
+
+        if let tail = buildTailPreview(state: state) {
+            state.blocks.append(tail)
         }
     }
 }
@@ -122,21 +130,21 @@ private extension BlockReducer {
 
     static func handleEndBlockQuote(state: inout ReducerState) {
         guard case let .blockquote(children) = state.currentContext else { return }
-        
+
         state.currentContext = state.contextStack.removeLast()
         emitBlock(.blockquote(children: children), state: &state)
     }
 
     static func handleEndCodeBlock(state: inout ReducerState) {
         guard case let .codeBlock(language, code) = state.currentContext else { return }
-        
+
         state.currentContext = state.contextStack.removeLast()
         emitBlock(.codeBlock(language: language, code: code), state: &state)
     }
 
     static func handleEndHeading(state: inout ReducerState) {
         guard case let .heading(level) = state.currentContext else { return }
-        
+
         let inlines = state.currentInlines
         state.currentInlines = []
         state.currentContext = state.contextStack.removeLast()
@@ -145,7 +153,7 @@ private extension BlockReducer {
 
     static func handleEndList(state: inout ReducerState) {
         guard case let .list(ordered, items) = state.currentContext else { return }
-        
+
         state.currentContext = state.contextStack.removeLast()
         if ordered {
             emitBlock(.orderedList(startIndex: 1, items: items), state: &state)
@@ -157,7 +165,7 @@ private extension BlockReducer {
     static func handleEndListItem(state: inout ReducerState) {
         guard case let .listItem(blocks) = state.currentContext else { return }
         state.currentContext = state.contextStack.removeLast()
-        
+
         guard case .list(let ordered, var items) = state.currentContext else { return }
         items.append(Block.ListItem(children: blocks))
         state.currentContext = .list(ordered: ordered, items: items)
@@ -193,13 +201,13 @@ private extension BlockReducer {
 private extension BlockReducer {
     static func handleCodeBlockText(_ text: String, state: inout ReducerState) {
         guard case let .codeBlock(language, code) = state.currentContext else { return }
-        
+
         state.currentContext = .codeBlock(language: language, code: code + text)
     }
 
     static func handleTableRow(_ cells: [String], state: inout ReducerState) {
         guard case .table(var rows) = state.currentContext else { return }
-        
+
         rows.append(cells)
         state.currentContext = .table(rows: rows)
     }
@@ -216,29 +224,121 @@ private extension BlockReducer {
         guard let frame = state.inlineStack.popLast() else { return }
         let children = state.currentInlines
         state.currentInlines = frame.savedInlines
-
-        let wrapped: Inline
-        switch frame.kind {
-        case .code:
-            let text = children.map { inline -> String in
-                if case let .text(content) = inline { return content }
-                return ""
-            }.joined()
-            wrapped = .code(text)
-        case .emphasis:
-            wrapped = .emphasis(children)
-        case .link(let destination):
-            wrapped = .link(destination: destination, children: children)
-        case .strikethrough:
-            wrapped = .strikethrough(children)
-        case .strong:
-            wrapped = .strong(children)
-        }
-        state.currentInlines.append(wrapped)
+        state.currentInlines.append(wrapInline(frame.kind, children: children))
     }
 
     static func pushInlineFrame(_ kind: InlineKind, state: inout ReducerState) {
         state.inlineStack.append(InlineFrame(kind: kind, savedInlines: state.currentInlines))
         state.currentInlines = []
+    }
+
+    static func wrapInline(_ kind: InlineKind, children: [Inline]) -> Inline {
+        switch kind {
+        case .code:
+            let text = children.compactMap { if case let .text(content) = $0 { content } else { nil } }.joined()
+            return .code(text)
+        case .emphasis:
+            return .emphasis(children)
+        case .link(let destination):
+            return .link(destination: destination, children: children)
+        case .strikethrough:
+            return .strikethrough(children)
+        case .strong:
+            return .strong(children)
+        }
+    }
+}
+
+// MARK: - Tail Preview
+
+private extension BlockReducer {
+    enum TailPart {
+        case block(Block)
+        case listItem(Block.ListItem)
+        case none
+    }
+
+    static func buildTailPreview(state: ReducerState) -> Block? {
+        if case .topLevel = state.currentContext { return nil }
+
+        var part = innerPart(
+            from: state.currentContext,
+            inlines: state.currentInlines,
+            inlineStack: state.inlineStack
+        )
+
+        for context in state.contextStack.reversed() {
+            switch context {
+            case .blockquote(let children):
+                var all = children
+                if case let .block(block) = part { all.append(block) }
+                part = .block(.blockquote(children: all))
+            case .codeBlock, .heading, .paragraph, .table:
+                break
+            case .list(let ordered, let items):
+                var all = items
+                if case let .listItem(item) = part { all.append(item) }
+                part = ordered
+                    ? .block(.orderedList(startIndex: 1, items: all))
+                    : .block(.unorderedList(items: all))
+            case .listItem(let blocks):
+                var all = blocks
+                if case let .block(block) = part { all.append(block) }
+                part = .listItem(Block.ListItem(children: all))
+            case .topLevel:
+                break
+            }
+            if case .topLevel = context { break }
+        }
+
+        if case let .block(block) = part { return block }
+        return nil
+    }
+
+    static func collapseInlineStack(current: [Inline], stack: [InlineFrame]) -> [Inline] {
+        var result = current
+        for frame in stack.reversed() {
+            result = frame.savedInlines + [wrapInline(frame.kind, children: result)]
+        }
+        return result
+    }
+
+    static func innerPart(
+        from context: OpenContext,
+        inlines: [Inline],
+        inlineStack: [InlineFrame]
+    ) -> TailPart {
+        switch context {
+        case .blockquote(let children):
+            return .block(.blockquote(children: children))
+        case .codeBlock(let language, let code):
+            return .block(.codeBlock(language: language, code: code))
+        case .heading(let level):
+            let preview = collapseInlineStack(current: inlines, stack: inlineStack)
+            return preview.isEmpty ? .none : .block(.heading(level: level, content: preview))
+        case .list(let ordered, let items):
+            guard !items.isEmpty else { return .none }
+            return ordered
+                ? .block(.orderedList(startIndex: 1, items: items))
+                : .block(.unorderedList(items: items))
+        case .listItem(let blocks):
+            return .listItem(Block.ListItem(children: blocks))
+        case .paragraph:
+            let preview = collapseInlineStack(current: inlines, stack: inlineStack)
+            return preview.isEmpty ? .none : .block(.paragraph(content: preview))
+        case .table(let rows):
+            return tablePreview(from: rows)
+        case .topLevel:
+            return .none
+        }
+    }
+
+    static func tablePreview(from rows: [[String]]) -> TailPart {
+        guard let headerCells = rows.first else { return .none }
+        let header = Block.TableRow(cells: headerCells.map { Block.TableCell(content: [.text($0)]) })
+        let dataRows = rows.dropFirst().map { row in
+            Block.TableRow(cells: row.map { Block.TableCell(content: [.text($0)]) })
+        }
+        return .block(.table(columnAlignments: [], header: header, rows: dataRows))
     }
 }

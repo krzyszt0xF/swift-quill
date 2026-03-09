@@ -69,7 +69,7 @@ struct StreamBufferTests {
         let events = buffer.append("```swift\nlet x = 1\n```\n")
         #expect(events == [
             .startCodeBlock(language: "swift"),
-            .codeBlockText("let x = 1"),
+            .codeBlockText("let x = 1\n"),
             .endCodeBlock,
         ])
     }
@@ -80,7 +80,7 @@ struct StreamBufferTests {
         let events = buffer.append("```\nhello\n```\n")
         #expect(events == [
             .startCodeBlock(language: nil),
-            .codeBlockText("hello"),
+            .codeBlockText("hello\n"),
             .endCodeBlock,
         ])
     }
@@ -91,8 +91,8 @@ struct StreamBufferTests {
         let events = buffer.append("````\n```\nstill code\n````\n")
         #expect(events == [
             .startCodeBlock(language: nil),
-            .codeBlockText("```"),
-            .codeBlockText("still code"),
+            .codeBlockText("```\n"),
+            .codeBlockText("still code\n"),
             .endCodeBlock,
         ])
     }
@@ -103,7 +103,7 @@ struct StreamBufferTests {
         let events = buffer.append("~~~\ncode here\n~~~\n")
         #expect(events == [
             .startCodeBlock(language: nil),
-            .codeBlockText("code here"),
+            .codeBlockText("code here\n"),
             .endCodeBlock,
         ])
     }
@@ -114,8 +114,8 @@ struct StreamBufferTests {
         let events = buffer.append("~~~\ncode\n```\n~~~\n")
         #expect(events == [
             .startCodeBlock(language: nil),
-            .codeBlockText("code"),
-            .codeBlockText("```"),
+            .codeBlockText("code\n"),
+            .codeBlockText("```\n"),
             .endCodeBlock,
         ])
     }
@@ -188,8 +188,8 @@ struct StreamBufferTests {
         var buffer = StreamBuffer()
         let events = buffer.append("- item\n\n")
         #expect(events == [
-            .startList(ordered: false), .startListItem, .text("item"),
-            .endListItem, .endList,
+            .startList(ordered: false), .startListItem, .startParagraph, .text("item"),
+            .endParagraph, .endListItem, .endList,
         ])
     }
 
@@ -198,9 +198,9 @@ struct StreamBufferTests {
         var buffer = StreamBuffer()
         let events = buffer.append("- first\n- second\n\n")
         #expect(events == [
-            .startList(ordered: false), .startListItem, .text("first"),
-            .endListItem, .startListItem, .text("second"),
-            .endListItem, .endList,
+            .startList(ordered: false), .startListItem, .startParagraph, .text("first"),
+            .endParagraph, .endListItem, .startListItem, .startParagraph, .text("second"),
+            .endParagraph, .endListItem, .endList,
         ])
     }
 
@@ -209,8 +209,8 @@ struct StreamBufferTests {
         var buffer = StreamBuffer()
         let events = buffer.append("1. item\n\n")
         #expect(events == [
-            .startList(ordered: true), .startListItem, .text("item"),
-            .endListItem, .endList,
+            .startList(ordered: true), .startListItem, .startParagraph, .text("item"),
+            .endParagraph, .endListItem, .endList,
         ])
     }
 
@@ -219,7 +219,7 @@ struct StreamBufferTests {
         var buffer = StreamBuffer()
         _ = buffer.append("- item\n")
         let events = buffer.finalize()
-        #expect(events == [.endListItem, .endList])
+        #expect(events == [.endParagraph, .endListItem, .endList])
     }
 
     // MARK: - Blockquote Detection
@@ -293,7 +293,7 @@ struct StreamBufferTests {
         let events2 = buffer.append("ift\ncode\n```\n")
         #expect(events2 == [
             .startCodeBlock(language: "swift"),
-            .codeBlockText("code"),
+            .codeBlockText("code\n"),
             .endCodeBlock,
         ])
     }
@@ -329,8 +329,8 @@ struct StreamBufferTests {
 
         let events2 = buffer.append(" item\n\n")
         #expect(events2 == [
-            .startList(ordered: false), .startListItem, .text("item"),
-            .endListItem, .endList,
+            .startList(ordered: false), .startListItem, .startParagraph, .text("item"),
+            .endParagraph, .endListItem, .endList,
         ])
     }
 
@@ -364,7 +364,7 @@ struct StreamBufferTests {
             .startParagraph, .text("Text"),
             .endParagraph,
             .startCodeBlock(language: nil),
-            .codeBlockText("code"),
+            .codeBlockText("code\n"),
             .endCodeBlock,
         ])
     }
@@ -375,9 +375,9 @@ struct StreamBufferTests {
         let events = buffer.append("```\nline1\n\nline2\n```\n")
         #expect(events == [
             .startCodeBlock(language: nil),
-            .codeBlockText("line1"),
-            .codeBlockText(""),
-            .codeBlockText("line2"),
+            .codeBlockText("line1\n"),
+            .codeBlockText("\n"),
+            .codeBlockText("line2\n"),
             .endCodeBlock,
         ])
     }

@@ -31,7 +31,7 @@ public enum BlockRenderer {
     }
 }
 
-private extension BlockRenderer {
+public extension BlockRenderer {
     static func view(for node: RenderNode) -> UIView {
         switch node {
         case let .codeBlock(language, code):

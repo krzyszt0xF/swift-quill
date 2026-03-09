@@ -37,7 +37,7 @@ struct StreamControllerTests {
 
         #expect(events == [
             .startCodeBlock(language: "swift"),
-            .codeBlockText("let x = 1"),
+            .codeBlockText("let x = 1\n"),
             .endCodeBlock,
         ])
     }
@@ -122,6 +122,45 @@ struct StreamControllerTests {
 
         #expect(singleEvents == splitEvents)
     }
+
+    @Test("Immediate append after events installation does not drop prefix events")
+    func immediateAppendNoPrefixDrop() async {
+        let controller = MarkdownStreamController()
+        let stream = await controller.events()
+
+        Task {
+            await controller.append("# Title\n\n")
+            await controller.finish()
+        }
+
+        var events: [ParserEvent] = []
+        for await event in stream {
+            events.append(event)
+        }
+
+        #expect(events.starts(with: [.startHeading(level: 1), .text("Title"), .endHeading]))
+    }
+
+    @Test("Mixed document chunks reduce into multiple block types")
+    func mixedDocumentChunkedReduction() async {
+        let controller = MarkdownStreamController()
+
+        let chunks = [
+            "# Str", "eaming Mixed\n\nInt", "ro paragraph.\n\n- o",
+            "ne\n- two\n\n> quote l", "ine\n\n```swift\nlet x = 1\n```",
+            "\n\n| Key | Value |\n| --- | --- |\n| mode | streaming |\n\n<details><summary>More context</summary>\nTail text\n</details>\n",
+        ]
+
+        let events = await collectEvents(from: controller, feeding: chunks)
+        let reduced = reduce(events)
+
+        #expect(reduced.contains { if case .heading = $0 { return true } else { return false } })
+        #expect(reduced.contains { if case .unorderedList = $0 { return true } else { return false } })
+        #expect(reduced.contains { if case .blockquote = $0 { return true } else { return false } })
+        #expect(reduced.contains { if case .codeBlock = $0 { return true } else { return false } })
+        #expect(reduced.contains { if case .table = $0 { return true } else { return false } })
+        #expect(reduced.count >= 6)
+    }
 }
 
 // MARK: - Helpers
@@ -146,5 +185,13 @@ private extension StreamControllerTests {
         }
         
         return collected
+    }
+
+    func reduce(_ events: [ParserEvent]) -> [Block] {
+        var state = BlockReducer.ReducerState()
+        for event in events {
+            BlockReducer.apply(event, to: &state)
+        }
+        return state.blocks
     }
 }
