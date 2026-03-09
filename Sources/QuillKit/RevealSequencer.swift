@@ -78,6 +78,10 @@ private extension RevealSequencer {
 
     func decompose(view: UIView, isRoot: Bool) {
         if let textFlow = view as? TextFlowView {
+            if isRoot {
+                textFlow.alpha = 0
+                taskQueue.append(.show(textFlow))
+            }
             textFlow.prepareForReveal()
             taskQueue.append(.text(textFlow))
             return
@@ -171,10 +175,11 @@ private extension RevealSequencer {
                 label.alpha = 1
             }) { [weak self] _ in
                 guard let self, self.currentTaskToken == token else { return }
-                self.finishCurrentTask(withGap: true)
+                self.finishCurrentTask(withGap: false)
             }
 
         case let .show(view):
+            onLayoutChange?()
             UIView.animate(withDuration: 0.15, animations: {
                 view.alpha = 1
             }) { [weak self] _ in
