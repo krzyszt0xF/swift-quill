@@ -23,6 +23,10 @@ public final class QuillView: UIView {
     private var renderedFrozenCount = 0
     private var streamGeneration = 0
     private var streamTask: Task<Void, Never>?
+    private var bufferingFlushTask: Task<Void, Never>?
+    private var moduleStreamGate = ModuleStreamGate()
+    private var tailUpdateTask: Task<Void, Never>?
+    private var pendingTailBlock: Block?
 
     public init(frame: CGRect = .zero, configuration: QuillRenderConfiguration = .init()) {
         self.configuration = configuration
@@ -47,7 +51,9 @@ public final class QuillView: UIView {
 
     deinit {
         streamTask?.cancel()
+        bufferingFlushTask?.cancel()
         heightUpdateTask?.cancel()
+        tailUpdateTask?.cancel()
     }
 
     public func updateConfiguration(_ mutate: (inout QuillRenderConfiguration) -> Void) {
@@ -65,12 +71,19 @@ public final class QuillView: UIView {
             return
         }
 
-        Task { await streamController.append(chunk) }
+        if configuration.streamingMode == .bufferedModules {
+            appendBufferedChunk(chunk, to: streamController)
+        } else {
+            Task { await streamController.append(chunk) }
+        }
     }
 
     public func cancelActiveStream() {
         streamTask?.cancel()
         streamTask = nil
+        cancelBufferedFlush()
+        moduleStreamGate.reset()
+        cancelTailUpdate()
         controller = nil
         streamGeneration += 1
         sequencer.reset()
@@ -85,14 +98,22 @@ public final class QuillView: UIView {
         let generation = streamGeneration
 
         Task { [weak self] in
+            guard let self else { return }
+
+            if self.configuration.streamingMode == .bufferedModules {
+                self.cancelBufferedFlush()
+                let remaining = self.moduleStreamGate.flushRemaining()
+                if !remaining.isEmpty {
+                    await streamController.append(remaining)
+                }
+            }
+
             await streamController.finish()
             await task?.value
-            guard let self else { return }
             guard self.streamGeneration == generation else {
                 return
             }
             self.renderer.clearTail()
-            self.sequencer.finish()
             self.scheduleHeightUpdate()
         }
     }
@@ -132,16 +153,48 @@ private extension QuillView {
         sequencer.onLayoutChange = { [weak self] in
             self?.scheduleHeightUpdate()
         }
+        sequencer.onComplete = { [weak self] in
+            self?.scheduleHeightUpdate()
+        }
     }
 
     func applyConfiguration() {
         renderer.tailConfiguration = configuration.tail
+        moduleStreamGate.updateConfiguration(
+            ModuleStreamGateConfiguration(
+                minModuleLength: configuration.bufferedStream.minModuleLength,
+                maxBufferingDelay: configuration.bufferedStream.maxBufferingDelay
+            )
+        )
         sequencer.applyConfiguration(
             typewriter: configuration.typewriter,
             performanceProfile: configuration.performanceProfile
         )
+        sequencer.setFixedTiming(
+            configuration.streamingMode == .bufferedModules
+                ? RevealSequencer.ResolvedTiming(
+                    charsPerStep: 6,
+                    baseDuration: 0.012,
+                    elementGapDuration: 0.04,
+                    commaPause: 0.03,
+                    sentencePause: 0.08,
+                    jitterMax: 0.005
+                )
+                : nil
+        )
+        sequencer.setMinimumTextAnimationWindow(
+            configuration.streamingMode == .bufferedModules
+                ? 0.24
+                : 0
+        )
 
-        if configuration.streamingMode == .stableBlocks {
+        if configuration.streamingMode != .bufferedModules {
+            cancelBufferedFlush()
+            moduleStreamGate.reset()
+        }
+
+        if configuration.streamingMode == .stableBlocks || configuration.streamingMode == .bufferedModules {
+            cancelTailUpdate()
             renderer.clearTail()
             scheduleHeightUpdate()
         }
@@ -159,7 +212,8 @@ private extension QuillView {
 
         let newHeight = ceil(renderer.stackView.bounds.height)
         let oldHeight = lastNotifiedHeight
-        guard abs(newHeight - oldHeight) > 0.5 else { return }
+        let minDelta = max(0.5, configuration.layout.heightNotificationMinimumDelta)
+        guard abs(newHeight - oldHeight) > minDelta else { return }
 
         lastNotifiedHeight = newHeight
         onHeightChange?(oldHeight, newHeight)
@@ -203,6 +257,9 @@ private extension QuillView {
     func resetStreamRendering() {
         streamTask?.cancel()
         streamTask = nil
+        cancelBufferedFlush()
+        moduleStreamGate.reset()
+        cancelTailUpdate()
         controller = nil
         streamGeneration += 1
 
@@ -229,11 +286,10 @@ private extension QuillView {
 
                 if newFrozen > self.renderedFrozenCount {
                     var newBlocks = Array(state.blocks[self.renderedFrozenCount..<newFrozen])
-                    let promotedTail = self.promoteTailIfPossible(firstFrozenBlock: newBlocks.first)
+                    let firstFrozenBlock = newBlocks.first
+                    let promotedTail = self.promoteTailIfPossible(firstFrozenBlock: firstFrozenBlock)
                     if promotedTail {
                         newBlocks.removeFirst()
-                    } else {
-                        self.renderer.clearTail()
                     }
 
                     self.renderedFrozenCount = newFrozen
@@ -241,6 +297,12 @@ private extension QuillView {
                     let views = self.renderer.append(blocks: newBlocks)
                     for view in views {
                         self.sequencer.enqueue(view: view)
+                    }
+
+                    if !promotedTail,
+                       self.configuration.streamingMode == .hybridTail,
+                       firstFrozenBlock != nil {
+                        self.renderer.clearTail()
                     }
                 }
 
@@ -261,18 +323,116 @@ private extension QuillView {
 
     func updateTailPreview(for state: BlockReducer.ReducerState) {
         guard configuration.streamingMode == .hybridTail else {
+            cancelTailUpdate()
             renderer.clearTail()
-            scheduleHeightUpdate()
             return
         }
 
         if state.blocks.count > state.frozenCount,
            let tailBlock = state.blocks.last {
-            renderer.updateTail(block: tailBlock)
+            if shouldApplyTailImmediately(tailBlock) {
+                cancelTailUpdate()
+                renderer.updateTail(block: tailBlock)
+                scheduleHeightUpdate()
+            } else {
+                scheduleTailUpdate(block: tailBlock)
+            }
         } else {
+            cancelTailUpdate()
             renderer.clearTail()
+            scheduleHeightUpdate()
+        }
+    }
+
+    func scheduleTailUpdate(block: Block) {
+        pendingTailBlock = block
+        guard tailUpdateTask == nil else { return }
+
+        let coalescingInterval = max(0, configuration.tail.flowTailUpdateCoalescingInterval)
+        tailUpdateTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.tailUpdateTask = nil }
+
+            if coalescingInterval > 0 {
+                try? await Task.sleep(for: .seconds(coalescingInterval))
+            }
+
+            guard !Task.isCancelled else { return }
+            let latestTailBlock = self.pendingTailBlock
+            self.pendingTailBlock = nil
+
+            guard let latestTailBlock else { return }
+            self.renderer.updateTail(block: latestTailBlock)
+            self.scheduleHeightUpdate()
+        }
+    }
+
+    func cancelTailUpdate() {
+        tailUpdateTask?.cancel()
+        tailUpdateTask = nil
+        pendingTailBlock = nil
+    }
+
+    func appendBufferedChunk(_ chunk: String, to streamController: MarkdownStreamController) {
+        let now = Date.timeIntervalSinceReferenceDate
+        let result = moduleStreamGate.append(chunk, now: now)
+        enqueueCommittedChunks(result.committedChunks, to: streamController)
+
+        if result.hasPendingText {
+            scheduleBufferedFlushIfNeeded(streamController: streamController, now: now)
+        } else {
+            cancelBufferedFlush()
+        }
+    }
+
+    func enqueueCommittedChunks(_ chunks: [String], to streamController: MarkdownStreamController) {
+        guard chunks.isEmpty == false else { return }
+        Task {
+            for chunk in chunks where chunk.isEmpty == false {
+                await streamController.append(chunk)
+            }
+        }
+    }
+
+    func scheduleBufferedFlushIfNeeded(streamController: MarkdownStreamController, now: TimeInterval) {
+        cancelBufferedFlush()
+        let delay = moduleStreamGate.timeUntilForcedCommit(now: now) ?? 0.12
+        let effectiveDelay = max(0.05, delay)
+
+        bufferingFlushTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(effectiveDelay))
+            guard let self, !Task.isCancelled else { return }
+            self.flushBufferedInputIfNeeded(streamController: streamController)
+        }
+    }
+
+    func flushBufferedInputIfNeeded(streamController: MarkdownStreamController) {
+        let now = Date.timeIntervalSinceReferenceDate
+        let chunks = moduleStreamGate.commitIfOverdue(now: now)
+        enqueueCommittedChunks(chunks, to: streamController)
+
+        if moduleStreamGate.hasPendingText {
+            scheduleBufferedFlushIfNeeded(streamController: streamController, now: now)
+        } else {
+            cancelBufferedFlush()
+        }
+    }
+
+    func cancelBufferedFlush() {
+        bufferingFlushTask?.cancel()
+        bufferingFlushTask = nil
+    }
+
+    func shouldApplyTailImmediately(_ block: Block) -> Bool {
+        guard configuration.tail.flowTailUpdateCoalescingInterval > 0 else {
+            return true
         }
 
-        scheduleHeightUpdate()
+        switch block {
+        case .codeBlock, .table:
+            return true
+        case .blockquote, .heading, .htmlBlock, .orderedList, .paragraph, .thematicBreak, .unorderedList:
+            return false
+        }
     }
 }

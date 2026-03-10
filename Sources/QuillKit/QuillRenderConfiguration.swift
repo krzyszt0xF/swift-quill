@@ -1,8 +1,10 @@
 import Foundation
+import CoreGraphics
 
 public enum StreamingMode: String, CaseIterable, Sendable {
     case stableBlocks
     case hybridTail
+    case bufferedModules
 
     public var displayName: String {
         switch self {
@@ -10,6 +12,8 @@ public enum StreamingMode: String, CaseIterable, Sendable {
             return "Stable Blocks"
         case .hybridTail:
             return "Hybrid Tail"
+        case .bufferedModules:
+            return "Buffered Modules"
         }
     }
 }
@@ -37,20 +41,38 @@ public struct QuillRenderConfiguration: Equatable, Sendable {
     public var typewriter: TypewriterConfiguration
     public var layout: LayoutConfiguration
     public var tail: TailConfiguration
+    public var bufferedStream: BufferedStreamConfiguration
 
     public init(
         streamingMode: StreamingMode = .hybridTail,
         performanceProfile: PerformanceProfile = .balanced,
         typewriter: TypewriterConfiguration = .balanced,
         layout: LayoutConfiguration = .default,
-        tail: TailConfiguration = .default
+        tail: TailConfiguration = .default,
+        bufferedStream: BufferedStreamConfiguration = .default
     ) {
         self.streamingMode = streamingMode
         self.performanceProfile = performanceProfile
         self.typewriter = typewriter
         self.layout = layout
         self.tail = tail
+        self.bufferedStream = bufferedStream
     }
+}
+
+public struct BufferedStreamConfiguration: Equatable, Sendable {
+    public var minModuleLength: Int
+    public var maxBufferingDelay: TimeInterval
+
+    public init(
+        minModuleLength: Int = 50,
+        maxBufferingDelay: TimeInterval = 1.5
+    ) {
+        self.minModuleLength = max(1, minModuleLength)
+        self.maxBufferingDelay = max(0.1, maxBufferingDelay)
+    }
+
+    public static var `default`: Self { Self() }
 }
 
 public struct TypewriterConfiguration: Equatable, Sendable {
@@ -135,21 +157,35 @@ public struct TypewriterConfiguration: Equatable, Sendable {
 
 public struct LayoutConfiguration: Equatable, Sendable {
     public var heightMeasurementCoalescingInterval: TimeInterval
+    public var heightNotificationMinimumDelta: CGFloat
 
-    public init(heightMeasurementCoalescingInterval: TimeInterval) {
+    public init(
+        heightMeasurementCoalescingInterval: TimeInterval,
+        heightNotificationMinimumDelta: CGFloat = 8
+    ) {
         self.heightMeasurementCoalescingInterval = max(0, heightMeasurementCoalescingInterval)
+        self.heightNotificationMinimumDelta = max(0, heightNotificationMinimumDelta)
     }
 
     public static var `default`: Self {
-        Self(heightMeasurementCoalescingInterval: 0.016)
+        Self(
+            heightMeasurementCoalescingInterval: 0.016,
+            heightNotificationMinimumDelta: 8
+        )
     }
 
     public static var snappy: Self {
-        Self(heightMeasurementCoalescingInterval: 0.010)
+        Self(
+            heightMeasurementCoalescingInterval: 0.010,
+            heightNotificationMinimumDelta: 4
+        )
     }
 
     public static var longForm: Self {
-        Self(heightMeasurementCoalescingInterval: 0.020)
+        Self(
+            heightMeasurementCoalescingInterval: 0.020,
+            heightNotificationMinimumDelta: 10
+        )
     }
 }
 
@@ -161,17 +197,21 @@ public struct TailConfiguration: Equatable, Sendable {
     public var flowTailSentencePause: TimeInterval
     public var flowTailStartBufferCharacters: Int
     public var flowTailMaxStartDelay: TimeInterval
+    public var flowTailIdleTimeout: TimeInterval
+    public var flowTailUpdateCoalescingInterval: TimeInterval
     public var reuseFlowTailView: Bool
     public var reuseCodeTailView: Bool
 
     public init(
         animateFlowTailText: Bool = true,
         flowTailCharsPerStep: Int = 1,
-        flowTailBaseDuration: TimeInterval = 0.024,
+        flowTailBaseDuration: TimeInterval = 0.034,
         flowTailCommaPause: TimeInterval = 0.020,
         flowTailSentencePause: TimeInterval = 0.060,
-        flowTailStartBufferCharacters: Int = 18,
-        flowTailMaxStartDelay: TimeInterval = 0.28,
+        flowTailStartBufferCharacters: Int = 48,
+        flowTailMaxStartDelay: TimeInterval = 0.80,
+        flowTailIdleTimeout: TimeInterval = 1.20,
+        flowTailUpdateCoalescingInterval: TimeInterval = 0.05,
         reuseFlowTailView: Bool = true,
         reuseCodeTailView: Bool = true
     ) {
@@ -182,6 +222,8 @@ public struct TailConfiguration: Equatable, Sendable {
         self.flowTailSentencePause = max(0, flowTailSentencePause)
         self.flowTailStartBufferCharacters = max(0, flowTailStartBufferCharacters)
         self.flowTailMaxStartDelay = max(0, flowTailMaxStartDelay)
+        self.flowTailIdleTimeout = max(0.05, flowTailIdleTimeout)
+        self.flowTailUpdateCoalescingInterval = max(0, flowTailUpdateCoalescingInterval)
         self.reuseFlowTailView = reuseFlowTailView
         self.reuseCodeTailView = reuseCodeTailView
     }

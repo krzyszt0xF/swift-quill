@@ -30,19 +30,18 @@ public final class RevealSequencer {
 
     public var onComplete: (() -> Void)?
     public var onLayoutChange: (() -> Void)?
-    public var onRevealStep: (() -> Void)?
-    public private(set) var isRunning = false
+    private var isRunning = false
 
     private var currentTask: AnimationTask?
     private var currentTaskToken: UUID?
     private var currentTiming: ResolvedTiming
-    private var isPaused = false
     private var taskQueue: [AnimationTask] = []
     private var watchdogTask: Task<Void, Never>?
 
     private var typewriterConfiguration: TypewriterConfiguration = .balanced
     private var performanceProfile: PerformanceProfile = .balanced
-    private var speedOverride: ResolvedTiming?
+    private var fixedTimingOverride: ResolvedTiming?
+    private var minimumTextAnimationWindow: TimeInterval = 0
 
     public init() {
         currentTiming = ResolvedTiming(
@@ -57,54 +56,13 @@ public final class RevealSequencer {
 
     public func enqueue(view: UIView) {
         decompose(view: view, isRoot: true)
-        if !isRunning, !isPaused {
+        if !isRunning {
             runNext()
         }
-    }
-
-    public func finish() {
-        isPaused = false
-        completeAll()
-        onComplete?()
-    }
-
-    public func pause() {
-        isPaused = true
     }
 
     public func reset() {
         completeAll()
-        isPaused = false
-    }
-
-    public func resume() {
-        guard isPaused else { return }
-        isPaused = false
-
-        if let task = currentTask, let token = currentTaskToken {
-            feedWatchdog()
-            if case let .text(textView) = task {
-                typeNextBatch(textView: textView, from: textView.lastRevealedIndex, token: token, timing: currentTiming)
-            }
-        } else if !taskQueue.isEmpty {
-            runNext()
-        }
-    }
-
-    /// Legacy override path retained for compatibility with existing integrations.
-    public func updateSpeed(
-        charsPerStep: Int = 6,
-        baseDuration: TimeInterval = 0.012,
-        elementGapDuration: TimeInterval = 0.04
-    ) {
-        speedOverride = ResolvedTiming(
-            charsPerStep: charsPerStep,
-            baseDuration: baseDuration,
-            elementGapDuration: elementGapDuration,
-            commaPause: typewriterConfiguration.commaPause,
-            sentencePause: typewriterConfiguration.sentencePause,
-            jitterMax: typewriterConfiguration.jitterMax
-        )
     }
 
     public func applyConfiguration(
@@ -113,12 +71,19 @@ public final class RevealSequencer {
     ) {
         typewriterConfiguration = typewriter
         self.performanceProfile = performanceProfile
-        speedOverride = nil
+    }
+
+    public func setFixedTiming(_ timing: ResolvedTiming?) {
+        fixedTimingOverride = timing
+    }
+
+    public func setMinimumTextAnimationWindow(_ duration: TimeInterval) {
+        minimumTextAnimationWindow = max(0, duration)
     }
 
     func resolvedTiming(forPendingTaskCount pendingTaskCount: Int) -> ResolvedTiming {
-        if let speedOverride {
-            return speedOverride
+        if let fixedTimingOverride {
+            return fixedTimingOverride
         }
 
         let profileTiming: TypewriterConfiguration.QueueTiming
@@ -147,6 +112,28 @@ public final class RevealSequencer {
             commaPause: typewriterConfiguration.commaPause,
             sentencePause: typewriterConfiguration.sentencePause,
             jitterMax: typewriterConfiguration.jitterMax
+        )
+    }
+
+    func resolveTextTiming(_ timing: ResolvedTiming, totalCharacters: Int) -> ResolvedTiming {
+        guard minimumTextAnimationWindow > 0, totalCharacters > 0 else {
+            return timing
+        }
+
+        let requiredSteps = max(1, Int(ceil(minimumTextAnimationWindow / timing.baseDuration)))
+        let reducedCharsPerStep = max(1, Int(floor(Double(totalCharacters) / Double(requiredSteps))))
+        let effectiveCharsPerStep = min(timing.charsPerStep, reducedCharsPerStep)
+        let effectiveStepCount = max(1, Int(ceil(Double(totalCharacters) / Double(effectiveCharsPerStep))))
+        let minimumBaseDuration = minimumTextAnimationWindow / Double(effectiveStepCount)
+        let effectiveBaseDuration = max(timing.baseDuration, minimumBaseDuration)
+
+        return ResolvedTiming(
+            charsPerStep: effectiveCharsPerStep,
+            baseDuration: effectiveBaseDuration,
+            elementGapDuration: timing.elementGapDuration,
+            commaPause: timing.commaPause,
+            sentencePause: timing.sentencePause,
+            jitterMax: timing.jitterMax
         )
     }
 }
@@ -233,11 +220,9 @@ private extension RevealSequencer {
     }
 
     func runNext() {
-        guard !isPaused, !taskQueue.isEmpty else {
+        guard !taskQueue.isEmpty else {
             isRunning = false
-            if taskQueue.isEmpty {
-                onComplete?()
-            }
+            onComplete?()
             return
         }
 
@@ -280,7 +265,8 @@ private extension RevealSequencer {
             if textView.totalCharacterCount == 0 {
                 finishCurrentTask(withGap: false)
             } else {
-                typeNextBatch(textView: textView, from: 0, token: token, timing: currentTiming)
+                let textTiming = resolveTextTiming(currentTiming, totalCharacters: textView.totalCharacterCount)
+                typeNextBatch(textView: textView, from: 0, token: token, timing: textTiming)
             }
         }
     }
@@ -328,7 +314,7 @@ private extension RevealSequencer {
         token: UUID,
         timing: ResolvedTiming
     ) {
-        guard !isPaused, currentTaskToken == token else { return }
+        guard currentTaskToken == token else { return }
         feedWatchdog()
 
         let total = textView.totalCharacterCount
@@ -342,7 +328,6 @@ private extension RevealSequencer {
         textView.revealCharacters(upTo: nextIndex)
 
         onLayoutChange?()
-        onRevealStep?()
 
         let delay = calculateDelay(textView: textView, from: currentIndex, to: nextIndex, timing: timing)
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in

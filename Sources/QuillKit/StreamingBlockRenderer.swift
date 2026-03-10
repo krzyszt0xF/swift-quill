@@ -133,14 +133,12 @@ public final class StreamingBlockRenderer {
     func promoteTailIfMatching(_ block: Block) -> UIView? {
         guard let tailView,
               let tailBlock,
-              tailBlock == block
+              isPromotionCompatible(tail: tailBlock, frozen: block)
         else {
             return nil
         }
 
-        if let textFlowView = tailView as? TextFlowView {
-            textFlowView.finishReveal()
-        }
+        prepareTailForPromotion(tailView: tailView, tailBlock: tailBlock, frozenBlock: block)
 
         ensureTailIsLast()
         self.tailView = nil
@@ -190,7 +188,8 @@ private extension StreamingBlockRenderer {
                 commaPause: tailConfiguration.flowTailCommaPause,
                 sentencePause: tailConfiguration.flowTailSentencePause,
                 startBufferCharacters: tailConfiguration.flowTailStartBufferCharacters,
-                maxStartDelay: tailConfiguration.flowTailMaxStartDelay
+                maxStartDelay: tailConfiguration.flowTailMaxStartDelay,
+                idleTimeout: tailConfiguration.flowTailIdleTimeout
             )
         } else {
             textFlowView.configure(with: attributedString)
@@ -261,6 +260,65 @@ private extension StreamingBlockRenderer {
     func applyStructuralSpacing(for view: UIView) {
         if view is CodeBlockView || view is PlaceholderBlockView {
             stackView.setCustomSpacing(12, after: view)
+        }
+    }
+
+    func isPromotionCompatible(tail: Block, frozen: Block) -> Bool {
+        if tail == frozen {
+            return true
+        }
+
+        switch (tail, frozen) {
+        case let (.codeBlock(tailLanguage, tailCode), .codeBlock(frozenLanguage, frozenCode)):
+            return tailLanguage == frozenLanguage
+                && (frozenCode.hasPrefix(tailCode) || tailCode.hasPrefix(frozenCode))
+        case let (.table(_, tailHeader, tailRows), .table(_, frozenHeader, frozenRows)):
+            return tailHeader.cells.count == frozenHeader.cells.count
+                && frozenRows.count >= tailRows.count
+        default:
+            return isFlowPromotionCompatible(tail: tail, frozen: frozen)
+        }
+    }
+
+    func isFlowPromotionCompatible(tail: Block, frozen: Block) -> Bool {
+        guard let tailFlow = flowAttributedString(from: tail)?.string else { return false }
+        guard let frozenFlow = flowAttributedString(from: frozen)?.string else { return false }
+
+        let tailText = tailFlow.trimmingCharacters(in: .whitespacesAndNewlines)
+        let frozenText = frozenFlow.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard tailText.isEmpty == false, frozenText.isEmpty == false else { return false }
+
+        guard frozenText.hasPrefix(tailText) || tailText.hasPrefix(frozenText) else {
+            return false
+        }
+
+        let overlapLength = min(tailText.count, frozenText.count)
+        return overlapLength >= 12 || tailText == frozenText
+    }
+
+    func prepareTailForPromotion(
+        tailView: UIView,
+        tailBlock: Block,
+        frozenBlock: Block
+    ) {
+        switch (tailBlock, frozenBlock) {
+        case (.codeBlock, let .codeBlock(_, frozenCode)):
+            if let codeBlockView = tailView as? CodeBlockView {
+                codeBlockView.updateCode(frozenCode)
+            }
+        case let (.table(_, _, _), .table(_, header, rows)):
+            if let placeholder = tailView as? PlaceholderBlockView {
+                placeholder.configureTable(header: header, rowCount: rows.count)
+            }
+        default:
+            if let textFlowView = tailView as? TextFlowView,
+               let attributed = flowAttributedString(from: frozenBlock) {
+                textFlowView.configure(with: attributed)
+            }
+        }
+
+        if let textFlowView = tailView as? TextFlowView {
+            textFlowView.finishReveal()
         }
     }
 

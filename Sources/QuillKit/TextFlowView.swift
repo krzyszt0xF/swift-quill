@@ -23,8 +23,8 @@ final class TextFlowView: UIView {
     private var streamingProfile: StreamingProfile?
     private var pendingStreamingStartTime: TimeInterval?
     private var lastStreamingUpdateTime: TimeInterval?
-    private var averagedStreamInterval: TimeInterval?
     private var previousStreamingTargetLength = 0
+    private var streamingIdleTimeout: TimeInterval = 0.30
 
     override var intrinsicContentSize: CGSize {
         CGSize(width: UIView.noIntrinsicMetric, height: heightConstraint?.constant ?? 0)
@@ -90,7 +90,8 @@ final class TextFlowView: UIView {
         commaPause: TimeInterval,
         sentencePause: TimeInterval,
         startBufferCharacters: Int = 0,
-        maxStartDelay: TimeInterval = 0
+        maxStartDelay: TimeInterval = 0,
+        idleTimeout: TimeInterval = 0.30
     ) {
         guard shouldAnimateStreamingUpdate(with: attributedString) else {
             configure(with: attributedString)
@@ -111,16 +112,13 @@ final class TextFlowView: UIView {
         let resolvedSentencePause = max(0, sentencePause)
         let resolvedStartBufferCharacters = max(0, startBufferCharacters)
         let resolvedMaxStartDelay = max(0, maxStartDelay)
-        let previousTargetLength = max(previousStreamingTargetLength, visibleCharacterCount)
-        let appendedCharacters = max(1, attributedString.length - previousTargetLength)
+        let resolvedIdleTimeout = max(0.05, idleTimeout)
         previousStreamingTargetLength = attributedString.length
+        streamingIdleTimeout = resolvedIdleTimeout
 
         streamingProfile = StreamingProfile(
             charsPerStep: resolvedCharsPerStep,
-            baseDuration: resolveAdaptiveBaseDuration(
-                baseDuration: resolvedBaseDuration,
-                appendedCharacters: appendedCharacters
-            ),
+            baseDuration: resolvedBaseDuration,
             commaPause: resolvedCommaPause,
             sentencePause: resolvedSentencePause
         )
@@ -204,12 +202,8 @@ final class TextFlowView: UIView {
 private extension TextFlowView {
     static let commaCharacters: Set<unichar> = [0x002C, 0xFF0C, 0x3001]
     static let sentenceCharacters: Set<unichar> = [0x002E, 0x0021, 0x003F, 0x000A]
-    static let streamIntervalSmoothingFactor = 0.35
-    static let minimumAnimationWindow: TimeInterval = 0.14
-    static let maximumAnimationWindow: TimeInterval = 0.45
-    static let maximumAdaptiveBaseDuration: TimeInterval = 0.080
     static let idleRevealPollInterval: TimeInterval = 0.016
-    static let idleRevealTimeout: TimeInterval = 0.30
+    static let defaultIdleRevealTimeout: TimeInterval = 0.30
 
     func resetStreamingState(clearTiming: Bool) {
         streamingRevealTask?.cancel()
@@ -221,37 +215,13 @@ private extension TextFlowView {
 
         if clearTiming {
             lastStreamingUpdateTime = nil
-            averagedStreamInterval = nil
             previousStreamingTargetLength = 0
+            streamingIdleTimeout = Self.defaultIdleRevealTimeout
         }
     }
 
     func updateStreamCadence(now: TimeInterval) {
-        if let lastStreamingUpdateTime {
-            let interval = max(0.001, now - lastStreamingUpdateTime)
-            if let averagedStreamInterval {
-                self.averagedStreamInterval = averagedStreamInterval + (interval - averagedStreamInterval) * Self.streamIntervalSmoothingFactor
-            } else {
-                averagedStreamInterval = interval
-            }
-        }
-
         lastStreamingUpdateTime = now
-    }
-
-    func resolveAdaptiveBaseDuration(
-        baseDuration: TimeInterval,
-        appendedCharacters: Int
-    ) -> TimeInterval {
-        guard let averagedStreamInterval else { return baseDuration }
-
-        let targetWindow = min(
-            max(averagedStreamInterval * 0.9, Self.minimumAnimationWindow),
-            Self.maximumAnimationWindow
-        )
-        let perCharacter = targetWindow / Double(max(1, appendedCharacters))
-        let clamped = min(perCharacter, Self.maximumAdaptiveBaseDuration)
-        return max(baseDuration, clamped)
     }
 
     func installStreamingTarget(_ attributedString: NSAttributedString, visibleCharacterCount: Int) {
@@ -337,7 +307,7 @@ private extension TextFlowView {
                 if self.lastRevealedIndex >= totalCharacters {
                     let now = Date.timeIntervalSinceReferenceDate
                     let idleSinceLastUpdate = now - (self.lastStreamingUpdateTime ?? now)
-                    if idleSinceLastUpdate >= Self.idleRevealTimeout {
+                    if idleSinceLastUpdate >= self.streamingIdleTimeout {
                         self.originalAttributedString = nil
                         self.workingAttributedString = nil
                         self.streamingProfile = nil

@@ -147,6 +147,21 @@ struct StreamingRendererTests {
         #expect(renderer.stackView.arrangedSubviews[1] is CodeBlockView)
     }
 
+    @Test("Compatible flow tail block can be promoted without exact equality")
+    func compatibleTailPromotionKeepsView() throws {
+        let renderer = StreamingBlockRenderer()
+        let previewBlock: Block = .paragraph(content: [.text("mutable frontier preview text")])
+        let frozenBlock: Block = .paragraph(content: [.text("mutable frontier preview text with closing context")])
+
+        renderer.updateTail(block: previewBlock)
+        let previewView = try #require(renderer.stackView.arrangedSubviews.last)
+
+        let promoted = renderer.promoteTailIfMatching(frozenBlock)
+        #expect(promoted === previewView)
+        #expect(renderer.stackView.arrangedSubviews.count == 1)
+        #expect(renderer.stackView.arrangedSubviews[0] === previewView)
+    }
+
     @Test("Reset clears all views and state")
     func resetClearsAll() {
         let renderer = StreamingBlockRenderer()
