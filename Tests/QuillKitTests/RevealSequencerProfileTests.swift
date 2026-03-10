@@ -98,6 +98,23 @@ struct RevealSequencerProfileTests {
         #expect(approximatelyEqual(low.elementGapDuration, 0.04))
     }
 
+    @Test("Fade configuration does not affect resolved pacing")
+    func fadeConfigurationDoesNotAffectResolvedTiming() {
+        let sequencer = RevealSequencer()
+        let baseline = TypewriterConfiguration.balanced
+        var withFade = TypewriterConfiguration.balanced
+        withFade.textRevealInitialAlpha = 0.05
+        withFade.textRevealFadeDuration = 0.30
+
+        sequencer.applyConfiguration(typewriter: baseline, performanceProfile: .balanced)
+        let baselineTiming = sequencer.resolvedTiming(forPendingTaskCount: 6)
+
+        sequencer.applyConfiguration(typewriter: withFade, performanceProfile: .balanced)
+        let fadeTiming = sequencer.resolvedTiming(forPendingTaskCount: 6)
+
+        #expect(baselineTiming == fadeTiming)
+    }
+
     @Test("Minimum text animation window slows down short reveals deterministically")
     func minimumTextAnimationWindow() {
         let sequencer = RevealSequencer()

@@ -8,6 +8,15 @@ final class TextFlowView: UIView {
         var sentencePause: TimeInterval
     }
 
+    private struct RevealFadeConfiguration {
+        var initialAlpha: CGFloat = 0.2
+        var duration: TimeInterval = 0.08
+
+        var isEnabled: Bool {
+            initialAlpha < 1 && duration > 0
+        }
+    }
+
     private(set) var lastRevealedIndex = 0
     private(set) var originalAttributedString: NSAttributedString?
 
@@ -25,6 +34,9 @@ final class TextFlowView: UIView {
     private var lastStreamingUpdateTime: TimeInterval?
     private var previousStreamingTargetLength = 0
     private var streamingIdleTimeout: TimeInterval = 0.30
+    private var revealFadeConfiguration = RevealFadeConfiguration()
+    private var revealFadeTasks: [UUID: Task<Void, Never>] = [:]
+    private var revealFadeGeneration = 0
 
     override var intrinsicContentSize: CGSize {
         CGSize(width: UIView.noIntrinsicMetric, height: heightConstraint?.constant ?? 0)
@@ -51,6 +63,10 @@ final class TextFlowView: UIView {
     deinit {
         streamingRevealTask?.cancel()
         deferredStreamingStartTask?.cancel()
+        for task in revealFadeTasks.values {
+            task.cancel()
+        }
+        revealFadeTasks.removeAll()
     }
 
     override func draw(_ rect: CGRect) {
@@ -91,7 +107,9 @@ final class TextFlowView: UIView {
         sentencePause: TimeInterval,
         startBufferCharacters: Int = 0,
         maxStartDelay: TimeInterval = 0,
-        idleTimeout: TimeInterval = 0.30
+        idleTimeout: TimeInterval = 0.30,
+        revealInitialAlpha: CGFloat = 0.2,
+        revealFadeDuration: TimeInterval = 0.08
     ) {
         guard shouldAnimateStreamingUpdate(with: attributedString) else {
             configure(with: attributedString)
@@ -113,8 +131,14 @@ final class TextFlowView: UIView {
         let resolvedStartBufferCharacters = max(0, startBufferCharacters)
         let resolvedMaxStartDelay = max(0, maxStartDelay)
         let resolvedIdleTimeout = max(0.05, idleTimeout)
+        let resolvedRevealInitialAlpha = min(max(0, revealInitialAlpha), 1)
+        let resolvedRevealFadeDuration = max(0, revealFadeDuration)
         previousStreamingTargetLength = attributedString.length
         streamingIdleTimeout = resolvedIdleTimeout
+        revealFadeConfiguration = RevealFadeConfiguration(
+            initialAlpha: resolvedRevealInitialAlpha,
+            duration: resolvedRevealFadeDuration
+        )
 
         streamingProfile = StreamingProfile(
             charsPerStep: resolvedCharsPerStep,
@@ -182,6 +206,13 @@ final class TextFlowView: UIView {
         lastRevealedIndex = 0
     }
 
+    func configureRevealFade(initialAlpha: CGFloat, duration: TimeInterval) {
+        revealFadeConfiguration = RevealFadeConfiguration(
+            initialAlpha: min(max(0, initialAlpha), 1),
+            duration: max(0, duration)
+        )
+    }
+
     func revealCharacters(upTo index: Int) {
         guard let originalAttributedString,
               let workingAttributedString,
@@ -189,13 +220,30 @@ final class TextFlowView: UIView {
               index <= originalAttributedString.length else { return }
 
         let revealRange = NSRange(location: lastRevealedIndex, length: index - lastRevealedIndex)
-        originalAttributedString.enumerateAttributes(in: revealRange) { attributes, range, _ in
-            workingAttributedString.setAttributes(attributes, range: range)
+        if revealFadeConfiguration.isEnabled {
+            applyAttributes(in: revealRange, alphaMultiplier: revealFadeConfiguration.initialAlpha)
+        } else {
+            applyAttributes(in: revealRange, alphaMultiplier: nil)
         }
 
         textContentStorage.attributedString = workingAttributedString
         lastRevealedIndex = index
         setNeedsDisplay()
+
+        if revealFadeConfiguration.isEnabled {
+            scheduleRevealFade(for: revealRange, generation: revealFadeGeneration)
+        }
+    }
+
+    func displayedForegroundColor(at index: Int) -> UIColor? {
+        guard let attributedString = textContentStorage.attributedString,
+              index >= 0,
+              index < attributedString.length
+        else {
+            return nil
+        }
+
+        return attributedString.attribute(.foregroundColor, at: index, effectiveRange: nil) as? UIColor
     }
 }
 
@@ -212,6 +260,7 @@ private extension TextFlowView {
         deferredStreamingStartTask = nil
         streamingProfile = nil
         pendingStreamingStartTime = nil
+        cancelRevealFadeTasks()
 
         if clearTiming {
             lastStreamingUpdateTime = nil
@@ -225,6 +274,7 @@ private extension TextFlowView {
     }
 
     func installStreamingTarget(_ attributedString: NSAttributedString, visibleCharacterCount: Int) {
+        cancelRevealFadeTasks()
         let clampedVisibleCount = min(max(0, visibleCharacterCount), attributedString.length)
         let workingString = NSMutableAttributedString(attributedString: attributedString)
         hideCharacters(
@@ -238,6 +288,73 @@ private extension TextFlowView {
         textContentStorage.attributedString = workingString
         setNeedsLayout()
         setNeedsDisplay()
+    }
+
+    func cancelRevealFadeTasks() {
+        revealFadeGeneration &+= 1
+        for task in revealFadeTasks.values {
+            task.cancel()
+        }
+        revealFadeTasks.removeAll()
+    }
+
+    func applyAttributes(in revealRange: NSRange, alphaMultiplier: CGFloat?) {
+        guard let originalAttributedString,
+              let workingAttributedString else {
+            return
+        }
+
+        originalAttributedString.enumerateAttributes(in: revealRange) { attributes, range, _ in
+            var resolvedAttributes = attributes
+            if let alphaMultiplier {
+                let baseColor = (attributes[.foregroundColor] as? UIColor) ?? .label
+                resolvedAttributes[.foregroundColor] = baseColor.withAlphaComponent(baseColor.cgColor.alpha * alphaMultiplier)
+            }
+            workingAttributedString.setAttributes(resolvedAttributes, range: range)
+        }
+    }
+
+    func scheduleRevealFade(for revealRange: NSRange, generation: Int) {
+        let midpointAlpha = revealFadeConfiguration.initialAlpha + ((1 - revealFadeConfiguration.initialAlpha) * 0.5)
+        let stepDelay = revealFadeConfiguration.duration / 2
+        let taskID = UUID()
+
+        let task = Task { @MainActor [weak self] in
+            defer { self?.revealFadeTasks[taskID] = nil }
+
+            if stepDelay > 0 {
+                try? await Task.sleep(for: .seconds(stepDelay))
+            }
+
+            guard let self,
+                  !Task.isCancelled,
+                  self.revealFadeGeneration == generation else {
+                return
+            }
+
+            self.applyAttributes(in: revealRange, alphaMultiplier: midpointAlpha)
+            if let workingAttributedString = self.workingAttributedString {
+                self.textContentStorage.attributedString = workingAttributedString
+                self.setNeedsDisplay()
+            }
+
+            if stepDelay > 0 {
+                try? await Task.sleep(for: .seconds(stepDelay))
+            }
+
+            guard !Task.isCancelled,
+                  self.revealFadeGeneration == generation else {
+                return
+            }
+
+            self.applyAttributes(in: revealRange, alphaMultiplier: nil)
+            if let workingAttributedString = self.workingAttributedString {
+                self.textContentStorage.attributedString = workingAttributedString
+                self.setNeedsDisplay()
+            }
+        }
+
+        revealFadeTasks[taskID] = task
     }
 
     func shouldDeferStreamingStart(

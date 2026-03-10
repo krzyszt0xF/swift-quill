@@ -189,7 +189,9 @@ private extension StreamingBlockRenderer {
                 sentencePause: tailConfiguration.flowTailSentencePause,
                 startBufferCharacters: tailConfiguration.flowTailStartBufferCharacters,
                 maxStartDelay: tailConfiguration.flowTailMaxStartDelay,
-                idleTimeout: tailConfiguration.flowTailIdleTimeout
+                idleTimeout: tailConfiguration.flowTailIdleTimeout,
+                revealInitialAlpha: tailConfiguration.flowTailRevealInitialAlpha,
+                revealFadeDuration: tailConfiguration.flowTailRevealFadeDuration
             )
         } else {
             textFlowView.configure(with: attributedString)

@@ -100,6 +100,8 @@ public struct TypewriterConfiguration: Equatable, Sendable {
     public var commaPause: TimeInterval
     public var sentencePause: TimeInterval
     public var jitterMax: TimeInterval
+    public var textRevealInitialAlpha: CGFloat
+    public var textRevealFadeDuration: TimeInterval
 
     public init(
         lowQueue: QueueTiming,
@@ -109,7 +111,9 @@ public struct TypewriterConfiguration: Equatable, Sendable {
         highQueueLowerBound: Int = 9,
         commaPause: TimeInterval,
         sentencePause: TimeInterval,
-        jitterMax: TimeInterval = 0.005
+        jitterMax: TimeInterval = 0.005,
+        textRevealInitialAlpha: CGFloat = 0.2,
+        textRevealFadeDuration: TimeInterval = 0.08
     ) {
         self.lowQueue = lowQueue
         self.mediumQueue = mediumQueue
@@ -119,6 +123,8 @@ public struct TypewriterConfiguration: Equatable, Sendable {
         self.commaPause = max(0, commaPause)
         self.sentencePause = max(0, sentencePause)
         self.jitterMax = max(0, jitterMax)
+        self.textRevealInitialAlpha = min(max(0, textRevealInitialAlpha), 1)
+        self.textRevealFadeDuration = max(0, textRevealFadeDuration)
     }
 
     public static var snappy: Self {
@@ -198,6 +204,8 @@ public struct TailConfiguration: Equatable, Sendable {
     public var flowTailStartBufferCharacters: Int
     public var flowTailMaxStartDelay: TimeInterval
     public var flowTailIdleTimeout: TimeInterval
+    public var flowTailRevealInitialAlpha: CGFloat
+    public var flowTailRevealFadeDuration: TimeInterval
     public var flowTailUpdateCoalescingInterval: TimeInterval
     public var reuseFlowTailView: Bool
     public var reuseCodeTailView: Bool
@@ -211,6 +219,8 @@ public struct TailConfiguration: Equatable, Sendable {
         flowTailStartBufferCharacters: Int = 48,
         flowTailMaxStartDelay: TimeInterval = 0.80,
         flowTailIdleTimeout: TimeInterval = 1.20,
+        flowTailRevealInitialAlpha: CGFloat = 0.2,
+        flowTailRevealFadeDuration: TimeInterval = 0.08,
         flowTailUpdateCoalescingInterval: TimeInterval = 0.05,
         reuseFlowTailView: Bool = true,
         reuseCodeTailView: Bool = true
@@ -223,6 +233,8 @@ public struct TailConfiguration: Equatable, Sendable {
         self.flowTailStartBufferCharacters = max(0, flowTailStartBufferCharacters)
         self.flowTailMaxStartDelay = max(0, flowTailMaxStartDelay)
         self.flowTailIdleTimeout = max(0.05, flowTailIdleTimeout)
+        self.flowTailRevealInitialAlpha = min(max(0, flowTailRevealInitialAlpha), 1)
+        self.flowTailRevealFadeDuration = max(0, flowTailRevealFadeDuration)
         self.flowTailUpdateCoalescingInterval = max(0, flowTailUpdateCoalescingInterval)
         self.reuseFlowTailView = reuseFlowTailView
         self.reuseCodeTailView = reuseCodeTailView

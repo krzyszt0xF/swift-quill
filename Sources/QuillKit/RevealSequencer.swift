@@ -154,6 +154,10 @@ private extension RevealSequencer {
                 textFlow.alpha = 0
                 taskQueue.append(.show(textFlow))
             }
+            textFlow.configureRevealFade(
+                initialAlpha: typewriterConfiguration.textRevealInitialAlpha,
+                duration: typewriterConfiguration.textRevealFadeDuration
+            )
             textFlow.prepareForReveal()
             taskQueue.append(.text(textFlow))
             return
