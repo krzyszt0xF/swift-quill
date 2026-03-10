@@ -154,10 +154,34 @@ public struct LayoutConfiguration: Equatable, Sendable {
 }
 
 public struct TailConfiguration: Equatable, Sendable {
+    public var animateFlowTailText: Bool
+    public var flowTailCharsPerStep: Int
+    public var flowTailBaseDuration: TimeInterval
+    public var flowTailCommaPause: TimeInterval
+    public var flowTailSentencePause: TimeInterval
+    public var flowTailStartBufferCharacters: Int
+    public var flowTailMaxStartDelay: TimeInterval
     public var reuseFlowTailView: Bool
     public var reuseCodeTailView: Bool
 
-    public init(reuseFlowTailView: Bool = true, reuseCodeTailView: Bool = true) {
+    public init(
+        animateFlowTailText: Bool = true,
+        flowTailCharsPerStep: Int = 1,
+        flowTailBaseDuration: TimeInterval = 0.024,
+        flowTailCommaPause: TimeInterval = 0.020,
+        flowTailSentencePause: TimeInterval = 0.060,
+        flowTailStartBufferCharacters: Int = 18,
+        flowTailMaxStartDelay: TimeInterval = 0.28,
+        reuseFlowTailView: Bool = true,
+        reuseCodeTailView: Bool = true
+    ) {
+        self.animateFlowTailText = animateFlowTailText
+        self.flowTailCharsPerStep = max(1, flowTailCharsPerStep)
+        self.flowTailBaseDuration = max(0.001, flowTailBaseDuration)
+        self.flowTailCommaPause = max(0, flowTailCommaPause)
+        self.flowTailSentencePause = max(0, flowTailSentencePause)
+        self.flowTailStartBufferCharacters = max(0, flowTailStartBufferCharacters)
+        self.flowTailMaxStartDelay = max(0, flowTailMaxStartDelay)
         self.reuseFlowTailView = reuseFlowTailView
         self.reuseCodeTailView = reuseCodeTailView
     }

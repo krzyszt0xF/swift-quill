@@ -1,7 +1,6 @@
 import QuillCore
 import UIKit
 
-/// Incrementally renders streaming markdown using a frozen-prefix + mutable-tail strategy.
 @MainActor
 public final class StreamingBlockRenderer {
     public let stackView: UIStackView
@@ -68,7 +67,11 @@ public final class StreamingBlockRenderer {
         case .flow:
             if tailConfiguration.reuseFlowTailView,
                let existingTailView = tailView as? TextFlowView {
-                applyFlow(block: block, to: existingTailView)
+                applyFlow(
+                    block: block,
+                    to: existingTailView,
+                    animateText: tailConfiguration.animateFlowTailText
+                )
                 tailDescriptor = descriptor
                 tailBlock = block
                 ensureTailIsLast()
@@ -104,7 +107,7 @@ public final class StreamingBlockRenderer {
             }
         }
 
-        let view = makeTailView(for: block)
+        let view = makeTailView(for: block, animateFlowText: tailConfiguration.animateFlowTailText)
         replaceTail(with: view, descriptor: descriptor, sourceBlock: block)
     }
 
@@ -113,6 +116,10 @@ public final class StreamingBlockRenderer {
             tailDescriptor = nil
             tailBlock = nil
             return
+        }
+
+        if let textFlowView = tailView as? TextFlowView {
+            textFlowView.finishReveal()
         }
 
         stackView.removeArrangedSubview(tailView)
@@ -129,6 +136,10 @@ public final class StreamingBlockRenderer {
               tailBlock == block
         else {
             return nil
+        }
+
+        if let textFlowView = tailView as? TextFlowView {
+            textFlowView.finishReveal()
         }
 
         ensureTailIsLast()
@@ -168,23 +179,43 @@ private extension StreamingBlockRenderer {
         return views
     }
 
-    func applyFlow(block: Block, to textFlowView: TextFlowView) {
-        let nodes = FlowSegmentBuilder.build(from: [block])
-        guard case let .flow(segment) = nodes.first else { return }
+    func applyFlow(block: Block, to textFlowView: TextFlowView, animateText: Bool) {
+        guard let attributedString = flowAttributedString(from: block) else { return }
 
-        textFlowView.configure(with: AttributedStringBuilder.build(from: segment))
+        if animateText {
+            textFlowView.configureStreaming(
+                with: attributedString,
+                charsPerStep: tailConfiguration.flowTailCharsPerStep,
+                baseDuration: tailConfiguration.flowTailBaseDuration,
+                commaPause: tailConfiguration.flowTailCommaPause,
+                sentencePause: tailConfiguration.flowTailSentencePause,
+                startBufferCharacters: tailConfiguration.flowTailStartBufferCharacters,
+                maxStartDelay: tailConfiguration.flowTailMaxStartDelay
+            )
+        } else {
+            textFlowView.configure(with: attributedString)
+        }
     }
 
-    func makeTailView(for block: Block) -> UIView {
+    func flowAttributedString(from block: Block) -> NSAttributedString? {
+        let nodes = FlowSegmentBuilder.build(from: [block])
+        guard case let .flow(segment) = nodes.first else {
+            return nil
+        }
+
+        return AttributedStringBuilder.build(from: segment)
+    }
+
+    func makeTailView(for block: Block, animateFlowText: Bool) -> UIView {
         let nodes = FlowSegmentBuilder.build(from: [block])
         guard let node = nodes.first else {
             return UIView()
         }
 
         let view = BlockRenderer.view(for: node)
-        if case let .flow(segment) = node,
+        if case .flow = node,
            let textFlowView = view as? TextFlowView {
-            textFlowView.configure(with: AttributedStringBuilder.build(from: segment))
+            applyFlow(block: block, to: textFlowView, animateText: animateFlowText)
         }
 
         return view
