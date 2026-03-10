@@ -12,6 +12,8 @@ final class CodeBlockView: UIView {
         clipsToBounds = true
         layer.cornerRadius = 8
         translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.defaultLow, for: .vertical)
+        setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 
         setupScrollView()
         setupTextView()
@@ -35,8 +37,7 @@ final class CodeBlockView: UIView {
     }
 
     func configure(language: String?, code: String) {
-        let trimmed = code.hasSuffix("\n") ? String(code.dropLast()) : code
-        textView.text = trimmed
+        textView.text = trimmedCode(code)
         textView.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
         textView.textColor = .label
 
@@ -49,12 +50,15 @@ final class CodeBlockView: UIView {
     }
 
     func updateCode(_ code: String) {
-        let trimmed = code.hasSuffix("\n") ? String(code.dropLast()) : code
-        textView.text = trimmed
+        textView.text = trimmedCode(code)
     }
 }
 
 private extension CodeBlockView {
+    func trimmedCode(_ code: String) -> String {
+        code.hasSuffix("\n") ? String(code.dropLast()) : code
+    }
+
     func setupLanguagePill() {
         languagePill.backgroundColor = .systemGray5
         languagePill.clipsToBounds = true
@@ -75,6 +79,8 @@ private extension CodeBlockView {
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.showsVerticalScrollIndicator = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.setContentHuggingPriority(.defaultLow, for: .vertical)
+        scrollView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 
         addSubview(scrollView)
         NSLayoutConstraint.activate([
@@ -94,11 +100,15 @@ private extension CodeBlockView {
         textView.textContainer.widthTracksTextView = false
         textView.textContainerInset = .zero
         textView.translatesAutoresizingMaskIntoConstraints = false
+        textView.setContentHuggingPriority(.defaultLow, for: .vertical)
+        textView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 
         scrollView.addSubview(textView)
+        let minHeight = textView.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.frameLayoutGuide.heightAnchor)
+        minHeight.priority = .defaultLow
         NSLayoutConstraint.activate([
             textView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-            textView.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
+            minHeight,
             textView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
             textView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             textView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),

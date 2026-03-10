@@ -167,6 +167,7 @@ private extension RevealSequencer {
                 view.alpha = 1
             }) { [weak self] _ in
                 guard let self, self.currentTaskToken == token else { return }
+                self.onLayoutChange?()
                 self.finishCurrentTask(withGap: true)
             }
 
