@@ -3,21 +3,57 @@ import UIKit
 /// Orchestrates sequential reveal animation for streamed markdown views.
 @MainActor
 public final class RevealSequencer {
+    public struct ResolvedTiming: Equatable, Sendable {
+        public var charsPerStep: Int
+        public var baseDuration: TimeInterval
+        public var elementGapDuration: TimeInterval
+        public var commaPause: TimeInterval
+        public var sentencePause: TimeInterval
+        public var jitterMax: TimeInterval
+
+        public init(
+            charsPerStep: Int,
+            baseDuration: TimeInterval,
+            elementGapDuration: TimeInterval,
+            commaPause: TimeInterval,
+            sentencePause: TimeInterval,
+            jitterMax: TimeInterval
+        ) {
+            self.charsPerStep = max(1, charsPerStep)
+            self.baseDuration = max(0.001, baseDuration)
+            self.elementGapDuration = max(0, elementGapDuration)
+            self.commaPause = max(0, commaPause)
+            self.sentencePause = max(0, sentencePause)
+            self.jitterMax = max(0, jitterMax)
+        }
+    }
+
     public var onComplete: (() -> Void)?
     public var onLayoutChange: (() -> Void)?
     public var onRevealStep: (() -> Void)?
     public private(set) var isRunning = false
 
-    private var baseDuration: TimeInterval = 0.012
-    private var charsPerStep = 6
     private var currentTask: AnimationTask?
     private var currentTaskToken: UUID?
-    private var elementGapDuration: TimeInterval = 0.04
+    private var currentTiming: ResolvedTiming
     private var isPaused = false
     private var taskQueue: [AnimationTask] = []
     private var watchdogTask: Task<Void, Never>?
 
-    public init() {}
+    private var typewriterConfiguration: TypewriterConfiguration = .balanced
+    private var performanceProfile: PerformanceProfile = .balanced
+    private var speedOverride: ResolvedTiming?
+
+    public init() {
+        currentTiming = ResolvedTiming(
+            charsPerStep: 6,
+            baseDuration: 0.012,
+            elementGapDuration: 0.03,
+            commaPause: 0.015,
+            sentencePause: 0.045,
+            jitterMax: 0.005
+        )
+    }
 
     public func enqueue(view: UIView) {
         decompose(view: view, isRoot: true)
@@ -48,21 +84,70 @@ public final class RevealSequencer {
         if let task = currentTask, let token = currentTaskToken {
             feedWatchdog()
             if case let .text(textView) = task {
-                typeNextBatch(textView: textView, from: textView.lastRevealedIndex, token: token)
+                typeNextBatch(textView: textView, from: textView.lastRevealedIndex, token: token, timing: currentTiming)
             }
         } else if !taskQueue.isEmpty {
             runNext()
         }
     }
 
+    /// Legacy override path retained for compatibility with existing integrations.
     public func updateSpeed(
         charsPerStep: Int = 6,
         baseDuration: TimeInterval = 0.012,
         elementGapDuration: TimeInterval = 0.04
     ) {
-        self.baseDuration = max(0.001, baseDuration)
-        self.charsPerStep = max(1, charsPerStep)
-        self.elementGapDuration = max(0, elementGapDuration)
+        speedOverride = ResolvedTiming(
+            charsPerStep: charsPerStep,
+            baseDuration: baseDuration,
+            elementGapDuration: elementGapDuration,
+            commaPause: typewriterConfiguration.commaPause,
+            sentencePause: typewriterConfiguration.sentencePause,
+            jitterMax: typewriterConfiguration.jitterMax
+        )
+    }
+
+    public func applyConfiguration(
+        typewriter: TypewriterConfiguration,
+        performanceProfile: PerformanceProfile
+    ) {
+        typewriterConfiguration = typewriter
+        self.performanceProfile = performanceProfile
+        speedOverride = nil
+    }
+
+    func resolvedTiming(forPendingTaskCount pendingTaskCount: Int) -> ResolvedTiming {
+        if let speedOverride {
+            return speedOverride
+        }
+
+        let profileTiming: TypewriterConfiguration.QueueTiming
+        if pendingTaskCount >= typewriterConfiguration.highQueueLowerBound {
+            profileTiming = typewriterConfiguration.highQueue
+        } else if pendingTaskCount >= typewriterConfiguration.mediumQueueLowerBound {
+            profileTiming = typewriterConfiguration.mediumQueue
+        } else {
+            profileTiming = typewriterConfiguration.lowQueue
+        }
+
+        let multiplier: Double
+        switch performanceProfile {
+        case .snappy:
+            multiplier = 0.9
+        case .balanced:
+            multiplier = 1.0
+        case .longForm:
+            multiplier = 1.1
+        }
+
+        return ResolvedTiming(
+            charsPerStep: profileTiming.charsPerStep,
+            baseDuration: profileTiming.baseDuration * multiplier,
+            elementGapDuration: profileTiming.elementGapDuration * multiplier,
+            commaPause: typewriterConfiguration.commaPause,
+            sentencePause: typewriterConfiguration.sentencePause,
+            jitterMax: typewriterConfiguration.jitterMax
+        )
     }
 }
 
@@ -138,7 +223,9 @@ private extension RevealSequencer {
     func completeAll() {
         cancelWatchdog()
         completeTask(currentTask)
-        for task in taskQueue { completeTask(task) }
+        for task in taskQueue {
+            completeTask(task)
+        }
         taskQueue.removeAll()
         isRunning = false
         currentTask = nil
@@ -159,6 +246,7 @@ private extension RevealSequencer {
         let token = UUID()
         currentTask = task
         currentTaskToken = token
+        currentTiming = resolvedTiming(forPendingTaskCount: taskQueue.count)
         feedWatchdog()
 
         switch task {
@@ -192,7 +280,7 @@ private extension RevealSequencer {
             if textView.totalCharacterCount == 0 {
                 finishCurrentTask(withGap: false)
             } else {
-                typeNextBatch(textView: textView, from: 0, token: token)
+                typeNextBatch(textView: textView, from: 0, token: token, timing: currentTiming)
             }
         }
     }
@@ -202,8 +290,8 @@ private extension RevealSequencer {
         currentTask = nil
         currentTaskToken = nil
 
-        if withGap, elementGapDuration > 0 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + elementGapDuration) { [weak self] in
+        if withGap, currentTiming.elementGapDuration > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + currentTiming.elementGapDuration) { [weak self] in
                 self?.runNext()
             }
         } else {
@@ -213,11 +301,16 @@ private extension RevealSequencer {
 
     func completeTask(_ task: AnimationTask?) {
         switch task {
-        case let .block(view): view.alpha = 1
-        case let .label(label): label.alpha = 1
-        case let .show(view): view.alpha = 1
-        case let .text(textView): textView.finishReveal()
-        case .none: break
+        case let .block(view):
+            view.alpha = 1
+        case let .label(label):
+            label.alpha = 1
+        case let .show(view):
+            view.alpha = 1
+        case let .text(textView):
+            textView.finishReveal()
+        case .none:
+            break
         }
     }
 }
@@ -229,7 +322,12 @@ private extension RevealSequencer {
     static let sentenceEnders: Set<unichar> = [0x002E, 0x0021, 0x003F, 0x000A]
     static let watchdogTimeout: TimeInterval = 4.0
 
-    func typeNextBatch(textView: TextFlowView, from currentIndex: Int, token: UUID) {
+    func typeNextBatch(
+        textView: TextFlowView,
+        from currentIndex: Int,
+        token: UUID,
+        timing: ResolvedTiming
+    ) {
         guard !isPaused, currentTaskToken == token else { return }
         feedWatchdog()
 
@@ -240,19 +338,24 @@ private extension RevealSequencer {
             return
         }
 
-        let nextIndex = min(currentIndex + charsPerStep, total)
+        let nextIndex = min(currentIndex + timing.charsPerStep, total)
         textView.revealCharacters(upTo: nextIndex)
 
         onLayoutChange?()
         onRevealStep?()
 
-        let delay = calculateDelay(textView: textView, from: currentIndex, to: nextIndex)
+        let delay = calculateDelay(textView: textView, from: currentIndex, to: nextIndex, timing: timing)
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            self?.typeNextBatch(textView: textView, from: nextIndex, token: token)
+            self?.typeNextBatch(textView: textView, from: nextIndex, token: token, timing: timing)
         }
     }
 
-    func calculateDelay(textView: TextFlowView, from startIndex: Int, to endIndex: Int) -> TimeInterval {
+    func calculateDelay(
+        textView: TextFlowView,
+        from startIndex: Int,
+        to endIndex: Int,
+        timing: ResolvedTiming
+    ) -> TimeInterval {
         var extraDelay: TimeInterval = 0
 
         if let original = textView.originalAttributedString {
@@ -260,14 +363,15 @@ private extension RevealSequencer {
             for i in startIndex..<endIndex where i < nsString.length {
                 let char = nsString.character(at: i)
                 if Self.sentenceEnders.contains(char) {
-                    extraDelay = max(extraDelay, 0.08)
+                    extraDelay = max(extraDelay, timing.sentencePause)
                 } else if Self.commaChars.contains(char) {
-                    extraDelay = max(extraDelay, 0.03)
+                    extraDelay = max(extraDelay, timing.commaPause)
                 }
             }
         }
 
-        return baseDuration + extraDelay + .random(in: 0...0.005)
+        let jitter = timing.jitterMax > 0 ? Double.random(in: 0...timing.jitterMax) : 0
+        return timing.baseDuration + extraDelay + jitter
     }
 }
 

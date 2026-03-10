@@ -34,26 +34,34 @@ final class PlaceholderBlockView: UIView {
 
     static func image(title: String?) -> PlaceholderBlockView {
         let view = PlaceholderBlockView()
-        view.iconView.image = UIImage(systemName: "photo")
-        view.label.text = title ?? "Image"
-        view.setMinimumHeight(Layout.imageMinimumHeight)
+        view.configureImage(title: title)
         return view
     }
 
     static func table(header: Block.TableRow, rowCount: Int) -> PlaceholderBlockView {
         let view = PlaceholderBlockView()
-        view.iconView.image = UIImage(systemName: "tablecells")
+        view.configureTable(header: header, rowCount: rowCount)
+        return view
+    }
+
+    func configureImage(title: String?) {
+        iconView.image = UIImage(systemName: "photo")
+        label.text = title ?? "Image"
+        setMinimumHeight(Layout.imageMinimumHeight)
+    }
+
+    func configureTable(header: Block.TableRow, rowCount: Int) {
+        iconView.image = UIImage(systemName: "tablecells")
 
         let columns = header.cells.count
         let totalRows = rowCount + 1
         let dimensions = "Table (\(columns)x\(totalRows))"
         let headerNames = header.cells
-            .map { plainText(from: $0.content) }
+            .map { Self.plainText(from: $0.content) }
             .joined(separator: " | ")
 
-        view.label.text = "\(dimensions)\n\(headerNames)"
-        view.setMinimumHeight(Layout.tableMinimumHeight)
-        return view
+        label.text = "\(dimensions)\n\(headerNames)"
+        setMinimumHeight(Layout.tableMinimumHeight)
     }
 }
 

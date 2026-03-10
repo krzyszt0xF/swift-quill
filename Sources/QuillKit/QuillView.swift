@@ -9,28 +9,51 @@ public final class QuillView: UIView {
         didSet { renderStatic() }
     }
 
+    public var configuration: QuillRenderConfiguration {
+        didSet { applyConfiguration() }
+    }
+
     private let renderer = StreamingBlockRenderer()
     private let sequencer = RevealSequencer()
     private var controller: MarkdownStreamController?
     private var heightInvalidationScheduled = false
+    private var heightUpdateTask: Task<Void, Never>?
     private var lastNotifiedHeight: CGFloat = 0
     private var previousWidth: CGFloat = 0
     private var renderedFrozenCount = 0
     private var streamGeneration = 0
     private var streamTask: Task<Void, Never>?
 
-    public override init(frame: CGRect) {
+    public init(frame: CGRect = .zero, configuration: QuillRenderConfiguration = .init()) {
+        self.configuration = configuration
         super.init(frame: frame)
         commonInit()
+        applyConfiguration()
+    }
+
+    public override init(frame: CGRect) {
+        configuration = QuillRenderConfiguration()
+        super.init(frame: frame)
+        commonInit()
+        applyConfiguration()
     }
 
     public required init?(coder: NSCoder) {
+        configuration = QuillRenderConfiguration()
         super.init(coder: coder)
         commonInit()
+        applyConfiguration()
     }
 
     deinit {
         streamTask?.cancel()
+        heightUpdateTask?.cancel()
+    }
+
+    public func updateConfiguration(_ mutate: (inout QuillRenderConfiguration) -> Void) {
+        var next = configuration
+        mutate(&next)
+        configuration = next
     }
 
     public func append(_ chunk: String) {
@@ -51,6 +74,8 @@ public final class QuillView: UIView {
         controller = nil
         streamGeneration += 1
         sequencer.reset()
+        renderer.clearTail()
+        scheduleHeightUpdate()
     }
 
     public func finish() {
@@ -66,7 +91,9 @@ public final class QuillView: UIView {
             guard self.streamGeneration == generation else {
                 return
             }
+            self.renderer.clearTail()
             self.sequencer.finish()
+            self.scheduleHeightUpdate()
         }
     }
 
@@ -107,8 +134,22 @@ private extension QuillView {
         }
     }
 
+    func applyConfiguration() {
+        renderer.tailConfiguration = configuration.tail
+        sequencer.applyConfiguration(
+            typewriter: configuration.typewriter,
+            performanceProfile: configuration.performanceProfile
+        )
+
+        if configuration.streamingMode == .stableBlocks {
+            renderer.clearTail()
+            scheduleHeightUpdate()
+        }
+    }
+
     func measureAndNotifyHeight() {
         heightInvalidationScheduled = false
+        heightUpdateTask = nil
         guard bounds.width > 0 else { return }
 
         setNeedsLayout()
@@ -140,9 +181,18 @@ private extension QuillView {
     func scheduleHeightUpdate() {
         guard !heightInvalidationScheduled else { return }
         heightInvalidationScheduled = true
-        Task { [weak self] in
-            await Task.yield()
-            self?.measureAndNotifyHeight()
+
+        let coalescingInterval = max(0, configuration.layout.heightMeasurementCoalescingInterval)
+        heightUpdateTask?.cancel()
+        heightUpdateTask = Task { [weak self] in
+            guard let self else { return }
+
+            if coalescingInterval > 0 {
+                try? await Task.sleep(for: .seconds(coalescingInterval))
+            }
+
+            guard !Task.isCancelled else { return }
+            self.measureAndNotifyHeight()
         }
     }
 }
@@ -177,16 +227,52 @@ private extension QuillView {
                 BlockReducer.apply(event, to: &state)
                 let newFrozen = state.frozenCount
 
-                guard newFrozen > self.renderedFrozenCount else { continue }
+                if newFrozen > self.renderedFrozenCount {
+                    var newBlocks = Array(state.blocks[self.renderedFrozenCount..<newFrozen])
+                    let promotedTail = self.promoteTailIfPossible(firstFrozenBlock: newBlocks.first)
+                    if promotedTail {
+                        newBlocks.removeFirst()
+                    } else {
+                        self.renderer.clearTail()
+                    }
 
-                let newBlocks = Array(state.blocks[self.renderedFrozenCount..<newFrozen])
-                self.renderedFrozenCount = newFrozen
+                    self.renderedFrozenCount = newFrozen
 
-                let views = self.renderer.append(blocks: newBlocks)
-                for view in views {
-                    self.sequencer.enqueue(view: view)
+                    let views = self.renderer.append(blocks: newBlocks)
+                    for view in views {
+                        self.sequencer.enqueue(view: view)
+                    }
                 }
+
+                self.updateTailPreview(for: state)
             }
         }
+    }
+
+    func promoteTailIfPossible(firstFrozenBlock: Block?) -> Bool {
+        guard configuration.streamingMode == .hybridTail,
+              let firstFrozenBlock
+        else {
+            return false
+        }
+
+        return renderer.promoteTailIfMatching(firstFrozenBlock) != nil
+    }
+
+    func updateTailPreview(for state: BlockReducer.ReducerState) {
+        guard configuration.streamingMode == .hybridTail else {
+            renderer.clearTail()
+            scheduleHeightUpdate()
+            return
+        }
+
+        if state.blocks.count > state.frozenCount,
+           let tailBlock = state.blocks.last {
+            renderer.updateTail(block: tailBlock)
+        } else {
+            renderer.clearTail()
+        }
+
+        scheduleHeightUpdate()
     }
 }

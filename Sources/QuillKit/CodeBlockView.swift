@@ -17,6 +17,8 @@ final class CodeBlockView: UIView {
     private var headerHeightConstraint: NSLayoutConstraint?
     private var contentTopConstraint: NSLayoutConstraint?
 
+    private(set) var currentLanguage: String?
+
     override init(frame: CGRect) {
         super.init(frame: frame)
 
@@ -50,6 +52,7 @@ final class CodeBlockView: UIView {
     }
 
     func configure(language: String?, code: String) {
+        currentLanguage = language
         textView.text = trimmedCode(code)
         textView.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
         textView.textColor = .label
