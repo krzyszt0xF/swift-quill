@@ -78,7 +78,7 @@ private extension BufferedStreamingModeTests {
 
         return QuillView(
             frame: CGRect(x: 0, y: 0, width: 320, height: 0),
-            configuration: configuration
+            internalConfiguration: configuration
         )
     }
 

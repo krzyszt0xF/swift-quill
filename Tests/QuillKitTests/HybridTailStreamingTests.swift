@@ -44,7 +44,7 @@ private extension HybridTailStreamingTests {
             tail: .default
         )
 
-        let view = QuillView(frame: CGRect(x: 0, y: 0, width: 320, height: 0), configuration: configuration)
+        let view = QuillView(frame: CGRect(x: 0, y: 0, width: 320, height: 0), internalConfiguration: configuration)
         view.layoutIfNeeded()
         return view
     }
