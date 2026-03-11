@@ -1,17 +1,16 @@
 import UIKit
 
-/// Orchestrates sequential reveal animation for streamed markdown views.
 @MainActor
-public final class RevealSequencer {
-    public struct ResolvedTiming: Equatable, Sendable {
-        public var charsPerStep: Int
-        public var baseDuration: TimeInterval
-        public var elementGapDuration: TimeInterval
-        public var commaPause: TimeInterval
-        public var sentencePause: TimeInterval
-        public var jitterMax: TimeInterval
+final class RevealSequencer {
+    struct ResolvedTiming: Equatable, Sendable {
+        var charsPerStep: Int
+        var baseDuration: TimeInterval
+        var elementGapDuration: TimeInterval
+        var commaPause: TimeInterval
+        var sentencePause: TimeInterval
+        var jitterMax: TimeInterval
 
-        public init(
+        init(
             charsPerStep: Int,
             baseDuration: TimeInterval,
             elementGapDuration: TimeInterval,
@@ -28,8 +27,8 @@ public final class RevealSequencer {
         }
     }
 
-    public var onComplete: (() -> Void)?
-    public var onLayoutChange: (() -> Void)?
+    var onComplete: (() -> Void)?
+    var onLayoutChange: (() -> Void)?
     private var isRunning = false
 
     private var currentTask: AnimationTask?
@@ -43,7 +42,7 @@ public final class RevealSequencer {
     private var fixedTimingOverride: ResolvedTiming?
     private var minimumTextAnimationWindow: TimeInterval = 0
 
-    public init() {
+    init() {
         currentTiming = ResolvedTiming(
             charsPerStep: 6,
             baseDuration: 0.012,
@@ -54,18 +53,18 @@ public final class RevealSequencer {
         )
     }
 
-    public func enqueue(view: UIView) {
+    func enqueue(view: UIView) {
         decompose(view: view, isRoot: true)
         if !isRunning {
             runNext()
         }
     }
 
-    public func reset() {
+    func reset() {
         completeAll()
     }
 
-    public func applyConfiguration(
+    func applyConfiguration(
         typewriter: TypewriterConfiguration,
         performanceProfile: PerformanceProfile
     ) {
@@ -73,11 +72,11 @@ public final class RevealSequencer {
         self.performanceProfile = performanceProfile
     }
 
-    public func setFixedTiming(_ timing: ResolvedTiming?) {
+    func setFixedTiming(_ timing: ResolvedTiming?) {
         fixedTimingOverride = timing
     }
 
-    public func setMinimumTextAnimationWindow(_ duration: TimeInterval) {
+    func setMinimumTextAnimationWindow(_ duration: TimeInterval) {
         minimumTextAnimationWindow = max(0, duration)
     }
 

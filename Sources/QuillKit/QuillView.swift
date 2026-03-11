@@ -1,17 +1,28 @@
 import QuillCore
 import UIKit
 
-/// Public UIKit entry point for static and streaming markdown rendering.
 @MainActor
 public final class QuillView: UIView {
     public var onHeightChange: ((_ old: CGFloat, _ new: CGFloat) -> Void)?
+
     public var markdown: String? {
         didSet { renderStatic() }
     }
 
-    public var configuration: QuillRenderConfiguration {
-        didSet { applyConfiguration() }
+    public private(set) var currentMarkdown: String?
+
+    public var streamingMode: StreamingMode = .bufferedModules {
+        didSet {
+            internalConfiguration.streamingMode = streamingMode
+            applyInternalConfiguration()
+        }
     }
+
+    public var streamingPreset: QuillStreamingPreset = .balanced {
+        didSet { applyPreset() }
+    }
+
+    private var internalConfiguration = QuillConfigurationMapper.resolve(.balanced)
 
     private let renderer = StreamingBlockRenderer()
     private let sequencer = RevealSequencer()
@@ -23,64 +34,76 @@ public final class QuillView: UIView {
     private var renderedFrozenCount = 0
     private var streamGeneration = 0
     private var streamTask: Task<Void, Never>?
+    private var finishTask: Task<Void, Never>?
+    private var appendTask: Task<Void, Never>?
     private var bufferingFlushTask: Task<Void, Never>?
     private var moduleStreamGate = ModuleStreamGate()
     private var tailUpdateTask: Task<Void, Never>?
     private var pendingTailBlock: Block?
 
-    public init(frame: CGRect = .zero, configuration: QuillRenderConfiguration = .init()) {
-        self.configuration = configuration
+    public init(frame: CGRect = .zero, streamingPreset: QuillStreamingPreset = .balanced) {
+        self.streamingPreset = streamingPreset
+        self.internalConfiguration = QuillConfigurationMapper.resolve(streamingPreset)
         super.init(frame: frame)
         commonInit()
-        applyConfiguration()
+        applyInternalConfiguration()
+    }
+
+    init(frame: CGRect, internalConfiguration: QuillRenderConfiguration) {
+        self.streamingMode = internalConfiguration.streamingMode
+        self.internalConfiguration = internalConfiguration
+        super.init(frame: frame)
+        commonInit()
+        applyInternalConfiguration()
     }
 
     public override init(frame: CGRect) {
-        configuration = QuillRenderConfiguration()
         super.init(frame: frame)
         commonInit()
-        applyConfiguration()
+        applyInternalConfiguration()
     }
 
     public required init?(coder: NSCoder) {
-        configuration = QuillRenderConfiguration()
         super.init(coder: coder)
         commonInit()
-        applyConfiguration()
+        applyInternalConfiguration()
     }
 
     deinit {
         streamTask?.cancel()
+        finishTask?.cancel()
+        appendTask?.cancel()
         bufferingFlushTask?.cancel()
         heightUpdateTask?.cancel()
         tailUpdateTask?.cancel()
     }
 
-    public func updateConfiguration(_ mutate: (inout QuillRenderConfiguration) -> Void) {
-        var next = configuration
-        mutate(&next)
-        configuration = next
-    }
-
     public func append(_ chunk: String) {
-        if controller == nil {
-            startStream()
+        let needsRestart = controller == nil
+        let previousContent = needsRestart ? currentMarkdown : nil
+
+        currentMarkdown = (currentMarkdown ?? "") + chunk
+
+        if needsRestart {
+            startStream(bootstrap: previousContent)
         }
 
-        guard let streamController = controller else {
-            return
-        }
+        guard let streamController = controller else { return }
 
-        if configuration.streamingMode == .bufferedModules {
+        if internalConfiguration.streamingMode == .bufferedModules {
             appendBufferedChunk(chunk, to: streamController)
         } else {
-            Task { await streamController.append(chunk) }
+            enqueueAppendChunk(chunk, to: streamController)
         }
     }
 
-    public func cancelActiveStream() {
+    public func cancelStreaming() {
         streamTask?.cancel()
         streamTask = nil
+        finishTask?.cancel()
+        finishTask = nil
+        appendTask?.cancel()
+        appendTask = nil
         cancelBufferedFlush()
         moduleStreamGate.reset()
         cancelTailUpdate()
@@ -96,11 +119,16 @@ public final class QuillView: UIView {
         controller = nil
         let task = streamTask
         let generation = streamGeneration
+        let pendingAppendTask = appendTask
+        appendTask = nil
 
-        Task { [weak self] in
+        finishTask?.cancel()
+        finishTask = Task { [weak self] in
             guard let self else { return }
 
-            if self.configuration.streamingMode == .bufferedModules {
+            await pendingAppendTask?.value
+
+            if self.internalConfiguration.streamingMode == .bufferedModules {
                 self.cancelBufferedFlush()
                 let remaining = self.moduleStreamGate.flushRemaining()
                 if !remaining.isEmpty {
@@ -110,15 +138,14 @@ public final class QuillView: UIView {
 
             await streamController.finish()
             await task?.value
-            guard self.streamGeneration == generation else {
-                return
-            }
+            guard self.streamGeneration == generation else { return }
             self.renderer.clearTail()
             self.scheduleHeightUpdate()
         }
     }
 
     public func reset() {
+        currentMarkdown = nil
         resetStreamRendering()
         sequencer.reset()
         lastNotifiedHeight = 0
@@ -158,20 +185,26 @@ private extension QuillView {
         }
     }
 
-    func applyConfiguration() {
-        renderer.tailConfiguration = configuration.tail
+    func applyPreset() {
+        internalConfiguration = QuillConfigurationMapper.resolve(streamingPreset)
+        internalConfiguration.streamingMode = streamingMode
+        applyInternalConfiguration()
+    }
+
+    func applyInternalConfiguration() {
+        renderer.tailConfiguration = internalConfiguration.tail
         moduleStreamGate.updateConfiguration(
             ModuleStreamGateConfiguration(
-                minModuleLength: configuration.bufferedStream.minModuleLength,
-                maxBufferingDelay: configuration.bufferedStream.maxBufferingDelay
+                minModuleLength: internalConfiguration.bufferedStream.minModuleLength,
+                maxBufferingDelay: internalConfiguration.bufferedStream.maxBufferingDelay
             )
         )
         sequencer.applyConfiguration(
-            typewriter: configuration.typewriter,
-            performanceProfile: configuration.performanceProfile
+            typewriter: internalConfiguration.typewriter,
+            performanceProfile: internalConfiguration.performanceProfile
         )
         sequencer.setFixedTiming(
-            configuration.streamingMode == .bufferedModules
+            internalConfiguration.streamingMode == .bufferedModules
                 ? RevealSequencer.ResolvedTiming(
                     charsPerStep: 6,
                     baseDuration: 0.012,
@@ -183,17 +216,18 @@ private extension QuillView {
                 : nil
         )
         sequencer.setMinimumTextAnimationWindow(
-            configuration.streamingMode == .bufferedModules
+            internalConfiguration.streamingMode == .bufferedModules
                 ? 0.24
                 : 0
         )
 
-        if configuration.streamingMode != .bufferedModules {
+        if internalConfiguration.streamingMode != .bufferedModules {
             cancelBufferedFlush()
             moduleStreamGate.reset()
         }
 
-        if configuration.streamingMode == .stableBlocks || configuration.streamingMode == .bufferedModules {
+        if internalConfiguration.streamingMode == .stableBlocks
+            || internalConfiguration.streamingMode == .bufferedModules {
             cancelTailUpdate()
             renderer.clearTail()
             scheduleHeightUpdate()
@@ -212,7 +246,7 @@ private extension QuillView {
 
         let newHeight = ceil(renderer.stackView.bounds.height)
         let oldHeight = lastNotifiedHeight
-        let minDelta = max(0.5, configuration.layout.heightNotificationMinimumDelta)
+        let minDelta = max(0.5, internalConfiguration.layout.heightNotificationMinimumDelta)
         guard abs(newHeight - oldHeight) > minDelta else { return }
 
         lastNotifiedHeight = newHeight
@@ -221,6 +255,7 @@ private extension QuillView {
 
     func renderStatic() {
         resetStreamRendering()
+        currentMarkdown = markdown
 
         guard let markdown, !markdown.isEmpty else {
             lastNotifiedHeight = 0
@@ -236,7 +271,7 @@ private extension QuillView {
         guard !heightInvalidationScheduled else { return }
         heightInvalidationScheduled = true
 
-        let coalescingInterval = max(0, configuration.layout.heightMeasurementCoalescingInterval)
+        let coalescingInterval = max(0, internalConfiguration.layout.heightMeasurementCoalescingInterval)
         heightUpdateTask?.cancel()
         heightUpdateTask = Task { [weak self] in
             guard let self else { return }
@@ -257,6 +292,10 @@ private extension QuillView {
     func resetStreamRendering() {
         streamTask?.cancel()
         streamTask = nil
+        finishTask?.cancel()
+        finishTask = nil
+        appendTask?.cancel()
+        appendTask = nil
         cancelBufferedFlush()
         moduleStreamGate.reset()
         cancelTailUpdate()
@@ -267,8 +306,8 @@ private extension QuillView {
         renderedFrozenCount = 0
     }
 
-    func startStream() {
-        cancelActiveStream()
+    func startStream(bootstrap: String? = nil) {
+        cancelStreaming()
 
         let streamController = MarkdownStreamController()
         controller = streamController
@@ -277,6 +316,10 @@ private extension QuillView {
         streamTask = Task { [weak self] in
             var state = BlockReducer.ReducerState()
             let events = await streamController.events()
+
+            if let bootstrap, !bootstrap.isEmpty {
+                await streamController.append(bootstrap)
+            }
 
             for await event in events {
                 guard !Task.isCancelled, let self, self.streamGeneration == generation else { break }
@@ -300,7 +343,7 @@ private extension QuillView {
                     }
 
                     if !promotedTail,
-                       self.configuration.streamingMode == .hybridTail,
+                       self.internalConfiguration.streamingMode == .hybridTail,
                        firstFrozenBlock != nil {
                         self.renderer.clearTail()
                     }
@@ -312,7 +355,7 @@ private extension QuillView {
     }
 
     func promoteTailIfPossible(firstFrozenBlock: Block?) -> Bool {
-        guard configuration.streamingMode == .hybridTail,
+        guard internalConfiguration.streamingMode == .hybridTail,
               let firstFrozenBlock
         else {
             return false
@@ -322,7 +365,7 @@ private extension QuillView {
     }
 
     func updateTailPreview(for state: BlockReducer.ReducerState) {
-        guard configuration.streamingMode == .hybridTail else {
+        guard internalConfiguration.streamingMode == .hybridTail else {
             cancelTailUpdate()
             renderer.clearTail()
             return
@@ -348,7 +391,7 @@ private extension QuillView {
         pendingTailBlock = block
         guard tailUpdateTask == nil else { return }
 
-        let coalescingInterval = max(0, configuration.tail.flowTailUpdateCoalescingInterval)
+        let coalescingInterval = max(0, internalConfiguration.tail.flowTailUpdateCoalescingInterval)
         tailUpdateTask = Task { [weak self] in
             guard let self else { return }
             defer { self.tailUpdateTask = nil }
@@ -386,11 +429,19 @@ private extension QuillView {
     }
 
     func enqueueCommittedChunks(_ chunks: [String], to streamController: MarkdownStreamController) {
-        guard chunks.isEmpty == false else { return }
-        Task {
-            for chunk in chunks where chunk.isEmpty == false {
-                await streamController.append(chunk)
-            }
+        for chunk in chunks where chunk.isEmpty == false {
+            enqueueAppendChunk(chunk, to: streamController)
+        }
+    }
+
+    func enqueueAppendChunk(_ chunk: String, to streamController: MarkdownStreamController) {
+        guard chunk.isEmpty == false else { return }
+
+        let previousTask = appendTask
+        appendTask = Task {
+            await previousTask?.value
+            guard !Task.isCancelled else { return }
+            await streamController.append(chunk)
         }
     }
 
@@ -424,7 +475,7 @@ private extension QuillView {
     }
 
     func shouldApplyTailImmediately(_ block: Block) -> Bool {
-        guard configuration.tail.flowTailUpdateCoalescingInterval > 0 else {
+        guard internalConfiguration.tail.flowTailUpdateCoalescingInterval > 0 else {
             return true
         }
 

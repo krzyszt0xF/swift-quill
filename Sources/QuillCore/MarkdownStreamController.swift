@@ -1,18 +1,17 @@
-/// Actor-based controller that streams markdown chunks as ParserEvents.
-public actor MarkdownStreamController {
+package actor MarkdownStreamController {
     private var buffer = StreamBuffer()
     private var continuation: AsyncStream<ParserEvent>.Continuation?
 
-    public init() {}
+    package init() {}
 
-    public func append(_ chunk: String) {
+    package func append(_ chunk: String) {
         let events = buffer.append(chunk)
         for event in events {
             continuation?.yield(event)
         }
     }
 
-    public func events() -> AsyncStream<ParserEvent> {
+    package func events() -> AsyncStream<ParserEvent> {
         continuation?.finish()
         buffer = StreamBuffer()
 
@@ -21,7 +20,7 @@ public actor MarkdownStreamController {
         return stream
     }
 
-    public func finish() {
+    package func finish() {
         let events = buffer.finalize()
         for event in events {
             continuation?.yield(event)

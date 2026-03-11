@@ -1,10 +1,17 @@
 # QuillCore
 
-Platform-agnostic markdown parsing and AST types.
+Platform-agnostic markdown parsing and streaming infrastructure.
 
 ## Purpose
 
-QuillCore provides the foundation layer of swift-quill. It parses markdown input into a structured AST (`RenderElement` array) that downstream renderers consume. All types are pure value types with zero UIKit or AppKit dependencies.
+QuillCore provides the foundation layer of swift-quill. It parses markdown input into a structured Block AST that downstream renderers consume. All types are package-scoped and have zero UIKit or AppKit dependencies.
+
+## Key Types
+
+- `Block` / `Inline` -- Recursive AST representing parsed markdown
+- `MarkdownParser` -- Converts raw markdown strings to `[Block]`
+- `MarkdownStreamController` -- Actor-based streaming coordinator for chunk-at-a-time input
+- `BlockReducer` -- Reduces parser events into an incrementally-updated block array
 
 ## Dependencies
 
@@ -12,7 +19,7 @@ QuillCore provides the foundation layer of swift-quill. It parses markdown input
 
 ## Testing
 
-QuillCore is testable via `swift test` on the command line without requiring a simulator, satisfying the ARCH-01 requirement that the core parsing layer remains platform-agnostic.
+QuillCore is testable via `swift test` on the command line without requiring a simulator:
 
 ```bash
 swift test --filter QuillCoreTests

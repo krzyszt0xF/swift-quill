@@ -1,9 +1,8 @@
 import QuillCore
 import UIKit
 
-/// Converts FlowSegment blocks into styled NSAttributedStrings.
-public enum AttributedStringBuilder {
-    public static func build(from segment: RenderNode.FlowSegment) -> NSAttributedString {
+enum AttributedStringBuilder {
+    static func build(from segment: RenderNode.FlowSegment) -> NSAttributedString {
         let result = NSMutableAttributedString()
 
         for (index, block) in segment.blocks.enumerated() {
@@ -17,7 +16,7 @@ public enum AttributedStringBuilder {
     }
 }
 
-public extension NSAttributedString.Key {
+extension NSAttributedString.Key {
     static let blockquoteDepth = NSAttributedString.Key("quill.blockquoteDepth")
 }
 
@@ -327,8 +326,8 @@ private extension AttributedStringBuilder {
     }
 
     static func applyBlockquoteIndent(to style: NSMutableParagraphStyle, nestingContext: NestingContext) {
-        guard nestingContext.blockquoteDepth > 0 else { 
-            return 
+        guard nestingContext.blockquoteDepth > 0 else {
+            return
         }
 
         let indent = CGFloat(nestingContext.blockquoteDepth) * 16
@@ -373,8 +372,8 @@ private extension AttributedStringBuilder {
 private extension UIFont {
     func withTraits(_ traits: UIFontDescriptor.SymbolicTraits) -> UIFont {
         let combined = fontDescriptor.symbolicTraits.union(traits)
-        guard let descriptor = fontDescriptor.withSymbolicTraits(combined) else { 
-            return self 
+        guard let descriptor = fontDescriptor.withSymbolicTraits(combined) else {
+            return self
         }
 
         return UIFont(descriptor: descriptor, size: 0)

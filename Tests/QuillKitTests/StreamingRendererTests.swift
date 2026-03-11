@@ -1,4 +1,4 @@
-import QuillCore
+@testable import QuillCore
 @testable import QuillKit
 import Testing
 import UIKit

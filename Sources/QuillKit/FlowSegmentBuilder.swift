@@ -1,6 +1,6 @@
 import QuillCore
 
-public extension Block {
+extension Block {
     var isFlowContent: Bool {
         switch self {
         case .blockquote:
@@ -25,12 +25,11 @@ public extension Block {
     }
 }
 
-/// Groups Block AST into RenderNodes for efficient TextKit 2 rendering.
-public enum FlowSegmentBuilder {
+enum FlowSegmentBuilder {
 
-    // MARK: - Public
+    // MARK: - Build
 
-    public static func build(from blocks: [Block]) -> [RenderNode] {
+    static func build(from blocks: [Block]) -> [RenderNode] {
         var nodes: [RenderNode] = []
         var buffer: [Block] = []
 

@@ -2,17 +2,17 @@ import QuillCore
 import UIKit
 
 @MainActor
-public final class StreamingBlockRenderer {
-    public let stackView: UIStackView
-    public private(set) var frozenViewCount: Int = 0
+final class StreamingBlockRenderer {
+    let stackView: UIStackView
+    private(set) var frozenViewCount: Int = 0
 
-    public var tailConfiguration: TailConfiguration = .default
+    var tailConfiguration: TailConfiguration = .default
 
     private var tailDescriptor: TailDescriptor?
     private var tailBlock: Block?
     private weak var tailView: UIView?
 
-    public init() {
+    init() {
         stackView = UIStackView()
         stackView.alignment = .fill
         stackView.axis = .vertical
@@ -20,7 +20,7 @@ public final class StreamingBlockRenderer {
         stackView.translatesAutoresizingMaskIntoConstraints = false
     }
 
-    public func reset() {
+    func reset() {
         for view in stackView.arrangedSubviews.reversed() {
             stackView.removeArrangedSubview(view)
             view.removeFromSuperview()
@@ -32,12 +32,12 @@ public final class StreamingBlockRenderer {
         tailView = nil
     }
 
-    public func append(blocks: [Block]) -> [UIView] {
+    func append(blocks: [Block]) -> [UIView] {
         let nodes = FlowSegmentBuilder.build(from: blocks)
         return addViews(for: nodes[...])
     }
 
-    public func update(blocks: [Block], frozenCount: Int) {
+    func update(blocks: [Block], frozenCount: Int) {
         precondition(Thread.isMainThread, "StreamingBlockRenderer.update must run on the main thread")
 
         clearTail()
@@ -55,7 +55,7 @@ public final class StreamingBlockRenderer {
         _ = addViews(for: nodes[frozenViewCount...])
     }
 
-    public func updateTail(block: Block?) {
+    func updateTail(block: Block?) {
         guard let block else {
             clearTail()
             return
@@ -111,7 +111,7 @@ public final class StreamingBlockRenderer {
         replaceTail(with: view, descriptor: descriptor, sourceBlock: block)
     }
 
-    public func clearTail() {
+    func clearTail() {
         guard let tailView else {
             tailDescriptor = nil
             tailBlock = nil

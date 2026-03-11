@@ -1,8 +1,7 @@
 import Foundation
 import QuillCore
 
-/// Intermediate representation mapping Block AST to view-level rendering units.
-public enum RenderNode: Sendable {
+enum RenderNode: Sendable {
     case codeBlock(language: String?, code: String)
     case flow(FlowSegment)
     case image(source: String?, title: String?)
@@ -12,7 +11,7 @@ public enum RenderNode: Sendable {
 }
 
 extension RenderNode: Equatable {
-    public static func == (lhs: RenderNode, rhs: RenderNode) -> Bool {
+    static func == (lhs: RenderNode, rhs: RenderNode) -> Bool {
         switch (lhs, rhs) {
         case let (.codeBlock(lLang, lCode), .codeBlock(rLang, rCode)):
             return lLang == rLang && lCode == rCode
@@ -28,13 +27,12 @@ extension RenderNode: Equatable {
     }
 }
 
-public extension RenderNode {
-    /// A group of consecutive flow blocks rendered in a single TextKit 2 layout context.
+extension RenderNode {
     struct FlowSegment: Sendable {
-        public let blocks: [Block]
-        public let id: UUID
+        let blocks: [Block]
+        let id: UUID
 
-        public init(blocks: [Block], id: UUID = UUID()) {
+        init(blocks: [Block], id: UUID = UUID()) {
             self.blocks = blocks
             self.id = id
         }
@@ -42,7 +40,7 @@ public extension RenderNode {
 }
 
 extension RenderNode.FlowSegment: Equatable {
-    public static func == (lhs: RenderNode.FlowSegment, rhs: RenderNode.FlowSegment) -> Bool {
+    static func == (lhs: RenderNode.FlowSegment, rhs: RenderNode.FlowSegment) -> Bool {
         lhs.blocks == rhs.blocks
     }
 }

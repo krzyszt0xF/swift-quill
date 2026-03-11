@@ -1,6 +1,5 @@
-/// Converts a sequence of ParserEvents into the Block/Inline AST.
-public enum BlockReducer {
-    public static func apply(_ event: ParserEvent, to state: inout ReducerState) {
+package enum BlockReducer {
+    package static func apply(_ event: ParserEvent, to state: inout ReducerState) {
         while state.blocks.count > state.frozenCount {
             state.blocks.removeLast()
         }
@@ -71,17 +70,17 @@ public enum BlockReducer {
     }
 }
 
-public extension BlockReducer {
+package extension BlockReducer {
     struct ReducerState: Sendable {
-        public var blocks: [Block] = []
-        public var frozenCount: Int = 0
+        package var blocks: [Block] = []
+        package var frozenCount: Int = 0
 
         var contextStack: [OpenContext] = []
         var currentContext: OpenContext = .topLevel
         var inlineStack: [InlineFrame] = []
         var currentInlines: [Inline] = []
 
-        public init() {}
+        package init() {}
     }
 }
 
