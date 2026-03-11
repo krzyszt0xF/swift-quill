@@ -33,12 +33,11 @@ public enum FlowSegmentBuilder {
     public static func build(from blocks: [Block]) -> [RenderNode] {
         var nodes: [RenderNode] = []
         var buffer: [Block] = []
-        let softCap = 10
 
         for block in blocks {
             if block.isFlowContent {
                 buffer.append(block)
-                if buffer.count >= softCap {
+                if buffer.count >= flowSoftCap {
                     flush(&buffer, into: &nodes)
                 }
             } else {
@@ -51,7 +50,47 @@ public enum FlowSegmentBuilder {
         return nodes
     }
 
+    static func frozenNodeCount(blocks: [Block], frozenBlockCount: Int) -> Int {
+        guard frozenBlockCount > 0, blocks.isEmpty == false else { return 0 }
+
+        let clampedFrozenCount = min(frozenBlockCount, blocks.count)
+        var nodeCount = 0
+        var pendingFlowCount = 0
+
+        for (index, block) in blocks.enumerated() {
+            if block.isFlowContent {
+                pendingFlowCount += 1
+                if pendingFlowCount >= flowSoftCap {
+                    if index < clampedFrozenCount {
+                        nodeCount += 1
+                    }
+                    pendingFlowCount = 0
+                }
+                continue
+            }
+
+            if pendingFlowCount > 0 {
+                if index <= clampedFrozenCount {
+                    nodeCount += 1
+                }
+                pendingFlowCount = 0
+            }
+
+            if index < clampedFrozenCount {
+                nodeCount += 1
+            }
+        }
+
+        if pendingFlowCount > 0, blocks.count <= clampedFrozenCount {
+            nodeCount += 1
+        }
+
+        return nodeCount
+    }
+
     // MARK: - Private
+
+    private static let flowSoftCap = 10
 
     private static func flush(_ buffer: inout [Block], into nodes: inout [RenderNode]) {
         guard !buffer.isEmpty else { return }

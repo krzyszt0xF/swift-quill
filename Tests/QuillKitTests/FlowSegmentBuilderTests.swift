@@ -1,5 +1,5 @@
 import QuillCore
-import QuillKit
+@testable import QuillKit
 import Testing
 
 @Suite("FlowSegmentBuilder")
@@ -82,6 +82,38 @@ struct FlowSegmentBuilderTests {
         #expect(result.count == 2)
         #expect(result[0] == .codeBlock(language: "swift", code: "let x = 1"))
         #expect(flowBlocks(result[1]) == [simpleParagraph("a"), simpleParagraph("b")])
+    }
+
+    @Test("Frozen node count respects flow soft cap")
+    func frozenNodeCountRespectsSoftCap() {
+        let blocks = (0..<12).map { simpleParagraph("p\($0)") }
+
+        #expect(FlowSegmentBuilder.frozenNodeCount(blocks: blocks, frozenBlockCount: 10) == 1)
+        #expect(FlowSegmentBuilder.frozenNodeCount(blocks: blocks, frozenBlockCount: 11) == 1)
+        #expect(FlowSegmentBuilder.frozenNodeCount(blocks: blocks, frozenBlockCount: 12) == 2)
+    }
+
+    @Test("Frozen node count drops flow segment spanning frozen boundary")
+    func frozenNodeCountDropsSpanningFlowSegment() {
+        let blocks: [Block] = [
+            simpleParagraph("a0"),
+            simpleParagraph("a1"),
+            simpleParagraph("a2"),
+            simpleParagraph("a3"),
+            simpleParagraph("a4"),
+            simpleParagraph("a5"),
+            simpleParagraph("a6"),
+            simpleParagraph("a7"),
+            simpleParagraph("a8"),
+            simpleParagraph("a9"),
+            simpleParagraph("a10"),
+            simpleParagraph("a11"),
+            simpleCodeBlock("let x = 1"),
+        ]
+
+        #expect(FlowSegmentBuilder.frozenNodeCount(blocks: blocks, frozenBlockCount: 11) == 1)
+        #expect(FlowSegmentBuilder.frozenNodeCount(blocks: blocks, frozenBlockCount: 12) == 2)
+        #expect(FlowSegmentBuilder.frozenNodeCount(blocks: blocks, frozenBlockCount: 13) == 3)
     }
 }
 

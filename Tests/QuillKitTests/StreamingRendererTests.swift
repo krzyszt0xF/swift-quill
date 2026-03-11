@@ -111,6 +111,57 @@ struct StreamingRendererTests {
         #expect(tailView1 !== tailView2)
     }
 
+    @Test("Table tail updates reuse the same placeholder view")
+    func tableTailUpdatesReuseView() throws {
+        let renderer = StreamingBlockRenderer()
+
+        let initialTable = makeTableBlock(rowValues: [["alpha", "1"]])
+        let expandedTable = makeTableBlock(rowValues: [["alpha", "1"], ["beta", "2"]])
+
+        renderer.updateTail(block: initialTable)
+        let firstTailView = try #require(renderer.stackView.arrangedSubviews.last)
+
+        renderer.updateTail(block: expandedTable)
+        let secondTailView = try #require(renderer.stackView.arrangedSubviews.last)
+
+        #expect(firstTailView === secondTailView)
+    }
+
+    @Test("Matching tail block is promoted without replacing the view")
+    func matchingTailPromotionKeepsView() throws {
+        let renderer = StreamingBlockRenderer()
+        let tailBlock: Block = .paragraph(content: [.text("mutable frontier")])
+
+        renderer.updateTail(block: tailBlock)
+        let previewView = try #require(renderer.stackView.arrangedSubviews.last)
+
+        let promoted = renderer.promoteTailIfMatching(tailBlock)
+        #expect(promoted === previewView)
+        #expect(renderer.stackView.arrangedSubviews.count == 1)
+        #expect(renderer.stackView.arrangedSubviews[0] === previewView)
+
+        _ = renderer.append(blocks: [.codeBlock(language: nil, code: "let x = 1\n")])
+
+        #expect(renderer.stackView.arrangedSubviews.count == 2)
+        #expect(renderer.stackView.arrangedSubviews[0] === previewView)
+        #expect(renderer.stackView.arrangedSubviews[1] is CodeBlockView)
+    }
+
+    @Test("Compatible flow tail block can be promoted without exact equality")
+    func compatibleTailPromotionKeepsView() throws {
+        let renderer = StreamingBlockRenderer()
+        let previewBlock: Block = .paragraph(content: [.text("mutable frontier preview text")])
+        let frozenBlock: Block = .paragraph(content: [.text("mutable frontier preview text with closing context")])
+
+        renderer.updateTail(block: previewBlock)
+        let previewView = try #require(renderer.stackView.arrangedSubviews.last)
+
+        let promoted = renderer.promoteTailIfMatching(frozenBlock)
+        #expect(promoted === previewView)
+        #expect(renderer.stackView.arrangedSubviews.count == 1)
+        #expect(renderer.stackView.arrangedSubviews[0] === previewView)
+    }
+
     @Test("Reset clears all views and state")
     func resetClearsAll() {
         let renderer = StreamingBlockRenderer()
@@ -240,5 +291,22 @@ struct StreamingRendererTests {
         flow.frame = CGRect(x: 0, y: 0, width: 320, height: 0)
         flow.layoutIfNeeded()
         #expect(flow.intrinsicContentSize.height > 0)
+    }
+}
+
+private extension StreamingRendererTests {
+    func makeTableBlock(rowValues: [[String]]) -> Block {
+        let header = Block.TableRow(cells: [
+            .init(content: [.text("name")]),
+            .init(content: [.text("value")]),
+        ])
+
+        let rows = rowValues.map { row in
+            Block.TableRow(cells: row.map { cell in
+                .init(content: [.text(cell)])
+            })
+        }
+
+        return .table(columnAlignments: [nil, nil], header: header, rows: rows)
     }
 }

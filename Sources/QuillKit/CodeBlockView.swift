@@ -1,9 +1,23 @@
 import UIKit
 
 final class CodeBlockView: UIView {
+    private enum Layout {
+        static let codeHorizontalInset: CGFloat = 12
+        static let codeVerticalInset: CGFloat = 12
+        static let headerToCodeSpacing: CGFloat = 8
+        static let minimumVisibleCodeHeight: CGFloat = 18
+        static let pillHeight: CGFloat = 20
+        static let pillTrailingInset: CGFloat = 8
+    }
+
+    private let headerView = UIView()
     private let languagePill = PaddedLabel()
     private let scrollView = UIScrollView()
     private let textView = UITextView()
+    private var headerHeightConstraint: NSLayoutConstraint?
+    private var contentTopConstraint: NSLayoutConstraint?
+
+    private(set) var currentLanguage: String?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -12,7 +26,10 @@ final class CodeBlockView: UIView {
         clipsToBounds = true
         layer.cornerRadius = 8
         translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.defaultLow, for: .vertical)
+        setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 
+        setupHeaderView()
         setupScrollView()
         setupTextView()
         setupLanguagePill()
@@ -35,26 +52,49 @@ final class CodeBlockView: UIView {
     }
 
     func configure(language: String?, code: String) {
-        let trimmed = code.hasSuffix("\n") ? String(code.dropLast()) : code
-        textView.text = trimmed
+        currentLanguage = language
+        textView.text = trimmedCode(code)
         textView.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
         textView.textColor = .label
 
         if let language, !language.isEmpty {
             languagePill.text = language
             languagePill.isHidden = false
+            headerHeightConstraint?.constant = Layout.pillHeight
+            contentTopConstraint?.constant = Layout.headerToCodeSpacing
         } else {
+            languagePill.text = nil
             languagePill.isHidden = true
+            headerHeightConstraint?.constant = 0
+            contentTopConstraint?.constant = 0
         }
     }
 
     func updateCode(_ code: String) {
-        let trimmed = code.hasSuffix("\n") ? String(code.dropLast()) : code
-        textView.text = trimmed
+        textView.text = trimmedCode(code)
     }
 }
 
 private extension CodeBlockView {
+    func trimmedCode(_ code: String) -> String {
+        code.hasSuffix("\n") ? String(code.dropLast()) : code
+    }
+
+    func setupHeaderView() {
+        headerView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(headerView)
+
+        let height = headerView.heightAnchor.constraint(equalToConstant: 0)
+        headerHeightConstraint = height
+
+        NSLayoutConstraint.activate([
+            headerView.topAnchor.constraint(equalTo: topAnchor, constant: Layout.codeVerticalInset),
+            headerView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Layout.codeHorizontalInset),
+            headerView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Layout.codeHorizontalInset),
+            height,
+        ])
+    }
+
     func setupLanguagePill() {
         languagePill.backgroundColor = .systemGray5
         languagePill.clipsToBounds = true
@@ -63,11 +103,14 @@ private extension CodeBlockView {
         languagePill.layer.cornerRadius = 4
         languagePill.textColor = .secondaryLabel
         languagePill.translatesAutoresizingMaskIntoConstraints = false
+        languagePill.isHidden = true
 
-        addSubview(languagePill)
+        headerView.addSubview(languagePill)
         NSLayoutConstraint.activate([
-            languagePill.topAnchor.constraint(equalTo: topAnchor, constant: 6),
-            languagePill.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            languagePill.topAnchor.constraint(equalTo: headerView.topAnchor),
+            languagePill.bottomAnchor.constraint(equalTo: headerView.bottomAnchor),
+            languagePill.leadingAnchor.constraint(greaterThanOrEqualTo: headerView.leadingAnchor),
+            languagePill.trailingAnchor.constraint(equalTo: headerView.trailingAnchor, constant: -Layout.pillTrailingInset),
         ])
     }
 
@@ -75,13 +118,19 @@ private extension CodeBlockView {
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.showsVerticalScrollIndicator = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.setContentHuggingPriority(.defaultLow, for: .vertical)
+        scrollView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 
         addSubview(scrollView)
+        let top = scrollView.topAnchor.constraint(equalTo: headerView.bottomAnchor)
+        contentTopConstraint = top
+
         NSLayoutConstraint.activate([
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12),
-            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            scrollView.topAnchor.constraint(equalTo: topAnchor, constant: 12),
-            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            top,
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Layout.codeVerticalInset),
+            scrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.minimumVisibleCodeHeight),
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Layout.codeHorizontalInset),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Layout.codeHorizontalInset),
         ])
     }
 
@@ -94,11 +143,15 @@ private extension CodeBlockView {
         textView.textContainer.widthTracksTextView = false
         textView.textContainerInset = .zero
         textView.translatesAutoresizingMaskIntoConstraints = false
+        textView.setContentHuggingPriority(.defaultLow, for: .vertical)
+        textView.setContentCompressionResistancePriority(.required, for: .vertical)
 
         scrollView.addSubview(textView)
+        let matchingHeight = textView.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor)
+        matchingHeight.priority = .defaultHigh
         NSLayoutConstraint.activate([
             textView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-            textView.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
+            matchingHeight,
             textView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
             textView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             textView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
