@@ -1,10 +1,9 @@
 import QuillCore
 import UIKit
 
-/// Assembles RenderNodes into a vertical UIView hierarchy.
 @MainActor
-public enum BlockRenderer {
-    public static func render(_ nodes: [RenderNode]) -> UIView {
+enum BlockRenderer {
+    static func render(_ nodes: [RenderNode]) -> UIView {
         let stack = UIStackView()
         stack.alignment = .fill
         stack.axis = .vertical
@@ -23,15 +22,13 @@ public enum BlockRenderer {
         return stack
     }
 
-    public static func render(markdown: String, parser: MarkdownParser = .live) -> UIView {
+    static func render(markdown: String, parser: MarkdownParser = .live) -> UIView {
         let blocks = parser.parse(markdown)
         let nodes = FlowSegmentBuilder.build(from: blocks)
-        
+
         return render(nodes)
     }
-}
 
-public extension BlockRenderer {
     static func view(for node: RenderNode) -> UIView {
         switch node {
         case let .codeBlock(language, code):

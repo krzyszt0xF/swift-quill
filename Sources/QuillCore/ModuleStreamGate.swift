@@ -1,10 +1,10 @@
 import Foundation
 
-public struct ModuleStreamGateConfiguration: Equatable, Sendable {
-    public var minModuleLength: Int
-    public var maxBufferingDelay: TimeInterval
+package struct ModuleStreamGateConfiguration: Equatable, Sendable {
+    package var minModuleLength: Int
+    package var maxBufferingDelay: TimeInterval
 
-    public init(
+    package init(
         minModuleLength: Int = 50,
         maxBufferingDelay: TimeInterval = 1.5
     ) {
@@ -13,13 +13,13 @@ public struct ModuleStreamGateConfiguration: Equatable, Sendable {
     }
 }
 
-public struct ModuleStreamGate: Sendable {
-    public struct AppendResult: Equatable, Sendable {
-        public var committedChunks: [String]
-        public var hasPendingText: Bool
-        public var hasPendingStructure: Bool
+package struct ModuleStreamGate: Sendable {
+    package struct AppendResult: Equatable, Sendable {
+        package var committedChunks: [String]
+        package var hasPendingText: Bool
+        package var hasPendingStructure: Bool
 
-        public init(
+        package init(
             committedChunks: [String],
             hasPendingText: Bool,
             hasPendingStructure: Bool
@@ -35,30 +35,30 @@ public struct ModuleStreamGate: Sendable {
     private var lastSafePosition = 0
     private var pendingSince: TimeInterval?
 
-    public init(configuration: ModuleStreamGateConfiguration = .init()) {
+    package init(configuration: ModuleStreamGateConfiguration = .init()) {
         self.configuration = configuration
     }
 
-    public var hasPendingText: Bool {
+    package var hasPendingText: Bool {
         accumulatedText.count > lastSafePosition
     }
 
-    public mutating func reset() {
+    package mutating func reset() {
         accumulatedText = ""
         lastSafePosition = 0
         pendingSince = nil
     }
 
-    public mutating func updateConfiguration(_ configuration: ModuleStreamGateConfiguration) {
+    package mutating func updateConfiguration(_ configuration: ModuleStreamGateConfiguration) {
         self.configuration = configuration
     }
 
-    public func timeUntilForcedCommit(now: TimeInterval) -> TimeInterval? {
+    package func timeUntilForcedCommit(now: TimeInterval) -> TimeInterval? {
         guard let pendingSince, hasPendingText else { return nil }
         return max(0, configuration.maxBufferingDelay - (now - pendingSince))
     }
 
-    public mutating func append(_ chunk: String, now: TimeInterval) -> AppendResult {
+    package mutating func append(_ chunk: String, now: TimeInterval) -> AppendResult {
         guard !chunk.isEmpty else {
             return AppendResult(
                 committedChunks: [],
@@ -80,7 +80,7 @@ public struct ModuleStreamGate: Sendable {
         return result
     }
 
-    public mutating func commitIfOverdue(now: TimeInterval) -> [String] {
+    package mutating func commitIfOverdue(now: TimeInterval) -> [String] {
         guard let pendingSince, now - pendingSince >= configuration.maxBufferingDelay else {
             return []
         }
@@ -100,7 +100,7 @@ public struct ModuleStreamGate: Sendable {
         return committed
     }
 
-    public mutating func flushRemaining() -> String {
+    package mutating func flushRemaining() -> String {
         let remaining = rawText(from: lastSafePosition, to: accumulatedText.count)
         accumulatedText = ""
         lastSafePosition = 0

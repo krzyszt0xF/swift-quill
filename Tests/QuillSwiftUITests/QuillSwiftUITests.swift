@@ -1,7 +1,8 @@
 import QuillSwiftUI
 import Testing
 
-@Test func quillSwiftUIDependencyChain() {
-    // Verifies QuillSwiftUI -> QuillKit -> QuillCore chain.
-    #expect(QuillSwiftUI.kitVersion == "0.1.0")
+@Test("QuillSwiftUI module imports successfully")
+func quillSwiftUIModuleAvailable() {
+    // Verifies the QuillSwiftUI -> QuillKit -> QuillCore dependency chain compiles.
+    // Real wrapper tests will be added in Phase 7.
 }

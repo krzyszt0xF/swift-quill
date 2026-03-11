@@ -1,5 +1,5 @@
-import QuillCore
-import QuillKit
+@testable import QuillCore
+@testable import QuillKit
 import Testing
 
 @Suite("Block.isFlowContent classification")

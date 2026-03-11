@@ -1,5 +1,4 @@
-/// SAX-like events emitted during incremental markdown streaming.
-public enum ParserEvent: Equatable, Sendable {
+package enum ParserEvent: Equatable, Sendable {
     case codeBlockText(String)
     case endBlockQuote
     case endCodeBlock

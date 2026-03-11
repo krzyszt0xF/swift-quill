@@ -1,6 +1,4 @@
 import QuillKit
 
-/// QuillSwiftUI provides SwiftUI wrappers around QuillKit.
-public enum QuillSwiftUI: Sendable {
-    public static var kitVersion: String { QuillKit.coreVersion }
-}
+// QuillSwiftUI: minimal SwiftUI wrapper target.
+// Real wrapper work is deferred to Phase 7.
