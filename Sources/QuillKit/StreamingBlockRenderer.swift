@@ -43,7 +43,7 @@ public final class StreamingBlockRenderer {
         clearTail()
 
         let nodes = FlowSegmentBuilder.build(from: blocks)
-        let frozenNodeCount = computeFrozenNodeCount(blocks: blocks, frozenCount: frozenCount)
+        let frozenNodeCount = FlowSegmentBuilder.frozenNodeCount(blocks: blocks, frozenBlockCount: frozenCount)
         let existingCount = stackView.arrangedSubviews.count
 
         let promoteTo = min(frozenNodeCount, existingCount)
@@ -148,13 +148,9 @@ public final class StreamingBlockRenderer {
     }
 }
 
-private extension StreamingBlockRenderer {
-    enum TailDescriptor: Equatable {
-        case code(language: String?)
-        case flow
-        case table(columns: Int)
-    }
+// MARK: - View Lifecycle
 
+private extension StreamingBlockRenderer {
     func addViews(for nodes: ArraySlice<RenderNode>) -> [UIView] {
         var views: [UIView] = []
         let hasTailView = tailView != nil
@@ -177,8 +173,37 @@ private extension StreamingBlockRenderer {
         return views
     }
 
+    func applyStructuralSpacing(for view: UIView) {
+        if view is CodeBlockView || view is PlaceholderBlockView {
+            stackView.setCustomSpacing(12, after: view)
+        }
+    }
+
+    func removeTailViews() {
+        let views = stackView.arrangedSubviews
+        let hasTailView = tailView != nil
+        let upperBound = views.count - (hasTailView ? 2 : 1)
+        guard upperBound >= frozenViewCount else { return }
+
+        for index in stride(from: upperBound, through: frozenViewCount, by: -1) {
+            let view = views[index]
+            stackView.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+    }
+}
+
+// MARK: - Tail Management
+
+private extension StreamingBlockRenderer {
+    enum TailDescriptor: Equatable {
+        case code(language: String?)
+        case flow
+        case table(columns: Int)
+    }
+
     func applyFlow(block: Block, to textFlowView: TextFlowView, animateText: Bool) {
-        guard let attributedString = flowAttributedString(from: block) else { return }
+        guard let attributedString = makeFlowAttributedString(from: block) else { return }
 
         if animateText {
             textFlowView.configureStreaming(
@@ -198,41 +223,15 @@ private extension StreamingBlockRenderer {
         }
     }
 
-    func flowAttributedString(from block: Block) -> NSAttributedString? {
-        let nodes = FlowSegmentBuilder.build(from: [block])
-        guard case let .flow(segment) = nodes.first else {
-            return nil
+    func descriptor(for block: Block) -> TailDescriptor {
+        switch block {
+        case let .codeBlock(language, _):
+            return .code(language: language)
+        case let .table(_, header, _):
+            return .table(columns: header.cells.count)
+        case .blockquote, .heading, .htmlBlock, .orderedList, .paragraph, .thematicBreak, .unorderedList:
+            return .flow
         }
-
-        return AttributedStringBuilder.build(from: segment)
-    }
-
-    func makeTailView(for block: Block, animateFlowText: Bool) -> UIView {
-        let nodes = FlowSegmentBuilder.build(from: [block])
-        guard let node = nodes.first else {
-            return UIView()
-        }
-
-        let view = BlockRenderer.view(for: node)
-        if case .flow = node,
-           let textFlowView = view as? TextFlowView {
-            applyFlow(block: block, to: textFlowView, animateText: animateFlowText)
-        }
-
-        return view
-    }
-
-    func replaceTail(with view: UIView, descriptor: TailDescriptor, sourceBlock: Block) {
-        if let existingTail = tailView {
-            stackView.removeArrangedSubview(existingTail)
-            existingTail.removeFromSuperview()
-        }
-
-        stackView.addArrangedSubview(view)
-        applyStructuralSpacing(for: view)
-        tailView = view
-        tailDescriptor = descriptor
-        tailBlock = sourceBlock
     }
 
     func ensureTailIsLast() {
@@ -248,21 +247,29 @@ private extension StreamingBlockRenderer {
         applyStructuralSpacing(for: tailView)
     }
 
-    func descriptor(for block: Block) -> TailDescriptor {
-        switch block {
-        case let .codeBlock(language, _):
-            return .code(language: language)
-        case let .table(_, header, _):
-            return .table(columns: header.cells.count)
-        case .blockquote, .heading, .htmlBlock, .orderedList, .paragraph, .thematicBreak, .unorderedList:
-            return .flow
+    func makeFlowAttributedString(from block: Block) -> NSAttributedString? {
+        let nodes = FlowSegmentBuilder.build(from: [block])
+        guard case let .flow(segment) = nodes.first else {
+            return nil
         }
+
+        return AttributedStringBuilder.build(from: segment)
     }
 
-    func applyStructuralSpacing(for view: UIView) {
-        if view is CodeBlockView || view is PlaceholderBlockView {
-            stackView.setCustomSpacing(12, after: view)
+    func checkFlowPromotionCompatibility(tail: Block, frozen: Block) -> Bool {
+        guard let tailFlow = makeFlowAttributedString(from: tail)?.string,
+              let frozenFlow = makeFlowAttributedString(from: frozen)?.string else { return false }
+
+        let tailText = tailFlow.trimmingCharacters(in: .whitespacesAndNewlines)
+        let frozenText = frozenFlow.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard tailText.isEmpty == false, frozenText.isEmpty == false else { return false }
+
+        guard frozenText.hasPrefix(tailText) || tailText.hasPrefix(frozenText) else {
+            return false
         }
+
+        let overlapLength = min(tailText.count, frozenText.count)
+        return overlapLength >= 12 || tailText == frozenText
     }
 
     func isPromotionCompatible(tail: Block, frozen: Block) -> Bool {
@@ -278,24 +285,23 @@ private extension StreamingBlockRenderer {
             return tailHeader.cells.count == frozenHeader.cells.count
                 && frozenRows.count >= tailRows.count
         default:
-            return isFlowPromotionCompatible(tail: tail, frozen: frozen)
+            return checkFlowPromotionCompatibility(tail: tail, frozen: frozen)
         }
     }
 
-    func isFlowPromotionCompatible(tail: Block, frozen: Block) -> Bool {
-        guard let tailFlow = flowAttributedString(from: tail)?.string else { return false }
-        guard let frozenFlow = flowAttributedString(from: frozen)?.string else { return false }
-
-        let tailText = tailFlow.trimmingCharacters(in: .whitespacesAndNewlines)
-        let frozenText = frozenFlow.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard tailText.isEmpty == false, frozenText.isEmpty == false else { return false }
-
-        guard frozenText.hasPrefix(tailText) || tailText.hasPrefix(frozenText) else {
-            return false
+    func makeTailView(for block: Block, animateFlowText: Bool) -> UIView {
+        let nodes = FlowSegmentBuilder.build(from: [block])
+        guard let node = nodes.first else {
+            return UIView()
         }
 
-        let overlapLength = min(tailText.count, frozenText.count)
-        return overlapLength >= 12 || tailText == frozenText
+        let view = BlockRenderer.view(for: node)
+        if case .flow = node,
+           let textFlowView = view as? TextFlowView {
+            applyFlow(block: block, to: textFlowView, animateText: animateFlowText)
+        }
+
+        return view
     }
 
     func prepareTailForPromotion(
@@ -314,7 +320,7 @@ private extension StreamingBlockRenderer {
             }
         default:
             if let textFlowView = tailView as? TextFlowView,
-               let attributed = flowAttributedString(from: frozenBlock) {
+               let attributed = makeFlowAttributedString(from: frozenBlock) {
                 textFlowView.configure(with: attributed)
             }
         }
@@ -324,51 +330,16 @@ private extension StreamingBlockRenderer {
         }
     }
 
-    func computeFrozenNodeCount(blocks: [Block], frozenCount: Int) -> Int {
-        guard frozenCount > 0 else { return 0 }
-
-        var nodeCount = 0
-        var blockIndex = 0
-        var inFlowRun = false
-
-        for block in blocks {
-            if blockIndex >= frozenCount {
-                if inFlowRun && block.isFlowContent {
-                    break
-                }
-                break
-            }
-
-            if block.isFlowContent {
-                if !inFlowRun {
-                    inFlowRun = true
-                    nodeCount += 1
-                }
-            } else {
-                inFlowRun = false
-                nodeCount += 1
-            }
-
-            blockIndex += 1
+    func replaceTail(with view: UIView, descriptor: TailDescriptor, sourceBlock: Block) {
+        if let existingTail = tailView {
+            stackView.removeArrangedSubview(existingTail)
+            existingTail.removeFromSuperview()
         }
 
-        if inFlowRun && blockIndex < blocks.count && blocks[blockIndex].isFlowContent {
-            nodeCount -= 1
-        }
-
-        return max(nodeCount, 0)
-    }
-
-    func removeTailViews() {
-        let views = stackView.arrangedSubviews
-        let hasTailView = tailView != nil
-        let upperBound = views.count - (hasTailView ? 2 : 1)
-        guard upperBound >= frozenViewCount else { return }
-
-        for index in stride(from: upperBound, through: frozenViewCount, by: -1) {
-            let view = views[index]
-            stackView.removeArrangedSubview(view)
-            view.removeFromSuperview()
-        }
+        stackView.addArrangedSubview(view)
+        applyStructuralSpacing(for: view)
+        tailView = view
+        tailDescriptor = descriptor
+        tailBlock = sourceBlock
     }
 }
