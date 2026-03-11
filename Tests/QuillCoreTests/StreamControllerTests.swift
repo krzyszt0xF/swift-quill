@@ -163,6 +163,169 @@ struct StreamControllerTests {
     }
 }
 
+// MARK: - Static vs Streaming Parity
+
+@Suite("Static vs Streaming Parity")
+struct StaticStreamingParityTests {
+    @Test("Simple document produces identical blocks through static and streaming paths")
+    func simpleDocumentParity() async {
+        let markdown = "# Hello\n\nSome text.\n\n---\n\n"
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [3, 7, 5])
+
+        #expect(staticBlocks == streamedBlocks)
+    }
+
+    @Test("Paragraph transitions match between paths")
+    func paragraphTransitionParity() async {
+        let markdown = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.\n\n"
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [4, 9, 6, 11])
+
+        #expect(staticBlocks == streamedBlocks)
+    }
+
+    @Test("Heading levels match between paths")
+    func headingLevelParity() async {
+        let markdown = "# H1\n\n## H2\n\n### H3\n\nBody.\n\n"
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [5, 3, 8, 6])
+
+        #expect(staticBlocks == streamedBlocks)
+    }
+
+    @Test("Ordered and unordered lists match between paths")
+    func listParity() async {
+        let markdown = """
+        - alpha
+        - beta
+          - nested
+
+        1. one
+        2. two
+
+        """
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [6, 4, 9, 7, 3])
+
+        #expect(staticBlocks == streamedBlocks)
+    }
+
+    @Test("Code fence with language matches between paths")
+    func codeFenceParity() async {
+        let markdown = "```swift\nlet x = 1\nlet y = 2\n```\n\n"
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [8, 5, 12, 7])
+
+        #expect(staticBlocks == streamedBlocks)
+    }
+
+    @Test("Table matches between paths")
+    func tableParity() async {
+        let markdown = """
+        | Key | Value |
+        | --- | --- |
+        | mode | streaming |
+        | state | active |
+
+        """
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [10, 8, 14, 6, 11])
+
+        #expect(staticBlocks == streamedBlocks)
+    }
+
+    @Test("Mixed document with all block types matches between paths")
+    func mixedDocumentParity() async {
+        let markdown = """
+        # Title
+
+        Intro paragraph with **bold** and *italic*.
+
+        - bullet one
+        - bullet two
+
+        1. ordered one
+        2. ordered two
+
+        > A blockquote.
+
+        ```swift
+        let x = 1
+        ```
+
+        | A | B |
+        | - | - |
+        | 1 | 2 |
+
+        ---
+
+        Closing paragraph.
+
+        """
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [3, 7, 5, 9, 4, 11, 6, 8])
+
+        #expect(staticBlocks == streamedBlocks)
+        #expect(staticBlocks.count == streamedBlocks.count)
+    }
+
+    @Test("Single-character chunk splits produce parity")
+    func singleCharacterChunkParity() async {
+        let markdown = "# Hi\n\nWorld.\n\n"
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [1])
+
+        #expect(staticBlocks == streamedBlocks)
+    }
+}
+
+private extension StaticStreamingParityTests {
+    func streamAndReduce(_ markdown: String, chunkSizes: [Int]) async -> [Block] {
+        let chunks = chunk(markdown, sizes: chunkSizes)
+        let controller = MarkdownStreamController()
+        let stream = await controller.events()
+
+        Task {
+            for chunk in chunks {
+                await controller.append(chunk)
+            }
+            await controller.finish()
+        }
+
+        var state = BlockReducer.ReducerState()
+        for await event in stream {
+            BlockReducer.apply(event, to: &state)
+        }
+        return state.blocks
+    }
+
+    func chunk(_ text: String, sizes: [Int]) -> [String] {
+        let characters = Array(text)
+        var index = 0
+        var sizeIndex = 0
+        var chunks: [String] = []
+
+        while index < characters.count {
+            let size = sizes[sizeIndex % sizes.count]
+            let end = min(index + max(1, size), characters.count)
+            chunks.append(String(characters[index..<end]))
+            index = end
+            sizeIndex += 1
+        }
+
+        return chunks
+    }
+}
+
 // MARK: - Helpers
 
 private extension StreamControllerTests {

@@ -1,11 +1,11 @@
 # QuillSwiftUI
 
-SwiftUI wrappers for swift-quill.
+Minimal SwiftUI target for swift-quill.
 
-## Purpose
+## Status
 
-QuillSwiftUI provides idiomatic SwiftUI APIs for rendering both static and streaming markdown. It wraps QuillKit's UIKit views with proper coordinator lifecycle management.
+This target is intentionally minimal. It exists to establish the dependency chain (`QuillSwiftUI -> QuillKit -> QuillCore`) but does not yet provide a production SwiftUI wrapper. Real wrapper work is deferred to a future phase.
 
 ## Dependencies
 
-- **QuillKit** -- Wraps the UIKit rendering layer via `UIViewRepresentable`
+- **QuillKit** -- Will wrap the UIKit rendering layer via `UIViewRepresentable`

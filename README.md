@@ -10,12 +10,47 @@ swift-quill is organized as three layered targets with strict dependency boundar
 
 ```
 QuillSwiftUI  ->  QuillKit  ->  QuillCore  ->  swift-markdown
-(SwiftUI API)    (UIKit)       (Platform-agnostic)
+(SwiftUI stub)   (UIKit API)   (Parsing layer)
 ```
 
-- **[QuillCore](Sources/QuillCore/README.md)** -- Platform-agnostic markdown parsing and AST types. Depends on [swift-markdown](https://github.com/swiftlang/swift-markdown) but fully encapsulates it. Testable via `swift test` without a simulator.
-- **[QuillKit](Sources/QuillKit/README.md)** -- UIKit rendering infrastructure built on TextKit 2 with per-block architecture.
-- **[QuillSwiftUI](Sources/QuillSwiftUI/README.md)** -- SwiftUI wrappers providing idiomatic APIs for static and streaming markdown.
+- **[QuillCore](Sources/QuillCore/README.md)** -- Platform-agnostic markdown parsing, streaming infrastructure, and Block AST. All symbols are package-scoped. Depends on [swift-markdown](https://github.com/swiftlang/swift-markdown) but fully encapsulates it.
+- **[QuillKit](Sources/QuillKit/README.md)** -- UIKit rendering and product API. Public surface is limited to `QuillView` and preset-based configuration.
+- **[QuillSwiftUI](Sources/QuillSwiftUI/README.md)** -- Minimal SwiftUI target. Real wrapper work is deferred to a future phase.
+
+## Usage
+
+```swift
+import QuillKit
+
+// Static rendering
+let view = QuillView()
+view.markdown = "# Hello\n\nSome **bold** text."
+
+// Streaming
+let streamView = QuillView(streamingPreset: .balanced)
+streamView.append("# Title\n\n")
+streamView.append("Streaming content...")
+streamView.finish()
+
+// Reset and reuse
+streamView.reset()
+```
+
+### Presets
+
+```swift
+// Named presets
+view.streamingPreset = .snappy    // Faster reveal
+view.streamingPreset = .balanced  // Default
+view.streamingPreset = .longForm  // Deliberate pacing
+
+// Custom tuning
+view.streamingPreset = .custom(
+    speedMultiplier: 1.2,
+    tailAggressiveness: .aggressive,
+    bufferingDelay: 1.0
+)
+```
 
 ## Requirements
 
@@ -39,7 +74,7 @@ Then add the desired target to your module:
 .target(
     name: "YourApp",
     dependencies: [
-        .product(name: "QuillSwiftUI", package: "swift-quill"),
+        .product(name: "QuillKit", package: "swift-quill"),
     ]
 )
 ```
