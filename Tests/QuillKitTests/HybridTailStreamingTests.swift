@@ -8,29 +8,33 @@ struct HybridTailStreamingTests {
     @Test("Tail preview appears before paragraph freeze and commits without duplication")
     func tailAppearsBeforeFreeze() async throws {
         let view = makeQuillView(mode: .hybridTail)
-
-        view.append("Hello ")
-        await wait(milliseconds: 30)
-
         let stack = try #require(stackView(for: view))
+
         #expect(stack.arrangedSubviews.isEmpty)
 
-        view.append("hybrid tail\n")
-        await wait(milliseconds: 50)
+        view.append("Hello hybrid tail\n")
+        let previewAppeared = await eventually(timeout: .seconds(1.2)) {
+            stack.arrangedSubviews.count == 1
+                && stack.arrangedSubviews.first is TextFlowView
+        }
+        #expect(previewAppeared)
 
-        #expect(stack.arrangedSubviews.count == 1)
         let tailPreviewView = try #require(stack.arrangedSubviews.first)
-        #expect(tailPreviewView is TextFlowView)
 
         view.append("still typing\n")
-        await wait(milliseconds: 50)
-        #expect(stack.arrangedSubviews.count == 1)
+        let remainsSingleDuringTailUpdate = await eventually(timeout: .seconds(1.2)) {
+            stack.arrangedSubviews.count == 1
+                && stack.arrangedSubviews.first === tailPreviewView
+        }
+        #expect(remainsSingleDuringTailUpdate)
 
         view.append("\n")
-        await wait(milliseconds: 160)
-
-        #expect(stack.arrangedSubviews.count == 1)
-        #expect(stack.arrangedSubviews[0] === tailPreviewView)
+        let promotedWithoutDuplication = await eventually(timeout: .seconds(1.2)) {
+            stack.arrangedSubviews.count == 1
+                && stack.arrangedSubviews.first === tailPreviewView
+        }
+        #expect(promotedWithoutDuplication)
+        #expect(view.currentMarkdown == "Hello hybrid tail\nstill typing\n\n")
     }
 }
 
@@ -53,7 +57,21 @@ private extension HybridTailStreamingTests {
         view.subviews.first { $0 is UIStackView } as? UIStackView
     }
 
-    func wait(milliseconds: UInt64) async {
-        try? await Task.sleep(for: .milliseconds(milliseconds))
+    func eventually(
+        timeout: Duration = .milliseconds(800),
+        poll: Duration = .milliseconds(10),
+        _ condition: () -> Bool
+    ) async -> Bool {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+
+        while clock.now < deadline {
+            if condition() {
+                return true
+            }
+            try? await Task.sleep(for: poll)
+        }
+
+        return condition()
     }
 }

@@ -16,9 +16,11 @@ struct BufferedStreamingModeTests {
         #expect(stack.arrangedSubviews.isEmpty)
 
         view.append(String(repeating: "b", count: 220) + "\n\n")
-        await wait(milliseconds: 320)
+        let rendered = await eventually(timeout: .seconds(1.2)) {
+            stack.arrangedSubviews.isEmpty == false
+        }
 
-        #expect(stack.arrangedSubviews.isEmpty == false)
+        #expect(rendered)
         #expect(visibleTextCharacterCount(in: stack) >= 180)
     }
 
@@ -40,9 +42,11 @@ struct BufferedStreamingModeTests {
         #expect(stack.arrangedSubviews.isEmpty)
 
         view.append(String(repeating: "k", count: 220) + "\n\n")
-        await wait(milliseconds: 320)
+        let rendered = await eventually(timeout: .seconds(1.2)) {
+            stack.arrangedSubviews.isEmpty == false
+        }
 
-        #expect(stack.arrangedSubviews.isEmpty == false)
+        #expect(rendered)
         #expect(visibleTextCharacterCount(in: stack) >= 360)
     }
 
@@ -54,7 +58,17 @@ struct BufferedStreamingModeTests {
         view.append("Long paragraph: " + String(repeating: "x", count: 2200))
         view.finish()
 
-        await wait(milliseconds: 60)
+        let revealInProgress = await eventually(timeout: .seconds(1.2)) {
+            guard let textFlow = stack.arrangedSubviews.first(where: { $0 is TextFlowView }) as? TextFlowView else {
+                return false
+            }
+
+            return textFlow.totalCharacterCount > 0
+                && textFlow.lastRevealedIndex > 0
+                && textFlow.lastRevealedIndex < textFlow.totalCharacterCount
+        }
+
+        #expect(revealInProgress)
 
         let textFlow = try #require(stack.arrangedSubviews.first { $0 is TextFlowView } as? TextFlowView)
         #expect(textFlow.totalCharacterCount > 0)
@@ -88,6 +102,24 @@ private extension BufferedStreamingModeTests {
 
     func visibleTextCharacterCount(in stack: UIStackView) -> Int {
         stack.arrangedSubviews.compactMap { ($0 as? TextFlowView)?.totalCharacterCount }.reduce(0, +)
+    }
+
+    func eventually(
+        timeout: Duration = .milliseconds(800),
+        poll: Duration = .milliseconds(10),
+        _ condition: () -> Bool
+    ) async -> Bool {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+
+        while clock.now < deadline {
+            if condition() {
+                return true
+            }
+            try? await Task.sleep(for: poll)
+        }
+
+        return condition()
     }
 
     func wait(milliseconds: UInt64) async {
