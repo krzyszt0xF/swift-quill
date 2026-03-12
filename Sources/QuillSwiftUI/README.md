@@ -1,11 +1,21 @@
 # QuillSwiftUI
 
-Minimal SwiftUI target for swift-quill.
+SwiftUI wrapper over QuillKit's UIKit rendering layer.
 
-## Status
+## Views
 
-This target is intentionally minimal. It exists to establish the dependency chain (`QuillSwiftUI -> QuillKit -> QuillCore`) but does not yet provide a production SwiftUI wrapper. Real wrapper work is deferred to a future phase.
+- **`QuillMarkdownView`** -- Static rendering. Pass a markdown string; updates when the string changes.
+- **`QuillStreamView`** -- Streaming rendering. Consumes any `AsyncSequence<String>` and drives `QuillView` append/finish/error lifecycle.
+
+## Stream identity
+
+`QuillStreamView` does not diff `AsyncSequence` values (they are not `Equatable`). Use `.id(streamID)` with a value that changes each time you start a new stream. SwiftUI will tear down the old view and create a fresh one.
+
+```swift
+QuillStreamView(chunks: myStream, preset: .balanced)
+    .id(streamID)
+```
 
 ## Dependencies
 
-- **QuillKit** -- Will wrap the UIKit rendering layer via `UIViewRepresentable`
+- **QuillKit** -- wraps `QuillView` via `UIViewRepresentable`

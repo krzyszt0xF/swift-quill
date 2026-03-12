@@ -10,14 +10,31 @@ swift-quill is organized as three layered targets with strict dependency boundar
 
 ```
 QuillSwiftUI  ->  QuillKit  ->  QuillCore  ->  swift-markdown
-(SwiftUI stub)   (UIKit API)   (Parsing layer)
+(SwiftUI API)    (UIKit API)   (Parsing layer)
 ```
 
 - **[QuillCore](Sources/QuillCore/README.md)** -- Platform-agnostic markdown parsing, streaming infrastructure, and Block AST. All symbols are package-scoped. Depends on [swift-markdown](https://github.com/swiftlang/swift-markdown) but fully encapsulates it.
 - **[QuillKit](Sources/QuillKit/README.md)** -- UIKit rendering and product API. Public surface is limited to `QuillView` and preset-based configuration.
-- **[QuillSwiftUI](Sources/QuillSwiftUI/README.md)** -- Minimal SwiftUI target. Real wrapper work is deferred to a future phase.
+- **[QuillSwiftUI](Sources/QuillSwiftUI/README.md)** -- SwiftUI wrapper over QuillKit. Provides `QuillMarkdownView` for static rendering and `QuillStreamView` for streaming via `AsyncSequence`.
 
 ## Usage
+
+### SwiftUI
+
+```swift
+import QuillSwiftUI
+
+// Static rendering
+QuillMarkdownView(markdown: "# Hello\n\nSome **bold** text.")
+
+// Streaming via AsyncSequence
+QuillStreamView(chunks: myAsyncStream, preset: .balanced)
+    .id(streamID) // required: use a new id each time you start a new stream
+```
+
+> **Note:** `QuillStreamView` does not diff the `AsyncSequence` value itself. Use `.id(streamID)` with a changing identity to restart streaming. SwiftUI will tear down the old view and create a fresh one.
+
+### UIKit
 
 ```swift
 import QuillKit
@@ -71,12 +88,15 @@ dependencies: [
 Then add the desired target to your module:
 
 ```swift
-.target(
-    name: "YourApp",
-    dependencies: [
-        .product(name: "QuillKit", package: "swift-quill"),
-    ]
-)
+// UIKit
+.target(name: "YourApp", dependencies: [
+    .product(name: "QuillKit", package: "swift-quill"),
+])
+
+// SwiftUI
+.target(name: "YourApp", dependencies: [
+    .product(name: "QuillSwiftUI", package: "swift-quill"),
+])
 ```
 
 ## License
