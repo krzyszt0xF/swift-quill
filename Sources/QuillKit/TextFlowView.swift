@@ -248,6 +248,9 @@ final class TextFlowView: UIView {
 }
 
 private extension TextFlowView {
+    static var benchmarkMetricsEnabled = false
+    static var benchmarkUpdateLayoutCallCount = 0
+    static var benchmarkUpdateLayoutTotalNanoseconds: UInt64 = 0
     static let commaCharacters: Set<unichar> = [0x002C, 0xFF0C, 0x3001]
     static let sentenceCharacters: Set<unichar> = [0x002E, 0x0021, 0x003F, 0x000A]
     static let idleRevealPollInterval: TimeInterval = 0.016
@@ -562,6 +565,15 @@ private extension TextFlowView {
     }
 
     func updateLayout() {
+        let benchmarkStart = Self.benchmarkMetricsEnabled ? DispatchTime.now().uptimeNanoseconds : nil
+        defer {
+            if Self.benchmarkMetricsEnabled, let benchmarkStart {
+                let elapsedNanoseconds = DispatchTime.now().uptimeNanoseconds &- benchmarkStart
+                Self.benchmarkUpdateLayoutCallCount += 1
+                Self.benchmarkUpdateLayoutTotalNanoseconds &+= elapsedNanoseconds
+            }
+        }
+
         textContainer.size = CGSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude)
         textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
 
@@ -631,5 +643,24 @@ private extension TextFlowView {
         }
 
         return (minY == .greatestFiniteMagnitude ? 0 : minY, maxY)
+    }
+}
+
+extension TextFlowView {
+    static func benchmarkMetricsSnapshot() -> (updateLayoutCalls: Int, updateLayoutTotalDurationMs: Double) {
+        (
+            updateLayoutCalls: benchmarkUpdateLayoutCallCount,
+            updateLayoutTotalDurationMs: Double(benchmarkUpdateLayoutTotalNanoseconds) / 1_000_000
+        )
+    }
+
+    static func resetBenchmarkMetrics() {
+        benchmarkUpdateLayoutCallCount = 0
+        benchmarkUpdateLayoutTotalNanoseconds = 0
+    }
+
+    static func setBenchmarkMetricsEnabled(_ enabled: Bool) {
+        benchmarkMetricsEnabled = enabled
+        resetBenchmarkMetrics()
     }
 }

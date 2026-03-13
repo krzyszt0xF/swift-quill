@@ -24,7 +24,7 @@ public final class QuillView: UIView {
 
     private var internalConfiguration = QuillConfigurationMapper.resolve(.balanced)
 
-    private let renderer = StreamingBlockRenderer()
+    private let renderer: StreamingBlockRenderer
     private let sequencer = RevealSequencer()
     private var controller: MarkdownStreamController?
     private var heightInvalidationScheduled = false
@@ -40,10 +40,20 @@ public final class QuillView: UIView {
     private var moduleStreamGate = ModuleStreamGate()
     private var tailUpdateTask: Task<Void, Never>?
     private var pendingTailBlock: Block?
+    private var benchmarkModeEnabled = false
 
     public init(frame: CGRect = .zero, streamingPreset: QuillStreamingPreset = .balanced) {
         self.streamingPreset = streamingPreset
         self.internalConfiguration = QuillConfigurationMapper.resolve(streamingPreset)
+        self.renderer = StreamingBlockRenderer()
+        super.init(frame: frame)
+        commonInit()
+        applyInternalConfiguration()
+    }
+
+    @_spi(Benchmarking)
+    public init(frame: CGRect = .zero, rendererBackend: _RendererBackend) {
+        self.renderer = StreamingBlockRenderer(backend: rendererBackend.toInternal)
         super.init(frame: frame)
         commonInit()
         applyInternalConfiguration()
@@ -52,18 +62,21 @@ public final class QuillView: UIView {
     init(frame: CGRect, internalConfiguration: QuillRenderConfiguration) {
         self.streamingMode = internalConfiguration.streamingMode
         self.internalConfiguration = internalConfiguration
+        self.renderer = StreamingBlockRenderer()
         super.init(frame: frame)
         commonInit()
         applyInternalConfiguration()
     }
 
     public override init(frame: CGRect) {
+        self.renderer = StreamingBlockRenderer()
         super.init(frame: frame)
         commonInit()
         applyInternalConfiguration()
     }
 
     public required init?(coder: NSCoder) {
+        self.renderer = StreamingBlockRenderer()
         super.init(coder: coder)
         commonInit()
         applyInternalConfiguration()
@@ -161,21 +174,72 @@ public final class QuillView: UIView {
     }
 }
 
+// MARK: - Benchmarking SPI
+
+@_spi(Benchmarking)
+public extension QuillView {
+    enum _RendererBackend {
+        case containerView
+        case stackView
+    }
+
+    struct _TextFlowLayoutMetrics: Sendable {
+        public let updateLayoutCalls: Int
+        public let updateLayoutTotalDurationMs: Double
+    }
+
+    func _relayoutCurrentContent() {
+        renderer.runBenchmarkRelayoutPass()
+    }
+
+    func _resetTextFlowLayoutMetrics() {
+        TextFlowView.resetBenchmarkMetrics()
+    }
+
+    func _setBenchmarkMode(_ enabled: Bool) {
+        benchmarkModeEnabled = enabled
+        if enabled {
+            heightUpdateTask?.cancel()
+            heightUpdateTask = nil
+            heightInvalidationScheduled = false
+        }
+        TextFlowView.setBenchmarkMetricsEnabled(enabled)
+    }
+
+    func _textFlowLayoutMetrics() -> _TextFlowLayoutMetrics {
+        let snapshot = TextFlowView.benchmarkMetricsSnapshot()
+        return _TextFlowLayoutMetrics(
+            updateLayoutCalls: snapshot.updateLayoutCalls,
+            updateLayoutTotalDurationMs: snapshot.updateLayoutTotalDurationMs
+        )
+    }
+}
+
+extension QuillView._RendererBackend {
+    var toInternal: StreamingBlockRenderer.Backend {
+        switch self {
+        case .containerView: return .containerView
+        case .stackView: return .stackView
+        }
+    }
+}
+
 // MARK: - Layout
 
 private extension QuillView {
     func commonInit() {
-        let stack = renderer.stackView
-        addSubview(stack)
+        let host = renderer.hostView
+        host.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(host)
 
-        let bottom = stack.bottomAnchor.constraint(equalTo: bottomAnchor)
+        let bottom = host.bottomAnchor.constraint(equalTo: bottomAnchor)
         bottom.priority = .defaultLow
 
         NSLayoutConstraint.activate([
             bottom,
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stack.topAnchor.constraint(equalTo: topAnchor),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            host.leadingAnchor.constraint(equalTo: leadingAnchor),
+            host.topAnchor.constraint(equalTo: topAnchor),
+            host.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])
         sequencer.onLayoutChange = { [weak self] in
             self?.scheduleHeightUpdate()
@@ -241,10 +305,10 @@ private extension QuillView {
 
         setNeedsLayout()
         layoutIfNeeded()
-        renderer.stackView.setNeedsLayout()
-        renderer.stackView.layoutIfNeeded()
+        renderer.hostView.setNeedsLayout()
+        renderer.hostView.layoutIfNeeded()
 
-        let newHeight = ceil(renderer.stackView.bounds.height)
+        let newHeight = ceil(renderer.hostView.bounds.height)
         let oldHeight = lastNotifiedHeight
         let minDelta = max(0.5, internalConfiguration.layout.heightNotificationMinimumDelta)
         guard abs(newHeight - oldHeight) > minDelta else { return }
@@ -268,6 +332,13 @@ private extension QuillView {
     }
 
     func scheduleHeightUpdate() {
+        if benchmarkModeEnabled {
+            heightInvalidationScheduled = false
+            heightUpdateTask?.cancel()
+            heightUpdateTask = nil
+            return
+        }
+
         guard !heightInvalidationScheduled else { return }
         heightInvalidationScheduled = true
 
