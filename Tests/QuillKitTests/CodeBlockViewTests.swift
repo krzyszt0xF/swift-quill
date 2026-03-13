@@ -5,12 +5,6 @@ import UIKit
 @MainActor
 @Suite("CodeBlockView")
 struct CodeBlockViewTests {
-    @Test("Can be instantiated")
-    func canBeInstantiated() {
-        let view = CodeBlockView()
-        #expect(view is UIView)
-    }
-
     @Test("Configure with language shows language pill")
     func configureWithLanguageShowsPill() {
         let view = CodeBlockView()
@@ -50,6 +44,17 @@ struct CodeBlockViewTests {
             verticalFittingPriority: .fittingSizeLevel
         )
 
+        #expect(fittingSize.height > 36)
+    }
+
+    @Test("sizeThatFits returns visible height for manual container measurement")
+    func sizeThatFitsReturnsVisibleHeight() {
+        let view = CodeBlockView()
+        view.configure(language: "json", code: "{ \"stream\": true, \"chunks\": 42 }\n")
+
+        let fittingSize = view.sizeThatFits(CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude))
+
+        #expect(fittingSize.width == 320)
         #expect(fittingSize.height > 36)
     }
 

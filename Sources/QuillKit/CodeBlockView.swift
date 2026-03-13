@@ -51,6 +51,21 @@ final class CodeBlockView: UIView {
         }
     }
 
+    override func sizeThatFits(_ size: CGSize) -> CGSize {
+        let measuredWidth = resolvedMeasurementWidth(from: size.width)
+        guard measuredWidth > 0 else {
+            return CGSize(width: size.width, height: minimumMeasuredHeight)
+        }
+
+        let fittingSize = systemLayoutSizeFitting(
+            CGSize(width: measuredWidth, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        )
+
+        return CGSize(width: measuredWidth, height: max(fittingSize.height, minimumMeasuredHeight))
+    }
+
     func configure(language: String?, code: String) {
         currentLanguage = language
         textView.text = trimmedCode(code)
@@ -68,14 +83,31 @@ final class CodeBlockView: UIView {
             headerHeightConstraint?.constant = 0
             contentTopConstraint?.constant = 0
         }
+
+        invalidateIntrinsicContentSize()
+        setNeedsLayout()
     }
 
     func updateCode(_ code: String) {
         textView.text = trimmedCode(code)
+        invalidateIntrinsicContentSize()
+        setNeedsLayout()
     }
 }
 
 private extension CodeBlockView {
+    var minimumMeasuredHeight: CGFloat {
+        let headerHeight = (currentLanguage?.isEmpty == false) ? Layout.pillHeight + Layout.headerToCodeSpacing : 0
+        return (Layout.codeVerticalInset * 2) + headerHeight + Layout.minimumVisibleCodeHeight
+    }
+
+    func resolvedMeasurementWidth(from proposedWidth: CGFloat) -> CGFloat {
+        if proposedWidth > 0, proposedWidth != UIView.noIntrinsicMetric {
+            return proposedWidth
+        }
+        return bounds.width
+    }
+
     func trimmedCode(_ code: String) -> String {
         code.hasSuffix("\n") ? String(code.dropLast()) : code
     }
@@ -155,6 +187,7 @@ private extension CodeBlockView {
             textView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
             textView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             textView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            textView.widthAnchor.constraint(greaterThanOrEqualTo: scrollView.frameLayoutGuide.widthAnchor),
         ])
     }
 }

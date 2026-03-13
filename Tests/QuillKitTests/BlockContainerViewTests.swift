@@ -1,3 +1,4 @@
+import QuillCore
 @testable import QuillKit
 import Testing
 import UIKit
@@ -124,6 +125,38 @@ struct BlockContainerViewTests {
         #expect(abs(nextView.frame.origin.y - expectedGap) < 1)
     }
 
+    @Test("Structured views keep visible size in manual container layout")
+    func structuredViewsKeepVisibleSize() {
+        let container = BlockContainerView()
+        let codeView = CodeBlockView()
+        codeView.configure(language: "json", code: "{ \"stream\": true, \"chunks\": 42 }\n")
+
+        let header = Block.TableRow(cells: [
+            .init(content: [.text("Key")]),
+            .init(content: [.text("Value")]),
+        ])
+        let tableView = PlaceholderBlockView.table(header: header, rowCount: 2)
+
+        container.insertBlock(codeView, at: 0)
+        container.insertBlock(tableView, at: 1)
+
+        container.frame = CGRect(x: 0, y: 0, width: 320, height: 500)
+        container.layoutIfNeeded()
+
+        #expect(abs(codeView.frame.width - 320) < 1)
+        #expect(codeView.frame.height > 36)
+        #expect(abs(tableView.frame.width - 320) < 1)
+        #expect(tableView.frame.height >= 110)
+
+        let scrollView = findSubview(of: UIScrollView.self, in: codeView)
+        let placeholderIcon = findSubview(of: UIImageView.self, in: tableView)
+        let placeholderLabel = findSubview(of: UILabel.self, in: tableView)
+
+        #expect((scrollView?.frame.width ?? 0) > 200)
+        #expect(abs((placeholderIcon?.center.x ?? 0) - tableView.bounds.midX) < 1)
+        #expect(abs((placeholderLabel?.center.x ?? 0) - tableView.bounds.midX) < 1)
+    }
+
     @Test("Frozen prefix identity through trailing-index ops")
     func frozenPrefixIdentity() {
         let container = BlockContainerView()
@@ -214,5 +247,19 @@ private final class MeasurementCountingView: UIView {
     override func sizeThatFits(_ size: CGSize) -> CGSize {
         sizeThatFitsCallCount += 1
         return CGSize(width: size.width, height: fixedHeight)
+    }
+}
+
+private extension BlockContainerViewTests {
+    func findSubview<T: UIView>(of type: T.Type, in view: UIView) -> T? {
+        for subview in view.subviews {
+            if let match = subview as? T {
+                return match
+            }
+            if let found = findSubview(of: type, in: subview) {
+                return found
+            }
+        }
+        return nil
     }
 }

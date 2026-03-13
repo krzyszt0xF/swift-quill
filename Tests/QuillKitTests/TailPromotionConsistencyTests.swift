@@ -40,11 +40,11 @@ struct TailPromotionConsistencyTests {
         stable.finish()
         await wait(milliseconds: 220)
 
-        let hybridStack = try #require(stackView(for: hybrid))
-        let stableStack = try #require(stackView(for: stable))
+        let hybridContainer = try #require(containerView(for: hybrid))
+        let stableContainer = try #require(containerView(for: stable))
 
-        let hybridSignatures = hybridStack.arrangedSubviews.map(viewSignature)
-        let stableSignatures = stableStack.arrangedSubviews.map(viewSignature)
+        let hybridSignatures = hybridContainer.blockViews.map(viewSignature)
+        let stableSignatures = stableContainer.blockViews.map(viewSignature)
 
         #expect(hybridSignatures == stableSignatures)
         #expect(hybridSignatures.contains("code"))
@@ -70,8 +70,8 @@ private extension TailPromotionConsistencyTests {
         return view
     }
 
-    func stackView(for view: QuillView) -> UIStackView? {
-        view.subviews.first { $0 is UIStackView } as? UIStackView
+    func containerView(for view: QuillView) -> BlockContainerView? {
+        view.subviews.first { $0 is BlockContainerView } as? BlockContainerView
     }
 
     func nodeSignature(_ node: RenderNode) -> String {

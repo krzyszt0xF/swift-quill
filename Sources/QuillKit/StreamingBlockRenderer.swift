@@ -4,52 +4,23 @@ import UIKit
 
 @MainActor
 final class StreamingBlockRenderer {
-    enum Backend {
-        case containerView
-        case stackView
-    }
-
-    let backend: Backend
     private(set) var frozenViewCount: Int = 0
     private(set) var stateRegistry: [BlockState] = []
 
     var tailConfiguration: TailConfiguration = .default
 
-    var arrangedBlockViews: [UIView] {
-        switch storage {
-        case let .containerView(view): return view.blockViews
-        case let .stackView(view): return view.arrangedSubviews
-        }
+    var renderedBlockViews: [UIView] {
+        containerView.blockViews
     }
 
     var hostView: UIView {
-        switch storage {
-        case let .containerView(view): return view
-        case let .stackView(view): return view
-        }
+        containerView
     }
 
-    private let storage: BackendStorage
+    let containerView = BlockContainerView()
     private var tailBlock: Block?
     private var tailDescriptor: TailDescriptor?
     private weak var tailView: UIView?
-    private var viewRegistry: [UUID: UIView] = [:]
-
-    init(backend: Backend = .stackView) {
-        self.backend = backend
-
-        switch backend {
-        case .containerView:
-            storage = .containerView(BlockContainerView())
-        case .stackView:
-            let stackView = UIStackView()
-            stackView.alignment = .fill
-            stackView.axis = .vertical
-            stackView.spacing = 0
-            stackView.translatesAutoresizingMaskIntoConstraints = false
-            storage = .stackView(stackView)
-        }
-    }
 
     func append(blocks: [Block]) -> [UIView] {
         let nodes = FlowSegmentBuilder.build(from: blocks)
@@ -67,14 +38,8 @@ final class StreamingBlockRenderer {
             textFlowView.finishReveal()
         }
 
-        switch storage {
-        case let .containerView(containerView):
-            if let index = containerView.blockViews.firstIndex(where: { $0 === tailView }) {
-                containerView.removeBlock(at: index)
-            }
-        case let .stackView(stackView):
-            stackView.removeArrangedSubview(tailView)
-            tailView.removeFromSuperview()
+        if let index = containerView.blockViews.firstIndex(where: { $0 === tailView }) {
+            containerView.removeBlock(at: index)
         }
 
         tailDescriptor = nil
@@ -83,13 +48,8 @@ final class StreamingBlockRenderer {
     }
 
     func invalidateHeightCaches() {
-        switch storage {
-        case let .containerView(containerView):
-            containerView.invalidateAllHeightCaches()
-        case .stackView:
-            break
-        }
-        hostView.setNeedsLayout()
+        containerView.invalidateAllHeightCaches()
+        containerView.setNeedsLayout()
     }
 
     @discardableResult
@@ -111,33 +71,12 @@ final class StreamingBlockRenderer {
     }
 
     func reset() {
-        switch storage {
-        case let .containerView(containerView):
-            containerView.removeAllBlocks()
-        case let .stackView(stackView):
-            for view in stackView.arrangedSubviews.reversed() {
-                stackView.removeArrangedSubview(view)
-                view.removeFromSuperview()
-            }
-        }
-
+        containerView.removeAllBlocks()
         frozenViewCount = 0
         stateRegistry.removeAll()
-        viewRegistry.removeAll()
         tailDescriptor = nil
         tailBlock = nil
         tailView = nil
-    }
-
-    func runBenchmarkRelayoutPass() {
-        switch storage {
-        case let .containerView(containerView):
-            containerView.invalidateAllHeightCaches()
-            containerView.relayoutForBenchmarkPass()
-        case let .stackView(stackView):
-            stackView.setNeedsLayout()
-            stackView.layoutIfNeeded()
-        }
     }
 
     func update(blocks: [Block], frozenCount: Int) {
@@ -151,12 +90,7 @@ final class StreamingBlockRenderer {
         let nodes = FlowSegmentBuilder.build(from: blocks)
         let frozenNodeCount = FlowSegmentBuilder.frozenNodeCount(blocks: blocks, frozenBlockCount: frozenCount)
 
-        switch backend {
-        case .containerView:
-            applyContainerUpdate(nodes: nodes, frozenNodeCount: frozenNodeCount)
-        case .stackView:
-            applyStackViewUpdate(nodes: nodes, frozenNodeCount: frozenNodeCount)
-        }
+        applyContainerUpdate(nodes: nodes, frozenNodeCount: frozenNodeCount)
     }
 
     func updateTail(block: Block?) {
@@ -179,6 +113,7 @@ final class StreamingBlockRenderer {
                     to: existingTailView,
                     animateText: tailConfiguration.animateFlowTailText
                 )
+                containerView.invalidateBlockLayout(for: existingTailView)
                 tailDescriptor = descriptor
                 tailBlock = block
                 ensureTailIsLast()
@@ -191,6 +126,7 @@ final class StreamingBlockRenderer {
                existingTailView.currentLanguage == language,
                case let .codeBlock(_, code) = block {
                 existingTailView.updateCode(code)
+                containerView.invalidateBlockLayout(for: existingTailView)
                 tailDescriptor = descriptor
                 tailBlock = block
                 ensureTailIsLast()
@@ -201,6 +137,7 @@ final class StreamingBlockRenderer {
             if let existingTailView = tailView as? PlaceholderBlockView,
                case let .table(_, header, rows) = block {
                 existingTailView.configureTable(header: header, rowCount: rows.count)
+                containerView.invalidateBlockLayout(for: existingTailView)
                 tailDescriptor = descriptor
                 tailBlock = block
                 ensureTailIsLast()
@@ -218,34 +155,13 @@ final class StreamingBlockRenderer {
         replaceTail(with: view, descriptor: descriptor, sourceBlock: block)
     }
 
-    private enum BackendStorage {
-        case containerView(BlockContainerView)
-        case stackView(UIStackView)
-    }
-
     private static let signposter = OSSignposter(
         subsystem: "com.quill.renderer",
         category: "Performance"
     )
-
-    var containerView: BlockContainerView {
-        guard case let .containerView(view) = storage else {
-            assertionFailure("Accessed containerView on .stackView backend")
-            return BlockContainerView()
-        }
-        return view
-    }
-
-    var stackView: UIStackView {
-        guard case let .stackView(view) = storage else {
-            assertionFailure("Accessed stackView on .containerView backend")
-            return UIStackView()
-        }
-        return view
-    }
 }
 
-// MARK: - Backend Update Strategies
+// MARK: - Container Update
 
 private extension StreamingBlockRenderer {
     func applyContainerUpdate(nodes: [RenderNode], frozenNodeCount: Int) {
@@ -274,38 +190,23 @@ private extension StreamingBlockRenderer {
 
         for removal in removals.sorted(by: { $0.offset > $1.offset }) {
             containerView.removeBlock(at: removal.offset)
-            viewRegistry.removeValue(forKey: removal.id)
         }
 
         for insertion in insertions.sorted(by: { $0.offset < $1.offset }) {
             let state = newStates[insertion.offset]
-            let view = BlockRenderer.view(for: state.node)
-            viewRegistry[state.id] = view
+            let view = RenderNodeViewFactory.view(for: state.node)
             containerView.insertBlock(view, at: min(insertion.offset, containerView.blockViews.count))
         }
 
         let oldNodeByID = Dictionary(oldStates.map { ($0.id, $0.node) }, uniquingKeysWith: { _, new in new })
         for (index, state) in newStates.enumerated() {
             if let oldNode = oldNodeByID[state.id], oldNode != state.node {
-                let view = BlockRenderer.view(for: state.node)
-                viewRegistry[state.id] = view
+                let view = RenderNodeViewFactory.view(for: state.node)
                 containerView.updateBlock(at: index, with: view)
             }
         }
 
         stateRegistry = newStates
-    }
-
-    func applyStackViewUpdate(nodes: [RenderNode], frozenNodeCount: Int) {
-        let existingCount = stackView.arrangedSubviews.count
-
-        let promoteTo = min(frozenNodeCount, existingCount)
-        if promoteTo > frozenViewCount {
-            frozenViewCount = promoteTo
-        }
-
-        removeTailViews()
-        _ = addViews(for: nodes[frozenViewCount...])
     }
 
     func buildNewStates(nodes: [RenderNode], frozenNodeCount: Int) -> [BlockState] {
@@ -338,24 +239,12 @@ private extension StreamingBlockRenderer {
 
 private extension StreamingBlockRenderer {
     func addViews(for nodes: ArraySlice<RenderNode>) -> [UIView] {
-        switch storage {
-        case let .containerView(containerView):
-            return addViewsToContainer(containerView, for: nodes)
-        case let .stackView(stackView):
-            return addViewsToStackView(stackView, for: nodes)
-        }
-    }
-
-    func addViewsToContainer(
-        _ containerView: BlockContainerView,
-        for nodes: ArraySlice<RenderNode>
-    ) -> [UIView] {
         var views: [UIView] = []
         let hasTailView = tailView != nil
         var insertionIndex = max(0, containerView.blockViews.count - (hasTailView ? 1 : 0))
 
         for node in nodes {
-            let view = BlockRenderer.view(for: node)
+            let view = RenderNodeViewFactory.view(for: node)
 
             if hasTailView {
                 containerView.insertBlock(view, at: insertionIndex)
@@ -368,50 +257,6 @@ private extension StreamingBlockRenderer {
         }
 
         return views
-    }
-
-    func addViewsToStackView(
-        _ stackView: UIStackView,
-        for nodes: ArraySlice<RenderNode>
-    ) -> [UIView] {
-        var views: [UIView] = []
-        let hasTailView = tailView != nil
-        var insertionIndex = max(0, stackView.arrangedSubviews.count - (hasTailView ? 1 : 0))
-
-        for node in nodes {
-            let view = BlockRenderer.view(for: node)
-
-            if hasTailView {
-                stackView.insertArrangedSubview(view, at: insertionIndex)
-                insertionIndex += 1
-            } else {
-                stackView.addArrangedSubview(view)
-            }
-
-            applyStackViewSpacing(for: view)
-            views.append(view)
-        }
-
-        return views
-    }
-
-    func applyStackViewSpacing(for view: UIView) {
-        if view is CodeBlockView || view is PlaceholderBlockView {
-            stackView.setCustomSpacing(12, after: view)
-        }
-    }
-
-    func removeTailViews() {
-        let views = stackView.arrangedSubviews
-        let hasTailView = tailView != nil
-        let upperBound = views.count - (hasTailView ? 2 : 1)
-        guard upperBound >= frozenViewCount else { return }
-
-        for index in stride(from: upperBound, through: frozenViewCount, by: -1) {
-            let view = views[index]
-            stackView.removeArrangedSubview(view)
-            view.removeFromSuperview()
-        }
     }
 }
 
@@ -473,28 +318,14 @@ private extension StreamingBlockRenderer {
     }
 
     func ensureTailIsLast() {
-        guard let tailView else { return }
-
-        switch storage {
-        case let .containerView(containerView):
-            guard let currentIndex = containerView.blockViews.firstIndex(where: { $0 === tailView }),
-                  currentIndex != containerView.blockViews.count - 1
-            else {
-                return
-            }
-            containerView.removeBlock(at: currentIndex)
-            containerView.insertBlock(tailView, at: containerView.blockViews.count)
-
-        case let .stackView(stackView):
-            guard let currentIndex = stackView.arrangedSubviews.firstIndex(of: tailView),
-                  currentIndex != stackView.arrangedSubviews.count - 1
-            else {
-                return
-            }
-            stackView.removeArrangedSubview(tailView)
-            stackView.addArrangedSubview(tailView)
-            applyStackViewSpacing(for: tailView)
+        guard let tailView,
+              let currentIndex = containerView.blockViews.firstIndex(where: { $0 === tailView }),
+              currentIndex != containerView.blockViews.count - 1
+        else {
+            return
         }
+        containerView.removeBlock(at: currentIndex)
+        containerView.insertBlock(tailView, at: containerView.blockViews.count)
     }
 
     func isPromotionCompatible(tail: Block, frozen: Block) -> Bool {
@@ -529,7 +360,7 @@ private extension StreamingBlockRenderer {
             return UIView()
         }
 
-        let view = BlockRenderer.view(for: node)
+        let view = RenderNodeViewFactory.view(for: node)
         if case .flow = node,
            let textFlowView = view as? TextFlowView {
             applyFlow(block: block, to: textFlowView, animateText: animateFlowText)
@@ -566,24 +397,12 @@ private extension StreamingBlockRenderer {
 
     func replaceTail(with view: UIView, descriptor: TailDescriptor, sourceBlock: Block) {
         if let existingTail = tailView {
-            switch storage {
-            case let .containerView(containerView):
-                if let index = containerView.blockViews.firstIndex(where: { $0 === existingTail }) {
-                    containerView.removeBlock(at: index)
-                }
-            case let .stackView(stackView):
-                stackView.removeArrangedSubview(existingTail)
-                existingTail.removeFromSuperview()
+            if let index = containerView.blockViews.firstIndex(where: { $0 === existingTail }) {
+                containerView.removeBlock(at: index)
             }
         }
 
-        switch storage {
-        case let .containerView(containerView):
-            containerView.insertBlock(view, at: containerView.blockViews.count)
-        case let .stackView(stackView):
-            stackView.addArrangedSubview(view)
-            applyStackViewSpacing(for: view)
-        }
+        containerView.insertBlock(view, at: containerView.blockViews.count)
 
         tailView = view
         tailDescriptor = descriptor

@@ -9,57 +9,57 @@ struct BufferedStreamingModeTests {
     @Test("Buffered mode avoids tiny first commit before safe threshold")
     func avoidsTinyFirstCommit() async throws {
         let view = makeBufferedView(minModuleLength: 180, maxBufferingDelay: 0.2)
-        let stack = try #require(stackView(for: view))
+        let container = try #require(containerView(for: view))
 
         view.append(String(repeating: "a", count: 150))
         await wait(milliseconds: 280)
-        #expect(stack.arrangedSubviews.isEmpty)
+        #expect(container.blockViews.isEmpty)
 
         view.append(String(repeating: "b", count: 220) + "\n\n")
         let rendered = await eventually(timeout: .seconds(1.2)) {
-            stack.arrangedSubviews.isEmpty == false
+            container.blockViews.isEmpty == false
         }
 
         #expect(rendered)
-        #expect(visibleTextCharacterCount(in: stack) >= 180)
+        #expect(visibleTextCharacterCount(in: container) >= 180)
     }
 
     @Test("Buffered mode with slow chunks waits for larger module commit")
     func slowChunksPreferLargerCommit() async throws {
         let view = makeBufferedView(minModuleLength: 180, maxBufferingDelay: 4.0)
-        let stack = try #require(stackView(for: view))
+        let container = try #require(containerView(for: view))
 
         view.append(String(repeating: "x", count: 60))
         await wait(milliseconds: 420)
-        #expect(stack.arrangedSubviews.isEmpty)
+        #expect(container.blockViews.isEmpty)
 
         view.append(String(repeating: "y", count: 60))
         await wait(milliseconds: 420)
-        #expect(stack.arrangedSubviews.isEmpty)
+        #expect(container.blockViews.isEmpty)
 
         view.append(String(repeating: "z", count: 60))
         await wait(milliseconds: 420)
-        #expect(stack.arrangedSubviews.isEmpty)
+        #expect(container.blockViews.isEmpty)
 
         view.append(String(repeating: "k", count: 220) + "\n\n")
         let rendered = await eventually(timeout: .seconds(1.2)) {
-            stack.arrangedSubviews.isEmpty == false
+            container.blockViews.isEmpty == false
         }
 
         #expect(rendered)
-        #expect(visibleTextCharacterCount(in: stack) >= 360)
+        #expect(visibleTextCharacterCount(in: container) >= 360)
     }
 
     @Test("Finish does not force-complete queued reveal animation")
     func finishDoesNotForceCompleteQueuedReveal() async throws {
         let view = makeBufferedView(minModuleLength: 120, maxBufferingDelay: 4.0)
-        let stack = try #require(stackView(for: view))
+        let container = try #require(containerView(for: view))
 
         view.append("Long paragraph: " + String(repeating: "x", count: 2200))
         view.finish()
 
         let revealInProgress = await eventually(timeout: .seconds(1.2)) {
-            guard let textFlow = stack.arrangedSubviews.first(where: { $0 is TextFlowView }) as? TextFlowView else {
+            guard let textFlow = container.blockViews.first(where: { $0 is TextFlowView }) as? TextFlowView else {
                 return false
             }
 
@@ -70,7 +70,7 @@ struct BufferedStreamingModeTests {
 
         #expect(revealInProgress)
 
-        let textFlow = try #require(stack.arrangedSubviews.first { $0 is TextFlowView } as? TextFlowView)
+        let textFlow = try #require(container.blockViews.first { $0 is TextFlowView } as? TextFlowView)
         #expect(textFlow.totalCharacterCount > 0)
         #expect(textFlow.lastRevealedIndex < textFlow.totalCharacterCount)
     }
@@ -96,12 +96,12 @@ private extension BufferedStreamingModeTests {
         )
     }
 
-    func stackView(for view: QuillView) -> UIStackView? {
-        view.subviews.first { $0 is UIStackView } as? UIStackView
+    func containerView(for view: QuillView) -> BlockContainerView? {
+        view.subviews.first { $0 is BlockContainerView } as? BlockContainerView
     }
 
-    func visibleTextCharacterCount(in stack: UIStackView) -> Int {
-        stack.arrangedSubviews.compactMap { ($0 as? TextFlowView)?.totalCharacterCount }.reduce(0, +)
+    func visibleTextCharacterCount(in container: BlockContainerView) -> Int {
+        container.blockViews.compactMap { ($0 as? TextFlowView)?.totalCharacterCount }.reduce(0, +)
     }
 
     func eventually(

@@ -8,30 +8,30 @@ struct HybridTailStreamingTests {
     @Test("Tail preview appears before paragraph freeze and commits without duplication")
     func tailAppearsBeforeFreeze() async throws {
         let view = makeQuillView(mode: .hybridTail)
-        let stack = try #require(stackView(for: view))
+        let container = try #require(containerView(for: view))
 
-        #expect(stack.arrangedSubviews.isEmpty)
+        #expect(container.blockViews.isEmpty)
 
         view.append("Hello hybrid tail\n")
         let previewAppeared = await eventually(timeout: .seconds(1.2)) {
-            stack.arrangedSubviews.count == 1
-                && stack.arrangedSubviews.first is TextFlowView
+            container.blockViews.count == 1
+                && container.blockViews.first is TextFlowView
         }
         #expect(previewAppeared)
 
-        let tailPreviewView = try #require(stack.arrangedSubviews.first)
+        let tailPreviewView = try #require(container.blockViews.first)
 
         view.append("still typing\n")
         let remainsSingleDuringTailUpdate = await eventually(timeout: .seconds(1.2)) {
-            stack.arrangedSubviews.count == 1
-                && stack.arrangedSubviews.first === tailPreviewView
+            container.blockViews.count == 1
+                && container.blockViews.first === tailPreviewView
         }
         #expect(remainsSingleDuringTailUpdate)
 
         view.append("\n")
         let promotedWithoutDuplication = await eventually(timeout: .seconds(1.2)) {
-            stack.arrangedSubviews.count == 1
-                && stack.arrangedSubviews.first === tailPreviewView
+            container.blockViews.count == 1
+                && container.blockViews.first === tailPreviewView
         }
         #expect(promotedWithoutDuplication)
         #expect(view.currentMarkdown == "Hello hybrid tail\nstill typing\n\n")
@@ -53,8 +53,8 @@ private extension HybridTailStreamingTests {
         return view
     }
 
-    func stackView(for view: QuillView) -> UIStackView? {
-        view.subviews.first { $0 is UIStackView } as? UIStackView
+    func containerView(for view: QuillView) -> BlockContainerView? {
+        view.subviews.first { $0 is BlockContainerView } as? BlockContainerView
     }
 
     func eventually(

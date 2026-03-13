@@ -13,8 +13,8 @@ struct StreamingRendererTests {
 
         renderer.update(blocks: blocks, frozenCount: 1)
 
-        #expect(renderer.arrangedBlockViews.count == 1)
-        #expect(renderer.arrangedBlockViews[0] is TextFlowView)
+        #expect(renderer.renderedBlockViews.count == 1)
+        #expect(renderer.renderedBlockViews[0] is TextFlowView)
     }
 
     @Test("Paragraph then code block creates two views")
@@ -27,9 +27,9 @@ struct StreamingRendererTests {
 
         renderer.update(blocks: blocks, frozenCount: 2)
 
-        #expect(renderer.arrangedBlockViews.count == 2)
-        #expect(renderer.arrangedBlockViews[0] is TextFlowView)
-        #expect(renderer.arrangedBlockViews[1] is CodeBlockView)
+        #expect(renderer.renderedBlockViews.count == 2)
+        #expect(renderer.renderedBlockViews[0] is TextFlowView)
+        #expect(renderer.renderedBlockViews[1] is CodeBlockView)
     }
 
     @Test("Frozen views survive when tail is added")
@@ -42,8 +42,8 @@ struct StreamingRendererTests {
         ]
         renderer.update(blocks: blocks1, frozenCount: 2)
 
-        let frozenFlow = renderer.arrangedBlockViews[0]
-        let frozenCode = renderer.arrangedBlockViews[1]
+        let frozenFlow = renderer.renderedBlockViews[0]
+        let frozenCode = renderer.renderedBlockViews[1]
 
         let blocks2: [Block] = [
             .paragraph(content: [.text("Before")]),
@@ -52,10 +52,10 @@ struct StreamingRendererTests {
         ]
         renderer.update(blocks: blocks2, frozenCount: 2)
 
-        #expect(renderer.arrangedBlockViews.count == 3)
-        #expect(renderer.arrangedBlockViews[0] === frozenFlow)
-        #expect(renderer.arrangedBlockViews[1] === frozenCode)
-        #expect(renderer.arrangedBlockViews[2] is TextFlowView)
+        #expect(renderer.renderedBlockViews.count == 3)
+        #expect(renderer.renderedBlockViews[0] === frozenFlow)
+        #expect(renderer.renderedBlockViews[1] === frozenCode)
+        #expect(renderer.renderedBlockViews[2] is TextFlowView)
     }
 
     @Test("Frozen prefix with three structural nodes preserved across updates")
@@ -69,9 +69,9 @@ struct StreamingRendererTests {
         ]
         renderer.update(blocks: blocks1, frozenCount: 3)
 
-        let view0 = renderer.arrangedBlockViews[0]
-        let view1 = renderer.arrangedBlockViews[1]
-        let view2 = renderer.arrangedBlockViews[2]
+        let view0 = renderer.renderedBlockViews[0]
+        let view1 = renderer.renderedBlockViews[1]
+        let view2 = renderer.renderedBlockViews[2]
 
         let blocks2: [Block] = [
             .paragraph(content: [.text("A")]),
@@ -81,10 +81,10 @@ struct StreamingRendererTests {
         ]
         renderer.update(blocks: blocks2, frozenCount: 3)
 
-        #expect(renderer.arrangedBlockViews.count == 4)
-        #expect(renderer.arrangedBlockViews[0] === view0)
-        #expect(renderer.arrangedBlockViews[1] === view1)
-        #expect(renderer.arrangedBlockViews[2] === view2)
+        #expect(renderer.renderedBlockViews.count == 4)
+        #expect(renderer.renderedBlockViews[0] === view0)
+        #expect(renderer.renderedBlockViews[1] === view1)
+        #expect(renderer.renderedBlockViews[2] === view2)
     }
 
     @Test("Tail views are rebuilt not reused")
@@ -98,7 +98,7 @@ struct StreamingRendererTests {
         ]
         renderer.update(blocks: blocks1, frozenCount: 2)
 
-        let tailView1 = renderer.arrangedBlockViews[2]
+        let tailView1 = renderer.renderedBlockViews[2]
 
         let blocks2: [Block] = [
             .paragraph(content: [.text("A")]),
@@ -107,7 +107,7 @@ struct StreamingRendererTests {
         ]
         renderer.update(blocks: blocks2, frozenCount: 2)
 
-        let tailView2 = renderer.arrangedBlockViews[2]
+        let tailView2 = renderer.renderedBlockViews[2]
         #expect(tailView1 !== tailView2)
     }
 
@@ -119,10 +119,10 @@ struct StreamingRendererTests {
         let expandedTable = makeTableBlock(rowValues: [["alpha", "1"], ["beta", "2"]])
 
         renderer.updateTail(block: initialTable)
-        let firstTailView = try #require(renderer.arrangedBlockViews.last)
+        let firstTailView = try #require(renderer.renderedBlockViews.last)
 
         renderer.updateTail(block: expandedTable)
-        let secondTailView = try #require(renderer.arrangedBlockViews.last)
+        let secondTailView = try #require(renderer.renderedBlockViews.last)
 
         #expect(firstTailView === secondTailView)
     }
@@ -133,18 +133,18 @@ struct StreamingRendererTests {
         let tailBlock: Block = .paragraph(content: [.text("mutable frontier")])
 
         renderer.updateTail(block: tailBlock)
-        let previewView = try #require(renderer.arrangedBlockViews.last)
+        let previewView = try #require(renderer.renderedBlockViews.last)
 
         let promoted = renderer.promoteTailIfMatching(tailBlock)
         #expect(promoted === previewView)
-        #expect(renderer.arrangedBlockViews.count == 1)
-        #expect(renderer.arrangedBlockViews[0] === previewView)
+        #expect(renderer.renderedBlockViews.count == 1)
+        #expect(renderer.renderedBlockViews[0] === previewView)
 
         _ = renderer.append(blocks: [.codeBlock(language: nil, code: "let x = 1\n")])
 
-        #expect(renderer.arrangedBlockViews.count == 2)
-        #expect(renderer.arrangedBlockViews[0] === previewView)
-        #expect(renderer.arrangedBlockViews[1] is CodeBlockView)
+        #expect(renderer.renderedBlockViews.count == 2)
+        #expect(renderer.renderedBlockViews[0] === previewView)
+        #expect(renderer.renderedBlockViews[1] is CodeBlockView)
     }
 
     @Test("Compatible flow tail block can be promoted without exact equality")
@@ -154,12 +154,12 @@ struct StreamingRendererTests {
         let frozenBlock: Block = .paragraph(content: [.text("mutable frontier preview text with closing context")])
 
         renderer.updateTail(block: previewBlock)
-        let previewView = try #require(renderer.arrangedBlockViews.last)
+        let previewView = try #require(renderer.renderedBlockViews.last)
 
         let promoted = renderer.promoteTailIfMatching(frozenBlock)
         #expect(promoted === previewView)
-        #expect(renderer.arrangedBlockViews.count == 1)
-        #expect(renderer.arrangedBlockViews[0] === previewView)
+        #expect(renderer.renderedBlockViews.count == 1)
+        #expect(renderer.renderedBlockViews[0] === previewView)
     }
 
     @Test("Reset clears all views and state")
@@ -171,10 +171,11 @@ struct StreamingRendererTests {
             .codeBlock(language: nil, code: "code\n"),
         ]
         renderer.update(blocks: blocks, frozenCount: 2)
-        #expect(renderer.arrangedBlockViews.count == 2)
+        #expect(renderer.renderedBlockViews.count == 2)
 
         renderer.reset()
-        #expect(renderer.arrangedBlockViews.isEmpty)
+        #expect(renderer.renderedBlockViews.isEmpty)
+        #expect(renderer.stateRegistry.isEmpty)
     }
 
     @Test("Reset allows fresh start")
@@ -189,7 +190,7 @@ struct StreamingRendererTests {
         let blocks2: [Block] = [.paragraph(content: [.text("New")])]
         renderer.update(blocks: blocks2, frozenCount: 0)
 
-        #expect(renderer.arrangedBlockViews.count == 1)
+        #expect(renderer.renderedBlockViews.count == 1)
     }
 
     @Test("Structural blocks get 12pt custom spacing")
@@ -202,9 +203,15 @@ struct StreamingRendererTests {
             .paragraph(content: [.text("After")]),
         ]
         renderer.update(blocks: blocks, frozenCount: 3)
+        renderer.containerView.frame = CGRect(x: 0, y: 0, width: 320, height: 400)
+        renderer.containerView.layoutIfNeeded()
 
-        let codeView = renderer.stackView.arrangedSubviews[1]
-        #expect(renderer.stackView.customSpacing(after: codeView) == 12)
+        #expect(renderer.renderedBlockViews[1] is CodeBlockView)
+
+        let codeView = renderer.renderedBlockViews[1]
+        let trailingView = renderer.renderedBlockViews[2]
+
+        #expect(abs((trailingView.frame.minY - codeView.frame.maxY) - 12) < 1)
     }
 
     @Test("Multiple flow blocks group into single view")
@@ -218,8 +225,8 @@ struct StreamingRendererTests {
         ]
         renderer.update(blocks: blocks, frozenCount: 3)
 
-        #expect(renderer.arrangedBlockViews.count == 1)
-        #expect(renderer.arrangedBlockViews[0] is TextFlowView)
+        #expect(renderer.renderedBlockViews.count == 1)
+        #expect(renderer.renderedBlockViews[0] is TextFlowView)
     }
 
     @Test("Growing frozen count promotes views")
@@ -237,7 +244,7 @@ struct StreamingRendererTests {
             .codeBlock(language: nil, code: "x\n"),
         ]
         renderer.update(blocks: blocks2, frozenCount: 1)
-        let flowView = renderer.arrangedBlockViews[0]
+        let flowView = renderer.renderedBlockViews[0]
 
         let blocks3: [Block] = [
             .paragraph(content: [.text("A")]),
@@ -246,8 +253,8 @@ struct StreamingRendererTests {
         ]
         renderer.update(blocks: blocks3, frozenCount: 2)
 
-        #expect(renderer.arrangedBlockViews.count == 3)
-        #expect(renderer.arrangedBlockViews[0] === flowView)
+        #expect(renderer.renderedBlockViews.count == 3)
+        #expect(renderer.renderedBlockViews[0] === flowView)
     }
 
     @Test("Mixed reducer snapshots grow renderer and keep non-empty flow")
@@ -274,8 +281,8 @@ struct StreamingRendererTests {
             BlockReducer.apply(event, to: &state)
             renderer.update(blocks: state.blocks, frozenCount: state.frozenCount)
 
-            maxViewCount = max(maxViewCount, renderer.arrangedBlockViews.count)
-            if renderer.arrangedBlockViews.contains(where: { $0 is CodeBlockView }) {
+            maxViewCount = max(maxViewCount, renderer.renderedBlockViews.count)
+            if renderer.renderedBlockViews.contains(where: { $0 is CodeBlockView }) {
                 sawCodeBlockView = true
             }
         }
@@ -283,7 +290,7 @@ struct StreamingRendererTests {
         #expect(maxViewCount >= 2)
         #expect(sawCodeBlockView)
 
-        guard let flow = renderer.arrangedBlockViews.first(where: { $0 is TextFlowView }) as? TextFlowView else {
+        guard let flow = renderer.renderedBlockViews.first(where: { $0 is TextFlowView }) as? TextFlowView else {
             Issue.record("Expected at least one TextFlowView in mixed snapshots")
             return
         }
@@ -294,99 +301,14 @@ struct StreamingRendererTests {
     }
 }
 
-// MARK: - Container Backend Parity Tests
+// MARK: - Tail Integration Tests
 
 @MainActor
-@Suite("StreamingBlockRenderer container backend parity")
-struct StreamingRendererParityTests {
-    @Test("Single paragraph creates one TextFlowView with container backend")
-    func singleParagraphContainerBackend() {
-        let renderer = StreamingBlockRenderer(backend: .containerView)
-        let blocks: [Block] = [.paragraph(content: [.text("Hello")])]
-
-        renderer.update(blocks: blocks, frozenCount: 1)
-
-        #expect(renderer.arrangedBlockViews.count == 1)
-        #expect(renderer.arrangedBlockViews[0] is TextFlowView)
-    }
-
-    @Test("Frozen views survive tail add with container backend")
-    func frozenViewsSurviveContainerBackend() {
-        let renderer = StreamingBlockRenderer(backend: .containerView)
-
-        let blocks1: [Block] = [
-            .paragraph(content: [.text("Before")]),
-            .codeBlock(language: "swift", code: "let x = 1\n"),
-        ]
-        renderer.update(blocks: blocks1, frozenCount: 2)
-
-        let frozenFlow = renderer.arrangedBlockViews[0]
-        let frozenCode = renderer.arrangedBlockViews[1]
-
-        let blocks2: [Block] = [
-            .paragraph(content: [.text("Before")]),
-            .codeBlock(language: "swift", code: "let x = 1\n"),
-            .paragraph(content: [.text("After")]),
-        ]
-        renderer.update(blocks: blocks2, frozenCount: 2)
-
-        #expect(renderer.arrangedBlockViews.count == 3)
-        #expect(renderer.arrangedBlockViews[0] === frozenFlow)
-        #expect(renderer.arrangedBlockViews[1] === frozenCode)
-        #expect(renderer.arrangedBlockViews[2] is TextFlowView)
-    }
-
-    @Test("Reset clears all with container backend")
-    func resetClearsAllContainerBackend() {
-        let renderer = StreamingBlockRenderer(backend: .containerView)
-
-        let blocks: [Block] = [
-            .paragraph(content: [.text("Hello")]),
-            .codeBlock(language: nil, code: "code\n"),
-        ]
-        renderer.update(blocks: blocks, frozenCount: 2)
-        #expect(renderer.arrangedBlockViews.count == 2)
-
-        renderer.reset()
-        #expect(renderer.arrangedBlockViews.isEmpty)
-        #expect(renderer.stateRegistry.isEmpty)
-    }
-
-    @Test("View types match between backends for mixed content")
-    func viewTypesMatchBetweenBackends() {
-        let blocks: [Block] = [
-            .paragraph(content: [.text("Intro")]),
-            .codeBlock(language: "swift", code: "let x = 1\n"),
-            .paragraph(content: [.text("Mid")]),
-            .codeBlock(language: nil, code: "y\n"),
-            .paragraph(content: [.text("End")]),
-        ]
-
-        let stackRenderer = StreamingBlockRenderer(backend: .stackView)
-        stackRenderer.update(blocks: blocks, frozenCount: 5)
-
-        let containerRenderer = StreamingBlockRenderer(backend: .containerView)
-        containerRenderer.update(blocks: blocks, frozenCount: 5)
-
-        let stackViews = stackRenderer.arrangedBlockViews
-        let containerViews = containerRenderer.arrangedBlockViews
-
-        #expect(stackViews.count == containerViews.count)
-
-        for (index, stackView) in stackViews.enumerated() {
-            #expect(type(of: stackView) == type(of: containerViews[index]))
-        }
-    }
-}
-
-// MARK: - Container Backend Tail Integration Tests
-
-@MainActor
-@Suite("StreamingBlockRenderer container backend tail")
-struct StreamingRendererContainerTailTests {
-    @Test("Tail update with containerView backend")
-    func tailUpdateContainerBackend() {
-        let renderer = StreamingBlockRenderer(backend: .containerView)
+@Suite("StreamingBlockRenderer tail")
+struct StreamingRendererTailTests {
+    @Test("Tail update adds view after frozen content")
+    func tailUpdate() {
+        let renderer = StreamingBlockRenderer()
 
         let blocks: [Block] = [
             .paragraph(content: [.text("F1")]),
@@ -397,18 +319,18 @@ struct StreamingRendererContainerTailTests {
         ]
         renderer.update(blocks: blocks, frozenCount: 5)
 
-        let countBefore = renderer.arrangedBlockViews.count
+        let countBefore = renderer.renderedBlockViews.count
 
         let tailBlock: Block = .paragraph(content: [.text("tail content")])
         renderer.updateTail(block: tailBlock)
 
-        #expect(renderer.arrangedBlockViews.count == countBefore + 1)
-        #expect(renderer.arrangedBlockViews.last is TextFlowView)
+        #expect(renderer.renderedBlockViews.count == countBefore + 1)
+        #expect(renderer.renderedBlockViews.last is TextFlowView)
     }
 
-    @Test("Clear tail with containerView backend")
-    func clearTailContainerBackend() {
-        let renderer = StreamingBlockRenderer(backend: .containerView)
+    @Test("Clear tail removes the tail view")
+    func clearTail() {
+        let renderer = StreamingBlockRenderer()
 
         let blocks: [Block] = [
             .paragraph(content: [.text("F1")]),
@@ -417,30 +339,30 @@ struct StreamingRendererContainerTailTests {
         renderer.update(blocks: blocks, frozenCount: 2)
 
         renderer.updateTail(block: .paragraph(content: [.text("tail")]))
-        #expect(renderer.arrangedBlockViews.count == 3)
+        #expect(renderer.renderedBlockViews.count == 3)
 
         renderer.clearTail()
-        #expect(renderer.arrangedBlockViews.count == 2)
+        #expect(renderer.renderedBlockViews.count == 2)
     }
 
-    @Test("Tail promotion with containerView backend")
-    func tailPromotionContainerBackend() throws {
-        let renderer = StreamingBlockRenderer(backend: .containerView)
+    @Test("Tail promotion keeps the same view instance")
+    func tailPromotion() throws {
+        let renderer = StreamingBlockRenderer()
 
         let tailBlock: Block = .paragraph(content: [.text("mutable frontier")])
         renderer.updateTail(block: tailBlock)
-        let tailView = try #require(renderer.arrangedBlockViews.last)
+        let tailView = try #require(renderer.renderedBlockViews.last)
 
         let promoted = renderer.promoteTailIfMatching(tailBlock)
 
         #expect(promoted === tailView)
-        #expect(renderer.arrangedBlockViews.count == 1)
-        #expect(renderer.arrangedBlockViews[0] === tailView)
+        #expect(renderer.renderedBlockViews.count == 1)
+        #expect(renderer.renderedBlockViews[0] === tailView)
     }
 
-    @Test("Frozen prefix identity through full pipeline with containerView backend")
-    func frozenPrefixIdentityContainerBackend() {
-        let renderer = StreamingBlockRenderer(backend: .containerView)
+    @Test("Frozen prefix identity through full pipeline")
+    func frozenPrefixIdentity() {
+        let renderer = StreamingBlockRenderer()
 
         let blocks1: [Block] = [
             .paragraph(content: [.text("F1")]),
@@ -451,9 +373,9 @@ struct StreamingRendererContainerTailTests {
         ]
         renderer.update(blocks: blocks1, frozenCount: 3)
 
-        let frozenView0 = renderer.arrangedBlockViews[0]
-        let frozenView1 = renderer.arrangedBlockViews[1]
-        let frozenView2 = renderer.arrangedBlockViews[2]
+        let frozenView0 = renderer.renderedBlockViews[0]
+        let frozenView1 = renderer.renderedBlockViews[1]
+        let frozenView2 = renderer.renderedBlockViews[2]
 
         let blocks2: [Block] = [
             .paragraph(content: [.text("F1")]),
@@ -464,15 +386,9 @@ struct StreamingRendererContainerTailTests {
         ]
         renderer.update(blocks: blocks2, frozenCount: 3)
 
-        #expect(renderer.arrangedBlockViews[0] === frozenView0)
-        #expect(renderer.arrangedBlockViews[1] === frozenView1)
-        #expect(renderer.arrangedBlockViews[2] === frozenView2)
-    }
-}
-
-private extension UIView {
-    func subviews<T: UIView>(ofType type: T.Type) -> [T] {
-        subviews.compactMap { $0 as? T }
+        #expect(renderer.renderedBlockViews[0] === frozenView0)
+        #expect(renderer.renderedBlockViews[1] === frozenView1)
+        #expect(renderer.renderedBlockViews[2] === frozenView2)
     }
 }
 

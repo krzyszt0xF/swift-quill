@@ -23,10 +23,10 @@ struct QuillViewIntegrationTests {
 
         let matched = await eventually { streamedView.currentMarkdown == fullMarkdown }
         let renderedStreamed = await eventually {
-            stackView(for: streamedView)?.arrangedSubviews.isEmpty == false
+            containerView(for: streamedView)?.blockViews.isEmpty == false
         }
         let renderedStatic = await eventually {
-            stackView(for: staticView)?.arrangedSubviews.isEmpty == false
+            containerView(for: staticView)?.blockViews.isEmpty == false
         }
         let structuralMatched = await eventually(timeout: .milliseconds(1200)) {
             structuralSignatures(for: streamedView) == structuralSignatures(for: staticView)
@@ -59,7 +59,7 @@ struct QuillViewIntegrationTests {
         }
 
         let renderedBeforeFinish = await eventually {
-            stackView(for: view)?.arrangedSubviews.isEmpty == false
+            containerView(for: view)?.blockViews.isEmpty == false
         }
         let beforeSignatures = viewSignatures(for: view)
 
@@ -102,7 +102,7 @@ struct QuillViewIntegrationTests {
         #expect(view.currentMarkdown == "First paragraph\n\nSecond paragraph\n\n")
 
         let rendered = await eventually {
-            (stackView(for: view)?.arrangedSubviews.count ?? 0) >= 1
+            (containerView(for: view)?.blockViews.count ?? 0) >= 1
         }
         #expect(rendered)
     }
@@ -119,7 +119,7 @@ struct QuillViewIntegrationTests {
         #expect(view.currentMarkdown == "Before cancel\n\nAfter cancel\n\n")
 
         let rendered = await eventually {
-            (stackView(for: view)?.arrangedSubviews.count ?? 0) >= 1
+            (containerView(for: view)?.blockViews.count ?? 0) >= 1
         }
         #expect(rendered)
     }
@@ -134,7 +134,7 @@ struct QuillViewIntegrationTests {
         view.reset()
 
         #expect(view.currentMarkdown == nil)
-        #expect(stackView(for: view)?.arrangedSubviews.isEmpty == true)
+        #expect(containerView(for: view)?.blockViews.isEmpty == true)
     }
 
     // MARK: - Equivalence Tests
@@ -355,13 +355,13 @@ private extension QuillViewIntegrationTests {
         return view
     }
 
-    func stackView(for view: QuillView) -> UIStackView? {
-        view.subviews.first { $0 is UIStackView } as? UIStackView
+    func containerView(for view: QuillView) -> BlockContainerView? {
+        view.subviews.first { $0 is BlockContainerView } as? BlockContainerView
     }
 
     func viewSignatures(for view: QuillView) -> [String] {
-        guard let stack = stackView(for: view) else { return [] }
-        return stack.arrangedSubviews.map(viewSignature)
+        guard let container = containerView(for: view) else { return [] }
+        return container.blockViews.map(viewSignature)
     }
 
     func structuralSignatures(for view: QuillView) -> [String] {

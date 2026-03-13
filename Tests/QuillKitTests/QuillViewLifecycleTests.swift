@@ -39,8 +39,8 @@ struct QuillViewLifecycleTests {
         view.reset()
         #expect(view.currentMarkdown == nil)
 
-        let stack = stackView(for: view)
-        #expect(stack?.arrangedSubviews.isEmpty == true)
+        let container = containerView(for: view)
+        #expect(container?.blockViews.isEmpty == true)
     }
 
     @Test("finish then append auto-restarts stream")
@@ -54,7 +54,7 @@ struct QuillViewLifecycleTests {
         #expect(view.currentMarkdown == "First paragraph\n\nSecond paragraph\n\n")
 
         let rendered = await eventually {
-            (stackView(for: view)?.arrangedSubviews.count ?? 0) >= 1
+            (containerView(for: view)?.blockViews.count ?? 0) >= 1
         }
         #expect(rendered)
     }
@@ -70,7 +70,7 @@ struct QuillViewLifecycleTests {
         #expect(view.currentMarkdown == "First chunk continued\n\n")
 
         let rendered = await eventually {
-            (stackView(for: view)?.arrangedSubviews.count ?? 0) >= 1
+            (containerView(for: view)?.blockViews.count ?? 0) >= 1
         }
         #expect(rendered)
     }
@@ -143,8 +143,8 @@ private extension QuillViewLifecycleTests {
         return view
     }
 
-    func stackView(for view: QuillView) -> UIStackView? {
-        view.subviews.first { $0 is UIStackView } as? UIStackView
+    func containerView(for view: QuillView) -> BlockContainerView? {
+        view.subviews.first { $0 is BlockContainerView } as? BlockContainerView
     }
 
     func eventually(

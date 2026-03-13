@@ -46,9 +46,11 @@ final class BlockContainerView: UIView {
         heightCache.removeAll()
     }
 
-    func relayoutForBenchmarkPass() {
-        guard bounds.width > 0 else { return }
-        _ = performRelayoutPass(for: bounds.width)
+    func invalidateBlockLayout(for view: UIView) {
+        guard let index = blockViews.firstIndex(where: { $0 === view }) else { return }
+        heightCache.removeValue(forKey: index)
+        measuredHeightByView.removeValue(forKey: ObjectIdentifier(view))
+        setNeedsLayout()
     }
 
     func removeAllBlocks() {
@@ -128,6 +130,7 @@ private extension BlockContainerView {
             let targetFrame = CGRect(x: 0, y: currentY, width: width, height: height)
             if framesAreEquivalent(view.frame, targetFrame) == false {
                 view.frame = targetFrame
+                layoutStructuredViewIfNeeded(view)
             }
             currentY += height + (spacingAfter[index] ?? 0)
         }
@@ -152,6 +155,12 @@ private extension BlockContainerView {
         for key in heightCache.keys where key >= index {
             heightCache.removeValue(forKey: key)
         }
+    }
+
+    func layoutStructuredViewIfNeeded(_ view: UIView) {
+        guard view is CodeBlockView || view is PlaceholderBlockView else { return }
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
     }
 
     func measureHeight(

@@ -40,20 +40,10 @@ public final class QuillView: UIView {
     private var moduleStreamGate = ModuleStreamGate()
     private var tailUpdateTask: Task<Void, Never>?
     private var pendingTailBlock: Block?
-    private var benchmarkModeEnabled = false
-
     public init(frame: CGRect = .zero, streamingPreset: QuillStreamingPreset = .balanced) {
         self.streamingPreset = streamingPreset
         self.internalConfiguration = QuillConfigurationMapper.resolve(streamingPreset)
         self.renderer = StreamingBlockRenderer()
-        super.init(frame: frame)
-        commonInit()
-        applyInternalConfiguration()
-    }
-
-    @_spi(Benchmarking)
-    public init(frame: CGRect = .zero, rendererBackend: _RendererBackend) {
-        self.renderer = StreamingBlockRenderer(backend: rendererBackend.toInternal)
         super.init(frame: frame)
         commonInit()
         applyInternalConfiguration()
@@ -174,56 +164,6 @@ public final class QuillView: UIView {
     }
 }
 
-// MARK: - Benchmarking SPI
-
-@_spi(Benchmarking)
-public extension QuillView {
-    enum _RendererBackend {
-        case containerView
-        case stackView
-    }
-
-    struct _TextFlowLayoutMetrics: Sendable {
-        public let updateLayoutCalls: Int
-        public let updateLayoutTotalDurationMs: Double
-    }
-
-    func _relayoutCurrentContent() {
-        renderer.runBenchmarkRelayoutPass()
-    }
-
-    func _resetTextFlowLayoutMetrics() {
-        TextFlowView.resetBenchmarkMetrics()
-    }
-
-    func _setBenchmarkMode(_ enabled: Bool) {
-        benchmarkModeEnabled = enabled
-        if enabled {
-            heightUpdateTask?.cancel()
-            heightUpdateTask = nil
-            heightInvalidationScheduled = false
-        }
-        TextFlowView.setBenchmarkMetricsEnabled(enabled)
-    }
-
-    func _textFlowLayoutMetrics() -> _TextFlowLayoutMetrics {
-        let snapshot = TextFlowView.benchmarkMetricsSnapshot()
-        return _TextFlowLayoutMetrics(
-            updateLayoutCalls: snapshot.updateLayoutCalls,
-            updateLayoutTotalDurationMs: snapshot.updateLayoutTotalDurationMs
-        )
-    }
-}
-
-extension QuillView._RendererBackend {
-    var toInternal: StreamingBlockRenderer.Backend {
-        switch self {
-        case .containerView: return .containerView
-        case .stackView: return .stackView
-        }
-    }
-}
-
 // MARK: - Layout
 
 private extension QuillView {
@@ -332,13 +272,6 @@ private extension QuillView {
     }
 
     func scheduleHeightUpdate() {
-        if benchmarkModeEnabled {
-            heightInvalidationScheduled = false
-            heightUpdateTask?.cancel()
-            heightUpdateTask = nil
-            return
-        }
-
         guard !heightInvalidationScheduled else { return }
         heightInvalidationScheduled = true
 
