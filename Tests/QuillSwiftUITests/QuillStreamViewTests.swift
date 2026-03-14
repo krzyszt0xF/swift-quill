@@ -1,11 +1,57 @@
 @testable import QuillKit
 @testable import QuillSwiftUI
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
 @Suite("QuillStreamView")
 struct QuillStreamViewTests {
+    @Test("Already-rendered content is preserved after error")
+    func contentRemainsAfterStreamError() async throws {
+        let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
+        let coordinator = QuillStreamView<AsyncThrowingStream<String, Error>>.Coordinator(
+            preset: .balanced,
+            mode: .bufferedModules
+        )
+
+        coordinator.subscribe(to: stream, onError: { _ in })
+
+        continuation.yield("Kept ")
+        let partialContentRendered = await eventually {
+            coordinator.quillView.currentMarkdown == "Kept "
+        }
+        #expect(partialContentRendered)
+
+        continuation.finish(throwing: TestStreamError.failed)
+        let preservedContent = await eventually {
+            coordinator.quillView.currentMarkdown == "Kept "
+        }
+        #expect(preservedContent)
+    }
+
+    @Test("cancel() cancels subscription task and calls cancelStreaming")
+    func cancelStopsSubscription() async throws {
+        let (stream, continuation) = AsyncStream<String>.makeStream()
+        let coordinator = makeCoordinator()
+        coordinator.subscribe(to: stream, onError: nil)
+
+        continuation.yield("Before")
+        let initialContentRendered = await eventually {
+            coordinator.quillView.currentMarkdown == "Before"
+        }
+        #expect(initialContentRendered)
+
+        let markdownBeforeCancel = coordinator.quillView.currentMarkdown
+        coordinator.cancel()
+
+        continuation.yield("After")
+        await wait(for: .milliseconds(50))
+
+        #expect(markdownBeforeCancel == "Before")
+        #expect(coordinator.quillView.currentMarkdown == "Before")
+    }
+
     @Test("Coordinator subscribes to AsyncSequence and calls append per chunk")
     func coordinatorAppendsChunks() async throws {
         let (stream, continuation) = AsyncStream<String>.makeStream()
@@ -16,13 +62,14 @@ struct QuillStreamViewTests {
         continuation.yield("world")
         continuation.finish()
 
-        try await Task.sleep(for: .milliseconds(50))
-
-        #expect(coordinator.quillView.currentMarkdown == "Hello world")
+        let renderedCombinedMarkdown = await eventually {
+            coordinator.quillView.currentMarkdown == "Hello world"
+        }
+        #expect(renderedCombinedMarkdown)
     }
 
     @Test("Coordinator calls finish after stream completes normally")
-    func coordinatorFinishesOnCompletion() async throws {
+    func coordinatorFinishesAfterCompletion() async throws {
         let (stream, continuation) = AsyncStream<String>.makeStream()
         let coordinator = makeCoordinator()
         coordinator.subscribe(to: stream, onError: nil)
@@ -30,9 +77,10 @@ struct QuillStreamViewTests {
         continuation.yield("Done")
         continuation.finish()
 
-        try await Task.sleep(for: .milliseconds(50))
-
-        #expect(coordinator.quillView.currentMarkdown == "Done")
+        let renderedMarkdown = await eventually {
+            coordinator.quillView.currentMarkdown == "Done"
+        }
+        #expect(renderedMarkdown)
     }
 
     @Test("Coordinator calls cancelStreaming and invokes onError when stream throws")
@@ -42,77 +90,76 @@ struct QuillStreamViewTests {
             preset: .balanced,
             mode: .bufferedModules
         )
+        let errorCapture = ErrorCapture()
 
-        nonisolated(unsafe) var receivedError: Error?
         coordinator.subscribe(to: stream, onError: { error in
-            receivedError = error
+            Task {
+                await errorCapture.store(error)
+            }
         })
 
         continuation.yield("Partial ")
-        try await Task.sleep(for: .milliseconds(20))
+        let partialContentRendered = await eventually {
+            coordinator.quillView.currentMarkdown == "Partial "
+        }
+        #expect(partialContentRendered)
 
         continuation.finish(throwing: TestStreamError.failed)
-        try await Task.sleep(for: .milliseconds(50))
 
-        #expect(receivedError != nil)
+        let recordedError = await errorCapture.waitForValue(timeout: .milliseconds(800))
+        #expect(recordedError)
         #expect(coordinator.quillView.currentMarkdown == "Partial ")
     }
 
-    @Test("cancel() cancels subscription task and calls cancelStreaming")
-    func cancelStopsSubscription() async throws {
-        let (stream, continuation) = AsyncStream<String>.makeStream()
-        let coordinator = makeCoordinator()
-        coordinator.subscribe(to: stream, onError: nil)
-
-        continuation.yield("Before")
-        try await Task.sleep(for: .milliseconds(20))
-
-        let markdownBeforeCancel = coordinator.quillView.currentMarkdown
-        coordinator.cancel()
-
-        continuation.yield("After")
-        try await Task.sleep(for: .milliseconds(50))
-
-        #expect(markdownBeforeCancel == "Before")
-        #expect(coordinator.quillView.currentMarkdown == "Before")
-    }
-
     @Test("Generation counter prevents stale chunks from interleaving")
-    func generationCounterPreventsStaleChunks() async throws {
-        let (stream1, continuation1) = AsyncStream<String>.makeStream()
-        let (stream2, continuation2) = AsyncStream<String>.makeStream()
+    func generationCounterPreventsStaleChunksFromInterleaving() async throws {
+        let (firstStream, firstContinuation) = AsyncStream<String>.makeStream()
+        let (secondStream, secondContinuation) = AsyncStream<String>.makeStream()
         let coordinator = makeCoordinator()
 
-        coordinator.subscribe(to: stream1, onError: nil)
-        continuation1.yield("First ")
-        try await Task.sleep(for: .milliseconds(20))
+        coordinator.subscribe(to: firstStream, onError: nil)
+        firstContinuation.yield("First ")
+        let initialContentRendered = await eventually {
+            coordinator.quillView.currentMarkdown == "First "
+        }
+        #expect(initialContentRendered)
 
-        coordinator.subscribe(to: stream2, onError: nil)
+        coordinator.subscribe(to: secondStream, onError: nil)
 
-        continuation1.yield("stale")
-        continuation2.yield("Second")
-        try await Task.sleep(for: .milliseconds(50))
+        firstContinuation.yield("stale")
+        secondContinuation.yield("Second")
 
-        #expect(coordinator.quillView.currentMarkdown == "Second")
+        let replacedContentRendered = await eventually {
+            coordinator.quillView.currentMarkdown == "Second"
+        }
+        #expect(replacedContentRendered)
+    }
+}
+
+private actor ErrorCapture {
+    private var error: Error?
+
+    func hasValue() -> Bool {
+        error != nil
     }
 
-    @Test("Already-rendered content is preserved after error")
-    func contentPreservedAfterError() async throws {
-        let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
-        let coordinator = QuillStreamView<AsyncThrowingStream<String, Error>>.Coordinator(
-            preset: .balanced,
-            mode: .bufferedModules
-        )
+    func waitForValue(timeout: Duration) async -> Bool {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
 
-        coordinator.subscribe(to: stream, onError: { _ in })
+        while clock.now < deadline {
+            if hasValue() {
+                return true
+            }
 
-        continuation.yield("Kept ")
-        try await Task.sleep(for: .milliseconds(20))
+            try? await Task.sleep(for: .milliseconds(10))
+        }
 
-        continuation.finish(throwing: TestStreamError.failed)
-        try await Task.sleep(for: .milliseconds(50))
+        return hasValue()
+    }
 
-        #expect(coordinator.quillView.currentMarkdown == "Kept ")
+    func store(_ error: Error) {
+        self.error = error
     }
 }
 
@@ -127,4 +174,5 @@ private extension QuillStreamViewTests {
             mode: .bufferedModules
         )
     }
+
 }

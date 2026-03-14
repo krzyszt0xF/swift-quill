@@ -1,4 +1,5 @@
 import QuillCore
+import QuillCoreTestSupport
 import Testing
 
 @Suite("BlockReducer")
@@ -273,15 +274,5 @@ struct BlockReducerTests {
             .paragraph(content: [.text("first")]),
             .paragraph(content: [.text("second")]),
         ])])
-    }
-}
-
-private extension BlockReducerTests {
-    func reduce(_ events: [ParserEvent]) -> [Block] {
-        var state = BlockReducer.ReducerState()
-        for event in events {
-            BlockReducer.apply(event, to: &state)
-        }
-        return state.blocks
     }
 }
