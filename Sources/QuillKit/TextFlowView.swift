@@ -37,6 +37,8 @@ final class TextFlowView: UIView {
     private var revealFadeConfiguration = RevealFadeConfiguration()
     private var revealFadeTasks: [UUID: Task<Void, Never>] = [:]
     private var revealFadeGeneration = 0
+    private var cachedPrefixHeight: CGFloat = 0
+    private var cachedPrefixHeightKey: (revealIndex: Int, width: CGFloat) = (-1, 0)
 
     override var intrinsicContentSize: CGSize {
         CGSize(width: UIView.noIntrinsicMetric, height: heightConstraint?.constant ?? 0)
@@ -194,7 +196,6 @@ final class TextFlowView: UIView {
               attributedString.length > 0 else { return }
 
         originalAttributedString = NSAttributedString(attributedString: attributedString)
-
         let workingString = NSMutableAttributedString(attributedString: attributedString)
         let fullRange = NSRange(location: 0, length: workingString.length)
         workingString.addAttribute(.foregroundColor, value: UIColor.clear, range: fullRange)
@@ -202,8 +203,9 @@ final class TextFlowView: UIView {
 
         workingAttributedString = workingString
         textContentStorage.attributedString = workingString
-        textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
         lastRevealedIndex = 0
+        setNeedsLayout()
+        setNeedsDisplay()
     }
 
     func configureRevealFade(initialAlpha: CGFloat, duration: TimeInterval) {
@@ -228,6 +230,7 @@ final class TextFlowView: UIView {
 
         textContentStorage.attributedString = workingAttributedString
         lastRevealedIndex = index
+        setNeedsLayout()
         setNeedsDisplay()
 
         if revealFadeConfiguration.isEnabled {
@@ -261,6 +264,8 @@ private extension TextFlowView {
         streamingProfile = nil
         pendingStreamingStartTime = nil
         cancelRevealFadeTasks()
+
+        cachedPrefixHeightKey = (-1, 0)
 
         if clearTiming {
             lastStreamingUpdateTime = nil
@@ -577,6 +582,11 @@ private extension TextFlowView {
             return true
         }
 
+        let visibleHeight = visiblePrefixHeight(forWidth: bounds.width)
+        if visibleHeight > 0, visibleHeight < maxY {
+            maxY = visibleHeight
+        }
+
         if maxY == 0,
            let attributedString = textContentStorage.attributedString,
            attributedString.length > 0 {
@@ -590,6 +600,37 @@ private extension TextFlowView {
 
         heightConstraint?.constant = ceil(maxY)
         invalidateIntrinsicContentSize()
+    }
+
+    func visiblePrefixHeight(forWidth width: CGFloat) -> CGFloat {
+        guard width > 0,
+              lastRevealedIndex > 0,
+              let originalAttributedString,
+              lastRevealedIndex < originalAttributedString.length
+        else {
+            return 0
+        }
+
+        let key = (revealIndex: lastRevealedIndex, width: width)
+        if key == cachedPrefixHeightKey {
+            return cachedPrefixHeight
+        }
+
+        let visiblePrefix = originalAttributedString.attributedSubstring(
+            from: NSRange(location: 0, length: lastRevealedIndex)
+        )
+        let boundingSize = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+        let height = ceil(
+            visiblePrefix.boundingRect(
+                with: boundingSize,
+                options: [.usesLineFragmentOrigin],
+                context: nil
+            ).height
+        )
+
+        cachedPrefixHeight = height
+        cachedPrefixHeightKey = key
+        return height
     }
 
     func yRange(for characterRange: NSRange) -> (min: CGFloat, max: CGFloat) {
