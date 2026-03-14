@@ -125,6 +125,11 @@ final class RevealSequencer {
         let effectiveStepCount = max(1, Int(ceil(Double(totalCharacters) / Double(effectiveCharsPerStep))))
         let minimumBaseDuration = minimumTextAnimationWindow / Double(effectiveStepCount)
         let effectiveBaseDuration = max(timing.baseDuration, minimumBaseDuration)
+        let jitterScale = timing.baseDuration > 0 ? timing.jitterMax / timing.baseDuration : 0
+        let effectiveJitterMax = min(
+            0.018,
+            max(timing.jitterMax, effectiveBaseDuration * jitterScale)
+        )
 
         return ResolvedTiming(
             charsPerStep: effectiveCharsPerStep,
@@ -132,7 +137,7 @@ final class RevealSequencer {
             elementGapDuration: timing.elementGapDuration,
             commaPause: timing.commaPause,
             sentencePause: timing.sentencePause,
-            jitterMax: timing.jitterMax
+            jitterMax: effectiveJitterMax
         )
     }
 }

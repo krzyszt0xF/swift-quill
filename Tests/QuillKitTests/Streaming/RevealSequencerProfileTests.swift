@@ -125,6 +125,8 @@ struct RevealSequencerProfileTests {
         #expect(tinyTextTiming.charsPerStep == 1)
         #expect(approximatelyEqual(shortTextTiming.baseDuration, 0.012))
         #expect(approximatelyEqual(tinyTextTiming.baseDuration, 0.04))
+        #expect(shortTextTiming.jitterMax == baseTiming.jitterMax)
+        #expect(tinyTextTiming.jitterMax > baseTiming.jitterMax)
     }
 
     @Test("Performance profile scales base timings")

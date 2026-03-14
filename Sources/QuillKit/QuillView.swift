@@ -210,8 +210,8 @@ private extension QuillView {
         sequencer.setFixedTiming(
             internalConfiguration.streamingMode == .bufferedModules
                 ? RevealSequencer.ResolvedTiming(
-                    charsPerStep: 6,
-                    baseDuration: 0.012,
+                    charsPerStep: 4,
+                    baseDuration: 0.014,
                     elementGapDuration: 0.04,
                     commaPause: 0.03,
                     sentencePause: 0.08,
@@ -221,7 +221,7 @@ private extension QuillView {
         )
         sequencer.setMinimumTextAnimationWindow(
             internalConfiguration.streamingMode == .bufferedModules
-                ? 0.24
+                ? 0.4
                 : 0
         )
 

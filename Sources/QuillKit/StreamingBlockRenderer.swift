@@ -278,7 +278,7 @@ private extension StreamingBlockRenderer {
                 charsPerStep: tailConfiguration.flowTailCharsPerStep,
                 baseDuration: tailConfiguration.flowTailBaseDuration,
                 commaPause: tailConfiguration.flowTailCommaPause,
-                sentencePause: tailConfiguration.flowTailSentencePause,
+                sentencePause: tailConfiguration.flowTailSentencePause, jitterMax: tailConfiguration.flowTailJitterMax,
                 startBufferCharacters: tailConfiguration.flowTailStartBufferCharacters,
                 maxStartDelay: tailConfiguration.flowTailMaxStartDelay,
                 idleTimeout: tailConfiguration.flowTailIdleTimeout,

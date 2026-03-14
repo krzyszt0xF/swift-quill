@@ -5,6 +5,7 @@ final class TextFlowView: UIView {
         var charsPerStep: Int
         var baseDuration: TimeInterval
         var commaPause: TimeInterval
+        var jitterMax: TimeInterval
         var sentencePause: TimeInterval
     }
 
@@ -107,11 +108,12 @@ final class TextFlowView: UIView {
         baseDuration: TimeInterval,
         commaPause: TimeInterval,
         sentencePause: TimeInterval,
+        jitterMax: TimeInterval = 0,
         startBufferCharacters: Int = 0,
         maxStartDelay: TimeInterval = 0,
         idleTimeout: TimeInterval = 0.30,
-        revealInitialAlpha: CGFloat = 0.2,
-        revealFadeDuration: TimeInterval = 0.08
+        revealInitialAlpha: CGFloat = 1,
+        revealFadeDuration: TimeInterval = 0
     ) {
         guard shouldAnimateStreamingUpdate(with: attributedString) else {
             configure(with: attributedString)
@@ -129,6 +131,7 @@ final class TextFlowView: UIView {
         let resolvedCharsPerStep = max(1, charsPerStep)
         let resolvedBaseDuration = max(0.001, baseDuration)
         let resolvedCommaPause = max(0, commaPause)
+        let resolvedJitterMax = max(0, jitterMax)
         let resolvedSentencePause = max(0, sentencePause)
         let resolvedStartBufferCharacters = max(0, startBufferCharacters)
         let resolvedMaxStartDelay = max(0, maxStartDelay)
@@ -146,6 +149,7 @@ final class TextFlowView: UIView {
             charsPerStep: resolvedCharsPerStep,
             baseDuration: resolvedBaseDuration,
             commaPause: resolvedCommaPause,
+            jitterMax: resolvedJitterMax,
             sentencePause: resolvedSentencePause
         )
 
@@ -448,6 +452,7 @@ private extension TextFlowView {
                     to: nextIndex,
                     baseDuration: profile.baseDuration,
                     commaPause: profile.commaPause,
+                    jitterMax: profile.jitterMax,
                     sentencePause: profile.sentencePause
                 )
 
@@ -546,6 +551,7 @@ private extension TextFlowView {
         to endIndex: Int,
         baseDuration: TimeInterval,
         commaPause: TimeInterval,
+        jitterMax: TimeInterval,
         sentencePause: TimeInterval
     ) -> TimeInterval {
         let lowerBound = max(0, startIndex)
@@ -563,7 +569,8 @@ private extension TextFlowView {
             }
         }
 
-        return baseDuration + extraDuration
+        let jitter = jitterMax > 0 ? Double.random(in: 0...jitterMax) : 0
+        return baseDuration + extraDuration + jitter
     }
 
     func updateLayout() {
