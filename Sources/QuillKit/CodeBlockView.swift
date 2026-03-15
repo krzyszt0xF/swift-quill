@@ -16,8 +16,18 @@ final class CodeBlockView: UIView {
     private let textView = UITextView()
     private var headerHeightConstraint: NSLayoutConstraint?
     private var contentTopConstraint: NSLayoutConstraint?
+    var revealProgress: CGFloat = 1
 
     private(set) var currentLanguage: String?
+
+    override var intrinsicContentSize: CGSize {
+        let measuredWidth = resolvedMeasurementWidth(from: bounds.width)
+        guard measuredWidth > 0 else {
+            return CGSize(width: UIView.noIntrinsicMetric, height: scaledHeight(for: minimumMeasuredHeight))
+        }
+
+        return CGSize(width: UIView.noIntrinsicMetric, height: scaledHeight(for: measuredHeight(for: measuredWidth)))
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -51,6 +61,15 @@ final class CodeBlockView: UIView {
         }
     }
 
+    override func sizeThatFits(_ size: CGSize) -> CGSize {
+        let measuredWidth = resolvedMeasurementWidth(from: size.width)
+        guard measuredWidth > 0 else {
+            return CGSize(width: size.width, height: scaledHeight(for: minimumMeasuredHeight))
+        }
+
+        return CGSize(width: measuredWidth, height: scaledHeight(for: measuredHeight(for: measuredWidth)))
+    }
+
     func configure(language: String?, code: String) {
         currentLanguage = language
         textView.text = trimmedCode(code)
@@ -68,14 +87,50 @@ final class CodeBlockView: UIView {
             headerHeightConstraint?.constant = 0
             contentTopConstraint?.constant = 0
         }
+
+        invalidateIntrinsicContentSize()
+        setNeedsLayout()
     }
 
     func updateCode(_ code: String) {
         textView.text = trimmedCode(code)
+        invalidateIntrinsicContentSize()
+        setNeedsLayout()
     }
 }
 
 private extension CodeBlockView {
+    func measuredHeight(for width: CGFloat) -> CGFloat {
+        let availableWidth = max(width - (Layout.codeHorizontalInset * 2), 0)
+        let codeHeight = max(
+            Layout.minimumVisibleCodeHeight,
+            textView.sizeThatFits(CGSize(width: availableWidth, height: .greatestFiniteMagnitude)).height
+        )
+        let headerHeight = headerHeightConstraint?.constant ?? 0
+        let contentTopSpacing = contentTopConstraint?.constant ?? 0
+
+        return max(
+            minimumMeasuredHeight,
+            Layout.codeVerticalInset + headerHeight + contentTopSpacing + codeHeight + Layout.codeVerticalInset
+        )
+    }
+
+    var minimumMeasuredHeight: CGFloat {
+        let headerHeight = (currentLanguage?.isEmpty == false) ? Layout.pillHeight + Layout.headerToCodeSpacing : 0
+        return (Layout.codeVerticalInset * 2) + headerHeight + Layout.minimumVisibleCodeHeight
+    }
+
+    func resolvedMeasurementWidth(from proposedWidth: CGFloat) -> CGFloat {
+        if proposedWidth > 0, proposedWidth != UIView.noIntrinsicMetric {
+            return proposedWidth
+        }
+        return bounds.width
+    }
+
+    func scaledHeight(for height: CGFloat) -> CGFloat {
+        ceil(max(0, height * revealProgress))
+    }
+
     func trimmedCode(_ code: String) -> String {
         code.hasSuffix("\n") ? String(code.dropLast()) : code
     }
@@ -155,6 +210,7 @@ private extension CodeBlockView {
             textView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
             textView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             textView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            textView.widthAnchor.constraint(greaterThanOrEqualTo: scrollView.frameLayoutGuide.widthAnchor),
         ])
     }
 }
@@ -169,5 +225,12 @@ private extension CodeBlockView {
         override func drawText(in rect: CGRect) {
             super.drawText(in: rect.insetBy(dx: 4, dy: 2))
         }
+    }
+}
+
+extension CodeBlockView: BlockRevealAnimating {
+    func currentRevealHeight() -> CGFloat {
+        let width = resolvedMeasurementWidth(from: bounds.width)
+        return scaledHeight(for: width > 0 ? measuredHeight(for: width) : minimumMeasuredHeight)
     }
 }

@@ -1,12 +1,15 @@
 @testable import QuillKit
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
 @Suite("QuillView Height Coalescing")
 struct QuillViewHeightCoalescingTests {
+    private static let coalescingWindowLowerBound: TimeInterval = 0.045
+
     @Test("Rapid updates coalesce into one height notification per scheduler window")
-    func coalescesHeightUpdates() async {
+    func rapidUpdatesCoalesceHeightCallbacks() async {
         let configuration = QuillRenderConfiguration(
             streamingMode: .stableBlocks,
             performanceProfile: .balanced,
@@ -27,24 +30,18 @@ struct QuillViewHeightCoalescingTests {
             view.markdown = markdown
         }
 
-        await wait(milliseconds: 140)
+        await wait(for: .milliseconds(140))
         #expect(callbackTimes.count <= 1)
 
         view.markdown = Array(repeating: "expanded", count: 12).joined(separator: "\n\n")
-        await wait(milliseconds: 140)
+        await wait(for: .milliseconds(140))
 
         #expect(callbackTimes.count >= 1)
         #expect(callbackTimes.count <= 2)
 
         if callbackTimes.count == 2 {
-            let delta = callbackTimes[1].timeIntervalSince(callbackTimes[0])
-            #expect(delta >= 0.045)
+            let callbackDelta = callbackTimes[1].timeIntervalSince(callbackTimes[0])
+            #expect(callbackDelta >= Self.coalescingWindowLowerBound)
         }
-    }
-}
-
-private extension QuillViewHeightCoalescingTests {
-    func wait(milliseconds: UInt64) async {
-        try? await Task.sleep(for: .milliseconds(milliseconds))
     }
 }

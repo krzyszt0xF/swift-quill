@@ -1,4 +1,5 @@
 @testable import QuillKit
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
@@ -20,62 +21,14 @@ struct TextFlowViewStreamingTests {
 
         #expect(view.lastRevealedIndex == 5)
 
-        _ = await waitUntil(timeoutMilliseconds: 400) {
+        let revealAdvanced = await eventually(timeout: .milliseconds(400)) {
             view.lastRevealedIndex > 5
         }
-        #expect(view.lastRevealedIndex > 5)
+        #expect(revealAdvanced)
         #expect(view.lastRevealedIndex < 11)
 
         view.finishReveal()
         #expect(view.lastRevealedIndex == 11)
-    }
-
-    @Test("Prefix mismatch falls back to immediate full update")
-    func prefixMismatchFallsBackToImmediateUpdate() {
-        let view = TextFlowView(frame: CGRect(x: 0, y: 0, width: 320, height: 0))
-        view.configure(with: NSAttributedString(string: "Hello"))
-
-        view.configureStreaming(
-            with: NSAttributedString(string: "Jello"),
-            charsPerStep: 1,
-            baseDuration: 0.100,
-            commaPause: 0,
-            sentencePause: 0
-        )
-
-        #expect(view.lastRevealedIndex == 5)
-    }
-
-    @Test("Buffered streaming waits for backlog before starting reveal")
-    func bufferedStreamingWaitsForBacklog() async {
-        let view = TextFlowView(frame: CGRect(x: 0, y: 0, width: 320, height: 0))
-        view.configure(with: NSAttributedString(string: "Hello"))
-
-        view.configureStreaming(
-            with: NSAttributedString(string: "Hello world"),
-            charsPerStep: 1,
-            baseDuration: 0.010,
-            commaPause: 0,
-            sentencePause: 0,
-            startBufferCharacters: 20,
-            maxStartDelay: 0.200
-        )
-
-        await wait(milliseconds: 80)
-        #expect(view.lastRevealedIndex == 5)
-
-        view.configureStreaming(
-            with: NSAttributedString(string: "Hello world, this now has enough buffered text."),
-            charsPerStep: 1,
-            baseDuration: 0.010,
-            commaPause: 0,
-            sentencePause: 0,
-            startBufferCharacters: 20,
-            maxStartDelay: 0.200
-        )
-
-        await wait(milliseconds: 80)
-        #expect(view.lastRevealedIndex > 5)
     }
 
     @Test("Buffered streaming starts after max delay when backlog stays below threshold")
@@ -94,8 +47,90 @@ struct TextFlowViewStreamingTests {
         )
 
         #expect(view.lastRevealedIndex == 5)
-        await wait(milliseconds: 240)
-        #expect(view.lastRevealedIndex > 5)
+
+        let revealStarted = await eventually(timeout: .milliseconds(240)) {
+            view.lastRevealedIndex > 5
+        }
+        #expect(revealStarted)
+    }
+
+    @Test("Buffered streaming waits for backlog before starting reveal")
+    func bufferedStreamingWaitsForBacklog() async {
+        let view = TextFlowView(frame: CGRect(x: 0, y: 0, width: 320, height: 0))
+        view.configure(with: NSAttributedString(string: "Hello"))
+
+        view.configureStreaming(
+            with: NSAttributedString(string: "Hello world"),
+            charsPerStep: 1,
+            baseDuration: 0.010,
+            commaPause: 0,
+            sentencePause: 0,
+            startBufferCharacters: 20,
+            maxStartDelay: 0.200
+        )
+
+        await wait(for: .milliseconds(80))
+        #expect(view.lastRevealedIndex == 5)
+
+        view.configureStreaming(
+            with: NSAttributedString(string: "Hello world, this now has enough buffered text."),
+            charsPerStep: 1,
+            baseDuration: 0.010,
+            commaPause: 0,
+            sentencePause: 0,
+            startBufferCharacters: 20,
+            maxStartDelay: 0.200
+        )
+
+        let revealStarted = await eventually(timeout: .milliseconds(120)) {
+            view.lastRevealedIndex > 5
+        }
+        #expect(revealStarted)
+    }
+
+    @Test("Hidden backlog does not expand layout before reveal")
+    func hiddenBacklogDoesNotExpandLayoutBeforeReveal() async {
+        let view = TextFlowView(frame: CGRect(x: 0, y: 0, width: 140, height: 0))
+        view.configure(with: NSAttributedString(string: "Short line"))
+        view.layoutIfNeeded()
+
+        let initialHeight = view.intrinsicContentSize.height
+
+        view.configureStreaming(
+            with: NSAttributedString(string: "Short line\nThis line should appear later\nAnd this one later too"),
+            charsPerStep: 1,
+            baseDuration: 0.050,
+            commaPause: 0,
+            sentencePause: 0
+        )
+        view.layoutIfNeeded()
+
+        let hiddenBacklogHeight = view.intrinsicContentSize.height
+        #expect(hiddenBacklogHeight == initialHeight)
+
+        let revealAdvanced = await eventually(timeout: .milliseconds(400)) {
+            view.lastRevealedIndex > 10
+        }
+        #expect(revealAdvanced)
+
+        view.layoutIfNeeded()
+        #expect(view.intrinsicContentSize.height > hiddenBacklogHeight)
+    }
+
+    @Test("Prefix mismatch falls back to immediate full update")
+    func prefixMismatchFallsBackToImmediateUpdate() {
+        let view = TextFlowView(frame: CGRect(x: 0, y: 0, width: 320, height: 0))
+        view.configure(with: NSAttributedString(string: "Hello"))
+
+        view.configureStreaming(
+            with: NSAttributedString(string: "Jello"),
+            charsPerStep: 1,
+            baseDuration: 0.100,
+            commaPause: 0,
+            sentencePause: 0
+        )
+
+        #expect(view.lastRevealedIndex == 5)
     }
 
     @Test("Revealed characters fade from initial alpha to full alpha")
@@ -122,7 +157,7 @@ struct TextFlowViewStreamingTests {
             revealFadeDuration: 0.08
         )
 
-        let revealCompleted = await waitUntil(timeoutMilliseconds: 400) {
+        let revealCompleted = await eventually(timeout: .milliseconds(400)) {
             view.lastRevealedIndex == 2
         }
         #expect(revealCompleted)
@@ -132,32 +167,15 @@ struct TextFlowViewStreamingTests {
         #expect(earlyColor.cgColor.alpha >= 0.2)
         #expect(earlyColor.cgColor.alpha < 1.0)
 
-        let reachedFullAlpha = await waitUntil(timeoutMilliseconds: 400) {
-            guard let color = view.displayedForegroundColor(at: 1) else {
+        let reachedFullAlpha = await eventually(timeout: .milliseconds(400)) {
+            guard let displayedColor = view.displayedForegroundColor(at: 1) else {
                 return false
             }
-            return abs(color.cgColor.alpha - 1.0) < 0.05
+            return abs(displayedColor.cgColor.alpha - 1.0) < 0.05
         }
         #expect(reachedFullAlpha)
+
         let finalColor = try #require(view.displayedForegroundColor(at: 1))
         #expect(abs(finalColor.cgColor.alpha - 1) < 0.05)
-    }
-}
-
-private extension TextFlowViewStreamingTests {
-    func wait(milliseconds: UInt64) async {
-        try? await Task.sleep(for: .milliseconds(milliseconds))
-    }
-
-    func waitUntil(timeoutMilliseconds: UInt64, condition: @escaping () -> Bool) async -> Bool {
-        let timeout = Duration.milliseconds(timeoutMilliseconds)
-        let start = ContinuousClock.now
-        while (ContinuousClock.now - start) < timeout {
-            if condition() {
-                return true
-            }
-            try? await Task.sleep(for: .milliseconds(10))
-        }
-        return condition()
     }
 }

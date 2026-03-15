@@ -28,9 +28,12 @@ final class RevealSequencer {
     }
 
     var onComplete: (() -> Void)?
-    var onLayoutChange: (() -> Void)?
+    var onLayoutChange: ((UIView?) -> Void)?
     private var isRunning = false
 
+    private var blockRevealTask: Task<Void, Never>?
+    private weak var blockRevealView: UIView?
+    private var blockRevealStartTime: TimeInterval = 0
     private var currentTask: AnimationTask?
     private var currentTaskToken: UUID?
     private var currentTiming: ResolvedTiming
@@ -125,6 +128,11 @@ final class RevealSequencer {
         let effectiveStepCount = max(1, Int(ceil(Double(totalCharacters) / Double(effectiveCharsPerStep))))
         let minimumBaseDuration = minimumTextAnimationWindow / Double(effectiveStepCount)
         let effectiveBaseDuration = max(timing.baseDuration, minimumBaseDuration)
+        let jitterScale = timing.baseDuration > 0 ? timing.jitterMax / timing.baseDuration : 0
+        let effectiveJitterMax = min(
+            0.018,
+            max(timing.jitterMax, effectiveBaseDuration * jitterScale)
+        )
 
         return ResolvedTiming(
             charsPerStep: effectiveCharsPerStep,
@@ -132,7 +140,7 @@ final class RevealSequencer {
             elementGapDuration: timing.elementGapDuration,
             commaPause: timing.commaPause,
             sentencePause: timing.sentencePause,
-            jitterMax: timing.jitterMax
+            jitterMax: effectiveJitterMax
         )
     }
 }
@@ -140,6 +148,7 @@ final class RevealSequencer {
 // MARK: - View Decomposition
 
 private extension RevealSequencer {
+    static let blockRevealDuration: TimeInterval = 0.2
     enum AnimationTask {
         case block(UIView)
         case label(UILabel)
@@ -169,6 +178,10 @@ private extension RevealSequencer {
         }
 
         if view is CodeBlockView || view is PlaceholderBlockView {
+            if let revealable = view as? BlockRevealAnimating {
+                revealable.prepareForBlockReveal()
+                onLayoutChange?(view)
+            }
             view.alpha = 0
             taskQueue.append(.block(view))
             return
@@ -239,12 +252,16 @@ private extension RevealSequencer {
 
         switch task {
         case let .block(view):
-            UIView.animate(withDuration: 0.2, animations: {
-                view.alpha = 1
-            }) { [weak self] _ in
-                guard let self, self.currentTaskToken == token else { return }
-                self.onLayoutChange?()
-                self.finishCurrentTask(withGap: true)
+            if view is BlockRevealAnimating {
+                startBlockRevealAnimation(for: view, token: token)
+            } else {
+                UIView.animate(withDuration: Self.blockRevealDuration, animations: {
+                    view.alpha = 1
+                }) { [weak self] _ in
+                    guard let self, self.currentTaskToken == token else { return }
+                    self.onLayoutChange?(view)
+                    self.finishCurrentTask(withGap: true)
+                }
             }
 
         case let .label(label):
@@ -256,7 +273,7 @@ private extension RevealSequencer {
             }
 
         case let .show(view):
-            onLayoutChange?()
+            onLayoutChange?(nil)
             UIView.animate(withDuration: 0.15, animations: {
                 view.alpha = 1
             }) { [weak self] _ in
@@ -291,6 +308,8 @@ private extension RevealSequencer {
     func completeTask(_ task: AnimationTask?) {
         switch task {
         case let .block(view):
+            cancelBlockRevealAnimation()
+            (view as? BlockRevealAnimating)?.finishBlockReveal()
             view.alpha = 1
         case let .label(label):
             label.alpha = 1
@@ -300,6 +319,64 @@ private extension RevealSequencer {
             textView.finishReveal()
         case .none:
             break
+        }
+    }
+}
+
+// MARK: - Block Reveal
+
+private extension RevealSequencer {
+    func advanceBlockRevealAnimation() {
+        guard let view = blockRevealView,
+              let revealable = view as? BlockRevealAnimating,
+              case let .block(currentView)? = currentTask,
+              currentView === view
+        else {
+            cancelBlockRevealAnimation()
+            return
+        }
+
+        let elapsed = Date.timeIntervalSinceReferenceDate - blockRevealStartTime
+        let rawProgress = min(1, max(0, elapsed / Self.blockRevealDuration))
+        let easedProgress = rawProgress * rawProgress * (3 - (2 * rawProgress))
+
+        if revealable.setBlockRevealProgress(easedProgress) {
+            onLayoutChange?(view)
+        }
+
+        guard rawProgress >= 1 else { return }
+
+        cancelBlockRevealAnimation()
+        onLayoutChange?(view)
+        finishCurrentTask(withGap: true)
+    }
+
+    func cancelBlockRevealAnimation() {
+        blockRevealTask?.cancel()
+        blockRevealTask = nil
+        blockRevealView = nil
+        blockRevealStartTime = 0
+    }
+
+    func startBlockRevealAnimation(for view: UIView, token: UUID) {
+        guard currentTaskToken == token else { return }
+
+        cancelBlockRevealAnimation()
+        blockRevealView = view
+        blockRevealStartTime = Date.timeIntervalSinceReferenceDate
+
+        UIView.animate(withDuration: Self.blockRevealDuration) {
+            view.alpha = 1
+        }
+
+        blockRevealTask = Task { [weak self] in
+            guard let self else { return }
+
+            while !Task.isCancelled {
+                self.advanceBlockRevealAnimation()
+                guard self.blockRevealView != nil else { return }
+                try? await Task.sleep(for: .milliseconds(16))
+            }
         }
     }
 }
@@ -322,15 +399,17 @@ private extension RevealSequencer {
 
         let total = textView.totalCharacterCount
         guard currentIndex < total else {
-            onLayoutChange?()
+            onLayoutChange?(textView)
             finishCurrentTask(withGap: false)
             return
         }
 
         let nextIndex = min(currentIndex + timing.charsPerStep, total)
-        textView.revealCharacters(upTo: nextIndex)
+        let heightChanged = textView.revealCharacters(upTo: nextIndex)
 
-        onLayoutChange?()
+        if heightChanged {
+            onLayoutChange?(textView)
+        }
 
         let delay = calculateDelay(textView: textView, from: currentIndex, to: nextIndex, timing: timing)
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in

@@ -154,16 +154,18 @@ private extension AttributedStringBuilder {
         return result
     }
 
-    static func thematicBreakAttributedString() -> NSAttributedString {
+    static let thematicBreakImage: UIImage = {
         let size = CGSize(width: 10000, height: 1)
         let renderer = UIGraphicsImageRenderer(size: size)
-        let image = renderer.image { context in
+        return renderer.image { context in
             UIColor.separator.setFill()
             context.fill(CGRect(origin: .zero, size: size))
         }
+    }()
 
+    static func thematicBreakAttributedString() -> NSAttributedString {
         let attachment = NSTextAttachment()
-        attachment.image = image
+        attachment.image = thematicBreakImage
         attachment.bounds = CGRect(x: 0, y: 0, width: 10000, height: 1)
 
         let result = NSMutableAttributedString(attachment: attachment)

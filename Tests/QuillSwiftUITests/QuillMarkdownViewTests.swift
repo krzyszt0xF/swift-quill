@@ -69,9 +69,10 @@ struct QuillMarkdownViewTests {
     }
 
     @Test("empty markdown does not crash")
-    func emptyMarkdownDoesNotCrash() {
+    func emptyMarkdownPreservesEmptyState() {
         let view = QuillView()
         view.markdown = ""
         #expect(view.markdown == "")
+        #expect(view.currentMarkdown == "")
     }
 }

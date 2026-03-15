@@ -5,6 +5,7 @@ final class TextFlowView: UIView {
         var charsPerStep: Int
         var baseDuration: TimeInterval
         var commaPause: TimeInterval
+        var jitterMax: TimeInterval
         var sentencePause: TimeInterval
     }
 
@@ -37,6 +38,8 @@ final class TextFlowView: UIView {
     private var revealFadeConfiguration = RevealFadeConfiguration()
     private var revealFadeTasks: [UUID: Task<Void, Never>] = [:]
     private var revealFadeGeneration = 0
+    private var cachedPrefixHeight: CGFloat = 0
+    private var cachedPrefixHeightKey: (revealIndex: Int, width: CGFloat) = (-1, 0)
 
     override var intrinsicContentSize: CGSize {
         CGSize(width: UIView.noIntrinsicMetric, height: heightConstraint?.constant ?? 0)
@@ -105,11 +108,12 @@ final class TextFlowView: UIView {
         baseDuration: TimeInterval,
         commaPause: TimeInterval,
         sentencePause: TimeInterval,
+        jitterMax: TimeInterval = 0,
         startBufferCharacters: Int = 0,
         maxStartDelay: TimeInterval = 0,
         idleTimeout: TimeInterval = 0.30,
-        revealInitialAlpha: CGFloat = 0.2,
-        revealFadeDuration: TimeInterval = 0.08
+        revealInitialAlpha: CGFloat = 1,
+        revealFadeDuration: TimeInterval = 0
     ) {
         guard shouldAnimateStreamingUpdate(with: attributedString) else {
             configure(with: attributedString)
@@ -127,6 +131,7 @@ final class TextFlowView: UIView {
         let resolvedCharsPerStep = max(1, charsPerStep)
         let resolvedBaseDuration = max(0.001, baseDuration)
         let resolvedCommaPause = max(0, commaPause)
+        let resolvedJitterMax = max(0, jitterMax)
         let resolvedSentencePause = max(0, sentencePause)
         let resolvedStartBufferCharacters = max(0, startBufferCharacters)
         let resolvedMaxStartDelay = max(0, maxStartDelay)
@@ -144,6 +149,7 @@ final class TextFlowView: UIView {
             charsPerStep: resolvedCharsPerStep,
             baseDuration: resolvedBaseDuration,
             commaPause: resolvedCommaPause,
+            jitterMax: resolvedJitterMax,
             sentencePause: resolvedSentencePause
         )
 
@@ -194,7 +200,6 @@ final class TextFlowView: UIView {
               attributedString.length > 0 else { return }
 
         originalAttributedString = NSAttributedString(attributedString: attributedString)
-
         let workingString = NSMutableAttributedString(attributedString: attributedString)
         let fullRange = NSRange(location: 0, length: workingString.length)
         workingString.addAttribute(.foregroundColor, value: UIColor.clear, range: fullRange)
@@ -202,8 +207,9 @@ final class TextFlowView: UIView {
 
         workingAttributedString = workingString
         textContentStorage.attributedString = workingString
-        textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
         lastRevealedIndex = 0
+        setNeedsLayout()
+        setNeedsDisplay()
     }
 
     func configureRevealFade(initialAlpha: CGFloat, duration: TimeInterval) {
@@ -213,11 +219,14 @@ final class TextFlowView: UIView {
         )
     }
 
-    func revealCharacters(upTo index: Int) {
+    @discardableResult
+    func revealCharacters(upTo index: Int) -> Bool {
         guard let originalAttributedString,
               let workingAttributedString,
               index > lastRevealedIndex,
-              index <= originalAttributedString.length else { return }
+              index <= originalAttributedString.length else { return false }
+
+        let oldHeight = heightConstraint?.constant ?? 0
 
         let revealRange = NSRange(location: lastRevealedIndex, length: index - lastRevealedIndex)
         if revealFadeConfiguration.isEnabled {
@@ -228,11 +237,15 @@ final class TextFlowView: UIView {
 
         textContentStorage.attributedString = workingAttributedString
         lastRevealedIndex = index
+        updateLayout()
         setNeedsDisplay()
 
         if revealFadeConfiguration.isEnabled {
             scheduleRevealFade(for: revealRange, generation: revealFadeGeneration)
         }
+
+        let newHeight = heightConstraint?.constant ?? 0
+        return abs(newHeight - oldHeight) > 0.5
     }
 
     func displayedForegroundColor(at index: Int) -> UIColor? {
@@ -261,6 +274,8 @@ private extension TextFlowView {
         streamingProfile = nil
         pendingStreamingStartTime = nil
         cancelRevealFadeTasks()
+
+        cachedPrefixHeightKey = (-1, 0)
 
         if clearTiming {
             lastStreamingUpdateTime = nil
@@ -443,6 +458,7 @@ private extension TextFlowView {
                     to: nextIndex,
                     baseDuration: profile.baseDuration,
                     commaPause: profile.commaPause,
+                    jitterMax: profile.jitterMax,
                     sentencePause: profile.sentencePause
                 )
 
@@ -541,6 +557,7 @@ private extension TextFlowView {
         to endIndex: Int,
         baseDuration: TimeInterval,
         commaPause: TimeInterval,
+        jitterMax: TimeInterval,
         sentencePause: TimeInterval
     ) -> TimeInterval {
         let lowerBound = max(0, startIndex)
@@ -558,13 +575,11 @@ private extension TextFlowView {
             }
         }
 
-        return baseDuration + extraDuration
+        let jitter = jitterMax > 0 ? Double.random(in: 0...jitterMax) : 0
+        return baseDuration + extraDuration + jitter
     }
 
-    func updateLayout() {
-        textContainer.size = CGSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude)
-        textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
-
+    func computeFullLayoutHeight() -> CGFloat {
         var maxY: CGFloat = 0
         textLayoutManager.enumerateTextLayoutFragments(
             from: textLayoutManager.documentRange.location,
@@ -576,20 +591,71 @@ private extension TextFlowView {
             }
             return true
         }
+        return maxY
+    }
 
-        if maxY == 0,
-           let attributedString = textContentStorage.attributedString,
-           attributedString.length > 0 {
-            let boundingSize = CGSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude)
-            maxY = attributedString.boundingRect(
+    func updateLayout() {
+        textContainer.size = CGSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude)
+        textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
+
+        let height: CGFloat
+        if let originalAttributedString {
+            let total = originalAttributedString.length
+            if lastRevealedIndex == 0 {
+                height = 0
+            } else if lastRevealedIndex >= total {
+                height = computeFullLayoutHeight()
+            } else {
+                height = visiblePrefixHeight(forWidth: bounds.width)
+            }
+        } else {
+            var maxY = computeFullLayoutHeight()
+            if maxY == 0,
+               let attributedString = textContentStorage.attributedString,
+               attributedString.length > 0 {
+                let boundingSize = CGSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude)
+                maxY = attributedString.boundingRect(
+                    with: boundingSize,
+                    options: [.usesLineFragmentOrigin],
+                    context: nil
+                ).height
+            }
+            height = maxY
+        }
+
+        heightConstraint?.constant = ceil(height)
+        invalidateIntrinsicContentSize()
+    }
+
+    func visiblePrefixHeight(forWidth width: CGFloat) -> CGFloat {
+        guard width > 0,
+              lastRevealedIndex > 0,
+              let originalAttributedString,
+              lastRevealedIndex < originalAttributedString.length
+        else {
+            return 0
+        }
+
+        let key = (revealIndex: lastRevealedIndex, width: width)
+        if key == cachedPrefixHeightKey {
+            return cachedPrefixHeight
+        }
+
+        let visiblePrefix = originalAttributedString.attributedSubstring(
+            from: NSRange(location: 0, length: lastRevealedIndex)
+        )
+        let boundingSize = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+        let height = ceil(
+            visiblePrefix.boundingRect(
                 with: boundingSize,
                 options: [.usesLineFragmentOrigin],
                 context: nil
             ).height
-        }
+        )
 
-        heightConstraint?.constant = ceil(maxY)
-        invalidateIntrinsicContentSize()
+        cachedPrefixHeight = height
+        cachedPrefixHeightKey = key
+        return height
     }
 
     func yRange(for characterRange: NSRange) -> (min: CGFloat, max: CGFloat) {

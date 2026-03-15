@@ -11,16 +11,16 @@ struct AttributedStringBuilderTests {
     @Test("H1 produces font size 28 bold")
     func headingH1Font() {
         let result = AttributedStringBuilder.build(from: segment(.heading(level: 1, content: [.text("Title")])))
-        let f = font(in: result)
-        #expect(f?.pointSize == 28)
-        #expect(f?.fontDescriptor.symbolicTraits.contains(.traitBold) == true)
+        let resultFont = font(in: result)
+        #expect(resultFont?.pointSize == 28)
+        #expect(resultFont?.fontDescriptor.symbolicTraits.contains(.traitBold) == true)
     }
 
     @Test("H6 produces font size 14 medium")
     func headingH6Font() {
         let result = AttributedStringBuilder.build(from: segment(.heading(level: 6, content: [.text("Small")])))
-        let f = font(in: result)
-        #expect(f?.pointSize == 14)
+        let resultFont = font(in: result)
+        #expect(resultFont?.pointSize == 14)
     }
 
     @Test("H1-H6 all have different point sizes")
@@ -35,61 +35,61 @@ struct AttributedStringBuilderTests {
     // MARK: - Inline Style Tests
 
     @Test("strong applies bold trait")
-    func boldText() {
+    func boldTrait() {
         let result = AttributedStringBuilder.build(
             from: segment(.paragraph(content: [.strong([.text("bold")])]))
         )
-        let f = font(in: result)
-        #expect(f?.fontDescriptor.symbolicTraits.contains(.traitBold) == true)
+        let resultFont = font(in: result)
+        #expect(resultFont?.fontDescriptor.symbolicTraits.contains(.traitBold) == true)
     }
 
     @Test("Emphasis applies italic trait")
-    func italicText() {
+    func italicTrait() {
         let result = AttributedStringBuilder.build(
             from: segment(.paragraph(content: [.emphasis([.text("italic")])]))
         )
-        let f = font(in: result)
-        #expect(f?.fontDescriptor.symbolicTraits.contains(.traitItalic) == true)
+        let resultFont = font(in: result)
+        #expect(resultFont?.fontDescriptor.symbolicTraits.contains(.traitItalic) == true)
     }
 
     @Test("Strong wrapping emphasis composes both traits")
-    func boldItalicNested() {
+    func nestedBoldItalic() {
         let result = AttributedStringBuilder.build(
             from: segment(.paragraph(content: [.strong([.emphasis([.text("both")])])]))
         )
-        let f = font(in: result)
-        let traits = f?.fontDescriptor.symbolicTraits ?? []
-        #expect(traits.contains(.traitBold))
-        #expect(traits.contains(.traitItalic))
+        let resultFont = font(in: result)
+        let symbolicTraits = resultFont?.fontDescriptor.symbolicTraits ?? []
+        #expect(symbolicTraits.contains(.traitBold))
+        #expect(symbolicTraits.contains(.traitItalic))
     }
 
     @Test("Strikethrough applies strikethroughStyle attribute")
-    func strikethroughText() {
+    func strikethroughAttribute() {
         let result = AttributedStringBuilder.build(
             from: segment(.paragraph(content: [.strikethrough([.text("deleted")])]))
         )
-        let value = result.attribute(.strikethroughStyle, at: 0, effectiveRange: nil) as? Int
-        #expect(value == NSUnderlineStyle.single.rawValue)
+        let strikethroughStyle = result.attribute(.strikethroughStyle, at: 0, effectiveRange: nil) as? Int
+        #expect(strikethroughStyle == NSUnderlineStyle.single.rawValue)
     }
 
     @Test("Code produces monospace font with background")
-    func inlineCode() {
+    func inlineCodeFormatting() {
         let result = AttributedStringBuilder.build(
             from: segment(.paragraph(content: [.code("let x")]))
         )
-        let f = font(in: result)
-        #expect(f?.fontDescriptor.symbolicTraits.contains(.traitMonoSpace) == true)
-        let bg = result.attribute(.backgroundColor, at: 0, effectiveRange: nil) as? UIColor
-        #expect(bg != nil)
+        let resultFont = font(in: result)
+        #expect(resultFont?.fontDescriptor.symbolicTraits.contains(.traitMonoSpace) == true)
+        let backgroundColor = result.attribute(.backgroundColor, at: 0, effectiveRange: nil) as? UIColor
+        #expect(backgroundColor != nil)
     }
 
     @Test("Link applies systemBlue foreground")
-    func linkText() {
+    func linkFormatting() {
         let result = AttributedStringBuilder.build(
             from: segment(.paragraph(content: [.link(destination: "https://example.com", children: [.text("click")])]))
         )
-        let color = result.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
-        #expect(color == UIColor.systemBlue)
+        let linkForegroundColor = result.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
+        #expect(linkForegroundColor == UIColor.systemBlue)
     }
 
     // MARK: - Multi-Block Tests
@@ -132,20 +132,20 @@ struct AttributedStringBuilderTests {
 
     @Test("Nested list has greater indentation than parent")
     func nestedListIndentation() {
-        let inner = Block.unorderedList(items: [
+        let innerList = Block.unorderedList(items: [
             Block.ListItem(children: [.paragraph(content: [.text("nested")])])
         ])
-        let outer = Block.unorderedList(items: [
-            Block.ListItem(children: [.paragraph(content: [.text("top")]), inner])
+        let outerList = Block.unorderedList(items: [
+            Block.ListItem(children: [.paragraph(content: [.text("top")]), innerList])
         ])
-        let result = AttributedStringBuilder.build(from: segment(outer))
+        let result = AttributedStringBuilder.build(from: segment(outerList))
 
         var outerIndent: CGFloat = 0
         var innerIndent: CGFloat = 0
         result.enumerateAttribute(.paragraphStyle, in: NSRange(location: 0, length: result.length)) { value, _, _ in
-            guard let style = value as? NSParagraphStyle else { return }
-            if style.headIndent > innerIndent { innerIndent = style.headIndent }
-            if outerIndent == 0 || style.headIndent < outerIndent { outerIndent = style.headIndent }
+            guard let paragraphStyle = value as? NSParagraphStyle else { return }
+            if paragraphStyle.headIndent > innerIndent { innerIndent = paragraphStyle.headIndent }
+            if outerIndent == 0 || paragraphStyle.headIndent < outerIndent { outerIndent = paragraphStyle.headIndent }
         }
         #expect(innerIndent > outerIndent)
     }
@@ -165,29 +165,29 @@ struct AttributedStringBuilderTests {
 
     @Test("Blockquote has greater indentation than plain text")
     func blockquoteIndentation() {
-        let bq = Block.blockquote(children: [.paragraph(content: [.text("quoted")])])
-        let plain = Block.paragraph(content: [.text("plain")])
-        let result = AttributedStringBuilder.build(from: segment(bq, plain))
+        let blockquote = Block.blockquote(children: [.paragraph(content: [.text("quoted")])])
+        let plainParagraph = Block.paragraph(content: [.text("plain")])
+        let result = AttributedStringBuilder.build(from: segment(blockquote, plainParagraph))
 
-        var bqIndent: CGFloat = 0
+        var blockquoteIndent: CGFloat = 0
         var plainIndent: CGFloat = 0
 
-        let bqRange = (result.string as NSString).range(of: "quoted")
-        if let style = result.attribute(.paragraphStyle, at: bqRange.location, effectiveRange: nil) as? NSParagraphStyle {
-            bqIndent = style.headIndent
+        let blockquoteRange = (result.string as NSString).range(of: "quoted")
+        if let paragraphStyle = result.attribute(.paragraphStyle, at: blockquoteRange.location, effectiveRange: nil) as? NSParagraphStyle {
+            blockquoteIndent = paragraphStyle.headIndent
         }
         let plainRange = (result.string as NSString).range(of: "plain")
-        if let style = result.attribute(.paragraphStyle, at: plainRange.location, effectiveRange: nil) as? NSParagraphStyle {
-            plainIndent = style.headIndent
+        if let paragraphStyle = result.attribute(.paragraphStyle, at: plainRange.location, effectiveRange: nil) as? NSParagraphStyle {
+            plainIndent = paragraphStyle.headIndent
         }
-        #expect(bqIndent > plainIndent)
+        #expect(blockquoteIndent > plainIndent)
     }
 
     @Test("Nested blockquote has greater indent than single")
     func nestedBlockquoteIndentation() {
-        let inner = Block.blockquote(children: [.paragraph(content: [.text("deep")])])
-        let outer = Block.blockquote(children: [.paragraph(content: [.text("shallow")]), inner])
-        let result = AttributedStringBuilder.build(from: segment(outer))
+        let nestedBlockquote = Block.blockquote(children: [.paragraph(content: [.text("deep")])])
+        let outerBlockquote = Block.blockquote(children: [.paragraph(content: [.text("shallow")]), nestedBlockquote])
+        let result = AttributedStringBuilder.build(from: segment(outerBlockquote))
 
         let shallowRange = (result.string as NSString).range(of: "shallow")
         let deepRange = (result.string as NSString).range(of: "deep")
@@ -200,12 +200,12 @@ struct AttributedStringBuilderTests {
 
     @Test("Blockquote carries blockquoteDepth custom attribute")
     func blockquoteDepthAttribute() {
-        let bq = Block.blockquote(children: [.paragraph(content: [.text("quoted")])])
-        let result = AttributedStringBuilder.build(from: segment(bq))
+        let blockquote = Block.blockquote(children: [.paragraph(content: [.text("quoted")])])
+        let result = AttributedStringBuilder.build(from: segment(blockquote))
 
-        let range = (result.string as NSString).range(of: "quoted")
-        let depth = result.attribute(.blockquoteDepth, at: range.location, effectiveRange: nil) as? Int
-        #expect(depth == 1)
+        let quotedRange = (result.string as NSString).range(of: "quoted")
+        let blockquoteDepth = result.attribute(.blockquoteDepth, at: quotedRange.location, effectiveRange: nil) as? Int
+        #expect(blockquoteDepth == 1)
     }
 
     // MARK: - Thematic Break Tests

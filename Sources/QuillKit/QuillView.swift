@@ -24,7 +24,7 @@ public final class QuillView: UIView {
 
     private var internalConfiguration = QuillConfigurationMapper.resolve(.balanced)
 
-    private let renderer = StreamingBlockRenderer()
+    private let renderer: StreamingBlockRenderer
     private let sequencer = RevealSequencer()
     private var controller: MarkdownStreamController?
     private var heightInvalidationScheduled = false
@@ -40,10 +40,10 @@ public final class QuillView: UIView {
     private var moduleStreamGate = ModuleStreamGate()
     private var tailUpdateTask: Task<Void, Never>?
     private var pendingTailBlock: Block?
-
     public init(frame: CGRect = .zero, streamingPreset: QuillStreamingPreset = .balanced) {
         self.streamingPreset = streamingPreset
         self.internalConfiguration = QuillConfigurationMapper.resolve(streamingPreset)
+        self.renderer = StreamingBlockRenderer()
         super.init(frame: frame)
         commonInit()
         applyInternalConfiguration()
@@ -52,18 +52,21 @@ public final class QuillView: UIView {
     init(frame: CGRect, internalConfiguration: QuillRenderConfiguration) {
         self.streamingMode = internalConfiguration.streamingMode
         self.internalConfiguration = internalConfiguration
+        self.renderer = StreamingBlockRenderer()
         super.init(frame: frame)
         commonInit()
         applyInternalConfiguration()
     }
 
     public override init(frame: CGRect) {
+        self.renderer = StreamingBlockRenderer()
         super.init(frame: frame)
         commonInit()
         applyInternalConfiguration()
     }
 
     public required init?(coder: NSCoder) {
+        self.renderer = StreamingBlockRenderer()
         super.init(coder: coder)
         commonInit()
         applyInternalConfiguration()
@@ -165,19 +168,23 @@ public final class QuillView: UIView {
 
 private extension QuillView {
     func commonInit() {
-        let stack = renderer.stackView
-        addSubview(stack)
+        let host = renderer.hostView
+        host.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(host)
 
-        let bottom = stack.bottomAnchor.constraint(equalTo: bottomAnchor)
+        let bottom = host.bottomAnchor.constraint(equalTo: bottomAnchor)
         bottom.priority = .defaultLow
 
         NSLayoutConstraint.activate([
             bottom,
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stack.topAnchor.constraint(equalTo: topAnchor),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            host.leadingAnchor.constraint(equalTo: leadingAnchor),
+            host.topAnchor.constraint(equalTo: topAnchor),
+            host.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])
-        sequencer.onLayoutChange = { [weak self] in
+        sequencer.onLayoutChange = { [weak self] view in
+            if let self, let view {
+                self.renderer.containerView.invalidateBlockLayout(for: view)
+            }
             self?.scheduleHeightUpdate()
         }
         sequencer.onComplete = { [weak self] in
@@ -206,8 +213,8 @@ private extension QuillView {
         sequencer.setFixedTiming(
             internalConfiguration.streamingMode == .bufferedModules
                 ? RevealSequencer.ResolvedTiming(
-                    charsPerStep: 6,
-                    baseDuration: 0.012,
+                    charsPerStep: 4,
+                    baseDuration: 0.014,
                     elementGapDuration: 0.04,
                     commaPause: 0.03,
                     sentencePause: 0.08,
@@ -217,7 +224,7 @@ private extension QuillView {
         )
         sequencer.setMinimumTextAnimationWindow(
             internalConfiguration.streamingMode == .bufferedModules
-                ? 0.24
+                ? 0.4
                 : 0
         )
 
@@ -241,10 +248,10 @@ private extension QuillView {
 
         setNeedsLayout()
         layoutIfNeeded()
-        renderer.stackView.setNeedsLayout()
-        renderer.stackView.layoutIfNeeded()
+        renderer.hostView.setNeedsLayout()
+        renderer.hostView.layoutIfNeeded()
 
-        let newHeight = ceil(renderer.stackView.bounds.height)
+        let newHeight = ceil(renderer.hostView.bounds.height)
         let oldHeight = lastNotifiedHeight
         let minDelta = max(0.5, internalConfiguration.layout.heightNotificationMinimumDelta)
         guard abs(newHeight - oldHeight) > minDelta else { return }

@@ -182,6 +182,7 @@ struct TailConfiguration: Equatable, Sendable {
     var flowTailStartBufferCharacters: Int
     var flowTailMaxStartDelay: TimeInterval
     var flowTailIdleTimeout: TimeInterval
+    var flowTailJitterMax: TimeInterval
     var flowTailRevealInitialAlpha: CGFloat
     var flowTailRevealFadeDuration: TimeInterval
     var flowTailUpdateCoalescingInterval: TimeInterval
@@ -190,15 +191,16 @@ struct TailConfiguration: Equatable, Sendable {
 
     init(
         animateFlowTailText: Bool = true,
-        flowTailCharsPerStep: Int = 1,
-        flowTailBaseDuration: TimeInterval = 0.034,
-        flowTailCommaPause: TimeInterval = 0.020,
-        flowTailSentencePause: TimeInterval = 0.060,
+        flowTailCharsPerStep: Int = 6,
+        flowTailBaseDuration: TimeInterval = 0.012,
+        flowTailCommaPause: TimeInterval = 0.030,
+        flowTailSentencePause: TimeInterval = 0.080,
         flowTailStartBufferCharacters: Int = 48,
         flowTailMaxStartDelay: TimeInterval = 0.80,
         flowTailIdleTimeout: TimeInterval = 1.20,
-        flowTailRevealInitialAlpha: CGFloat = 0.2,
-        flowTailRevealFadeDuration: TimeInterval = 0.08,
+        flowTailJitterMax: TimeInterval = 0.005,
+        flowTailRevealInitialAlpha: CGFloat = 1,
+        flowTailRevealFadeDuration: TimeInterval = 0,
         flowTailUpdateCoalescingInterval: TimeInterval = 0.05,
         reuseFlowTailView: Bool = true,
         reuseCodeTailView: Bool = true
@@ -211,6 +213,7 @@ struct TailConfiguration: Equatable, Sendable {
         self.flowTailStartBufferCharacters = max(0, flowTailStartBufferCharacters)
         self.flowTailMaxStartDelay = max(0, flowTailMaxStartDelay)
         self.flowTailIdleTimeout = max(0.05, flowTailIdleTimeout)
+        self.flowTailJitterMax = max(0, flowTailJitterMax)
         self.flowTailRevealInitialAlpha = min(max(0, flowTailRevealInitialAlpha), 1)
         self.flowTailRevealFadeDuration = max(0, flowTailRevealFadeDuration)
         self.flowTailUpdateCoalescingInterval = max(0, flowTailUpdateCoalescingInterval)

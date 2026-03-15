@@ -12,7 +12,17 @@ final class PlaceholderBlockView: UIView {
 
     private let iconView = UIImageView()
     private let label = UILabel()
-    private var minimumHeightConstraint: NSLayoutConstraint?
+    private var minimumHeight: CGFloat = Layout.imageMinimumHeight
+    var revealProgress: CGFloat = 1
+
+    override var intrinsicContentSize: CGSize {
+        let measuredWidth = resolvedMeasurementWidth(from: bounds.width)
+        guard measuredWidth > 0 else {
+            return CGSize(width: UIView.noIntrinsicMetric, height: scaledHeight(for: minimumMeasuredHeight))
+        }
+
+        return CGSize(width: UIView.noIntrinsicMetric, height: scaledHeight(for: measuredHeight(for: measuredWidth)))
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -32,6 +42,39 @@ final class PlaceholderBlockView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    override func sizeThatFits(_ size: CGSize) -> CGSize {
+        let measuredWidth = resolvedMeasurementWidth(from: size.width)
+        guard measuredWidth > 0 else {
+            return CGSize(width: size.width, height: scaledHeight(for: minimumMeasuredHeight))
+        }
+
+        return CGSize(width: measuredWidth, height: scaledHeight(for: measuredHeight(for: measuredWidth)))
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+
+        let contentWidth = max(bounds.width - (Layout.contentInset * 2), 0)
+        label.preferredMaxLayoutWidth = contentWidth
+
+        let labelHeight = labelHeight(for: bounds.width)
+        let totalContentHeight = Layout.iconSize + Layout.stackSpacing + labelHeight
+        let contentOriginY = max(Layout.contentInset, (bounds.height - totalContentHeight) / 2)
+
+        iconView.frame = CGRect(
+            x: (bounds.width - Layout.iconSize) / 2,
+            y: contentOriginY,
+            width: Layout.iconSize,
+            height: Layout.iconSize
+        )
+        label.frame = CGRect(
+            x: Layout.contentInset,
+            y: iconView.frame.maxY + Layout.stackSpacing,
+            width: contentWidth,
+            height: labelHeight
+        )
+    }
+
     static func image(title: String?) -> PlaceholderBlockView {
         let view = PlaceholderBlockView()
         view.configureImage(title: title)
@@ -47,7 +90,9 @@ final class PlaceholderBlockView: UIView {
     func configureImage(title: String?) {
         iconView.image = UIImage(systemName: "photo")
         label.text = title ?? "Image"
-        setMinimumHeight(Layout.imageMinimumHeight)
+        minimumHeight = Layout.imageMinimumHeight
+        invalidateIntrinsicContentSize()
+        setNeedsLayout()
     }
 
     func configureTable(header: Block.TableRow, rowCount: Int) {
@@ -61,11 +106,24 @@ final class PlaceholderBlockView: UIView {
             .joined(separator: " | ")
 
         label.text = "\(dimensions)\n\(headerNames)"
-        setMinimumHeight(Layout.tableMinimumHeight)
+        minimumHeight = Layout.tableMinimumHeight
+        invalidateIntrinsicContentSize()
+        setNeedsLayout()
     }
 }
 
 private extension PlaceholderBlockView {
+    func measuredHeight(for width: CGFloat) -> CGFloat {
+        max(
+            minimumMeasuredHeight,
+            (Layout.contentInset * 2) + Layout.iconSize + Layout.stackSpacing + labelHeight(for: width)
+        )
+    }
+
+    var minimumMeasuredHeight: CGFloat {
+        max(minimumHeight, (Layout.contentInset * 2) + Layout.iconSize)
+    }
+
     static func plainText(from inlines: [Inline]) -> String {
         inlines.map { plainText(from: $0) }.joined()
     }
@@ -97,42 +155,35 @@ private extension PlaceholderBlockView {
         iconView.contentMode = .scaleAspectFit
         iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: Layout.iconSize)
         iconView.tintColor = .secondaryLabel
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.setContentHuggingPriority(.required, for: .vertical)
-        iconView.setContentCompressionResistancePriority(.required, for: .vertical)
 
         label.font = .systemFont(ofSize: 14)
         label.numberOfLines = 0
         label.textAlignment = .center
         label.textColor = .secondaryLabel
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.setContentCompressionResistancePriority(.required, for: .vertical)
-
-        let stack = UIStackView(arrangedSubviews: [iconView, label])
-        stack.alignment = .center
-        stack.axis = .vertical
-        stack.spacing = Layout.stackSpacing
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        stack.setContentHuggingPriority(.defaultHigh, for: .vertical)
-        stack.setContentCompressionResistancePriority(.required, for: .vertical)
-
-        addSubview(stack)
-        NSLayoutConstraint.activate([
-            iconView.heightAnchor.constraint(equalToConstant: Layout.iconSize),
-            iconView.widthAnchor.constraint(equalToConstant: Layout.iconSize),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Layout.contentInset),
-            stack.centerXAnchor.constraint(equalTo: centerXAnchor),
-            stack.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: Layout.contentInset),
-            stack.topAnchor.constraint(equalTo: topAnchor, constant: Layout.contentInset),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -Layout.contentInset),
-        ])
+        addSubview(iconView)
+        addSubview(label)
     }
 
-    func setMinimumHeight(_ height: CGFloat) {
-        minimumHeightConstraint?.isActive = false
-        let constraint = heightAnchor.constraint(greaterThanOrEqualToConstant: height)
-        constraint.priority = .required
-        constraint.isActive = true
-        minimumHeightConstraint = constraint
+    func resolvedMeasurementWidth(from proposedWidth: CGFloat) -> CGFloat {
+        if proposedWidth > 0, proposedWidth != UIView.noIntrinsicMetric {
+            return proposedWidth
+        }
+        return bounds.width
+    }
+
+    func scaledHeight(for height: CGFloat) -> CGFloat {
+        ceil(max(0, height * revealProgress))
+    }
+
+    func labelHeight(for width: CGFloat) -> CGFloat {
+        let availableWidth = max(width - (Layout.contentInset * 2), 0)
+        return label.sizeThatFits(CGSize(width: availableWidth, height: .greatestFiniteMagnitude)).height
+    }
+}
+
+extension PlaceholderBlockView: BlockRevealAnimating {
+    func currentRevealHeight() -> CGFloat {
+        let width = resolvedMeasurementWidth(from: bounds.width)
+        return scaledHeight(for: width > 0 ? measuredHeight(for: width) : minimumMeasuredHeight)
     }
 }

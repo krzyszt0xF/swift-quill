@@ -16,10 +16,11 @@ struct ModuleStreamGateTests {
         # Second
         beta
 
-        """
+        """ + "\n"
 
         let result = gate.append(markdown, now: 0)
         #expect(result.committedChunks.count == 2)
+        guard result.committedChunks.count == 2 else { return }
         #expect(result.committedChunks[0].contains("# First"))
         #expect(result.committedChunks[1].contains("# Second"))
         #expect(result.hasPendingText == false)
@@ -34,11 +35,12 @@ struct ModuleStreamGateTests {
         let text = """
         This is a long paragraph without headings and with enough content to pass the threshold.
 
-        """
+        """ + "\n"
 
         let result = gate.append(text, now: 0)
         #expect(result.committedChunks.count == 1)
-        #expect(result.committedChunks[0].contains("long paragraph"))
+        guard let firstCommitted = result.committedChunks.first else { return }
+        #expect(firstCommitted.contains("long paragraph"))
         #expect(result.hasPendingText == false)
     }
 
@@ -114,21 +116,24 @@ struct ModuleStreamGateTests {
     @Test("Overdue commit prefers double newline boundary when available")
     func overdueCommitPrefersDoubleNewlineBoundary() {
         var gate = ModuleStreamGate(
-            configuration: .init(minModuleLength: 8, maxBufferingDelay: 1.5)
+            configuration: .init(minModuleLength: 30, maxBufferingDelay: 1.5)
         )
 
-        _ = gate.append(
-            """
-            alpha section
-            beta section
+        let markdown = """
+        alpha section
+        beta section
 
-            gamma section
-            """,
-            now: 0
-        )
+        gamma section
+        """
+
+        let appendResult = gate.append(markdown, now: 0)
+        #expect(appendResult.committedChunks.isEmpty)
+
+        gate.updateConfiguration(.init(minModuleLength: 8, maxBufferingDelay: 1.5))
 
         let committed = gate.commitIfOverdue(now: 1.6)
         #expect(committed.count == 1)
+        guard committed.count == 1 else { return }
         #expect(committed[0].contains("beta section"))
         #expect(committed[0].contains("gamma section") == false)
     }

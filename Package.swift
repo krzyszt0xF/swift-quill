@@ -30,17 +30,26 @@ let package = Package(
             dependencies: ["QuillKit"],
             exclude: ["README.md"]
         ),
+        .target(
+            name: "QuillSharedTestSupport",
+            path: "Sources/QuillSharedTestSupport"
+        ),
+        .target(
+            name: "QuillCoreTestSupport",
+            dependencies: ["QuillCore", "QuillSharedTestSupport"],
+            path: "Sources/QuillCoreTestSupport"
+        ),
         .testTarget(
             name: "QuillCoreTests",
-            dependencies: ["QuillCore"]
+            dependencies: ["QuillCore", "QuillCoreTestSupport", "QuillSharedTestSupport"]
         ),
         .testTarget(
             name: "QuillKitTests",
-            dependencies: ["QuillKit", "QuillCore"]
+            dependencies: ["QuillKit", "QuillCore", "QuillSharedTestSupport"]
         ),
         .testTarget(
             name: "QuillSwiftUITests",
-            dependencies: ["QuillSwiftUI"]
+            dependencies: ["QuillSwiftUI", "QuillSharedTestSupport"]
         ),
     ]
 )
