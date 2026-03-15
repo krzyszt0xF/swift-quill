@@ -44,6 +44,7 @@ final class BlockContainerView: UIView {
 
     func invalidateAllHeightCaches() {
         heightCache.removeAll()
+        measuredHeightByView.removeAll()
     }
 
     func invalidateBlockLayout(for view: UIView) {
@@ -185,9 +186,16 @@ private extension BlockContainerView {
         if !widthDidChange,
            widthsAreEquivalent(view.bounds.width, width),
            view.bounds.height > 0 {
-            heightCache[index] = view.bounds.height
-            measuredHeightByView[viewID] = (width: width, height: view.bounds.height)
-            return view.bounds.height
+            view.layoutIfNeeded()
+            var height = view.intrinsicContentSize.height
+            if height <= 0 || height == UIView.noIntrinsicMetric {
+                height = view.bounds.height
+            }
+            if height > 0 {
+                heightCache[index] = height
+                measuredHeightByView[viewID] = (width: width, height: height)
+            }
+            return max(height, 0)
         }
 
         let hadWidthMismatch = widthsAreEquivalent(view.bounds.width, width) == false

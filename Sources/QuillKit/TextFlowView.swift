@@ -219,11 +219,14 @@ final class TextFlowView: UIView {
         )
     }
 
-    func revealCharacters(upTo index: Int) {
+    @discardableResult
+    func revealCharacters(upTo index: Int) -> Bool {
         guard let originalAttributedString,
               let workingAttributedString,
               index > lastRevealedIndex,
-              index <= originalAttributedString.length else { return }
+              index <= originalAttributedString.length else { return false }
+
+        let oldHeight = heightConstraint?.constant ?? 0
 
         let revealRange = NSRange(location: lastRevealedIndex, length: index - lastRevealedIndex)
         if revealFadeConfiguration.isEnabled {
@@ -234,12 +237,15 @@ final class TextFlowView: UIView {
 
         textContentStorage.attributedString = workingAttributedString
         lastRevealedIndex = index
-        setNeedsLayout()
+        updateLayout()
         setNeedsDisplay()
 
         if revealFadeConfiguration.isEnabled {
             scheduleRevealFade(for: revealRange, generation: revealFadeGeneration)
         }
+
+        let newHeight = heightConstraint?.constant ?? 0
+        return abs(newHeight - oldHeight) > 0.5
     }
 
     func displayedForegroundColor(at index: Int) -> UIColor? {
@@ -573,10 +579,7 @@ private extension TextFlowView {
         return baseDuration + extraDuration + jitter
     }
 
-    func updateLayout() {
-        textContainer.size = CGSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude)
-        textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
-
+    func computeFullLayoutHeight() -> CGFloat {
         var maxY: CGFloat = 0
         textLayoutManager.enumerateTextLayoutFragments(
             from: textLayoutManager.documentRange.location,
@@ -588,24 +591,39 @@ private extension TextFlowView {
             }
             return true
         }
+        return maxY
+    }
 
-        let visibleHeight = visiblePrefixHeight(forWidth: bounds.width)
-        if visibleHeight > 0, visibleHeight < maxY {
-            maxY = visibleHeight
+    func updateLayout() {
+        textContainer.size = CGSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude)
+        textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
+
+        let height: CGFloat
+        if let originalAttributedString {
+            let total = originalAttributedString.length
+            if lastRevealedIndex == 0 {
+                height = 0
+            } else if lastRevealedIndex >= total {
+                height = computeFullLayoutHeight()
+            } else {
+                height = visiblePrefixHeight(forWidth: bounds.width)
+            }
+        } else {
+            var maxY = computeFullLayoutHeight()
+            if maxY == 0,
+               let attributedString = textContentStorage.attributedString,
+               attributedString.length > 0 {
+                let boundingSize = CGSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude)
+                maxY = attributedString.boundingRect(
+                    with: boundingSize,
+                    options: [.usesLineFragmentOrigin],
+                    context: nil
+                ).height
+            }
+            height = maxY
         }
 
-        if maxY == 0,
-           let attributedString = textContentStorage.attributedString,
-           attributedString.length > 0 {
-            let boundingSize = CGSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude)
-            maxY = attributedString.boundingRect(
-                with: boundingSize,
-                options: [.usesLineFragmentOrigin],
-                context: nil
-            ).height
-        }
-
-        heightConstraint?.constant = ceil(maxY)
+        heightConstraint?.constant = ceil(height)
         invalidateIntrinsicContentSize()
     }
 
