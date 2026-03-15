@@ -202,4 +202,59 @@ struct BlockContainerViewTests {
         #expect(abs((placeholderIcon?.center.x ?? 0) - tablePlaceholderView.bounds.midX) < Self.frameTolerance)
         #expect(abs((placeholderLabel?.center.x ?? 0) - tablePlaceholderView.bounds.midX) < Self.frameTolerance)
     }
+
+    @Test("Code block reveal progress changes container measurement")
+    func codeBlockRevealProgressChangesContainerMeasurement() {
+        let container = BlockContainerView()
+        let codeBlockView = CodeBlockView()
+        codeBlockView.configure(language: "swift", code: "let value = 42\nprint(value)\n")
+
+        container.insertBlock(codeBlockView, at: 0)
+        container.frame = CGRect(x: 0, y: 0, width: Self.testWidth, height: 400)
+        container.layoutIfNeeded()
+
+        let fullHeight = container.totalHeight(for: Self.testWidth)
+
+        codeBlockView.prepareForBlockReveal()
+        container.invalidateBlockLayout(for: codeBlockView)
+        let collapsedHeight = container.totalHeight(for: Self.testWidth)
+
+        let didGrow = codeBlockView.setBlockRevealProgress(0.5)
+        container.invalidateBlockLayout(for: codeBlockView)
+        let partialHeight = container.totalHeight(for: Self.testWidth)
+
+        #expect(collapsedHeight < fullHeight)
+        #expect(didGrow)
+        #expect(partialHeight > collapsedHeight)
+        #expect(partialHeight < fullHeight)
+    }
+
+    @Test("Table placeholder reveal progress changes container measurement")
+    func tablePlaceholderRevealProgressChangesContainerMeasurement() {
+        let container = BlockContainerView()
+        let header = Block.TableRow(cells: [
+            .init(content: [.text("Column A")]),
+            .init(content: [.text("Column B")]),
+        ])
+        let tablePlaceholderView = PlaceholderBlockView.table(header: header, rowCount: 4)
+
+        container.insertBlock(tablePlaceholderView, at: 0)
+        container.frame = CGRect(x: 0, y: 0, width: Self.testWidth, height: 400)
+        container.layoutIfNeeded()
+
+        let fullHeight = container.totalHeight(for: Self.testWidth)
+
+        tablePlaceholderView.prepareForBlockReveal()
+        container.invalidateBlockLayout(for: tablePlaceholderView)
+        let collapsedHeight = container.totalHeight(for: Self.testWidth)
+
+        let didGrow = tablePlaceholderView.setBlockRevealProgress(0.5)
+        container.invalidateBlockLayout(for: tablePlaceholderView)
+        let partialHeight = container.totalHeight(for: Self.testWidth)
+
+        #expect(collapsedHeight < fullHeight)
+        #expect(didGrow)
+        #expect(partialHeight > collapsedHeight)
+        #expect(partialHeight < fullHeight)
+    }
 }
