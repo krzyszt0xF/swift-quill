@@ -13,6 +13,16 @@ final class PlaceholderBlockView: UIView {
     private let iconView = UIImageView()
     private let label = UILabel()
     private var minimumHeight: CGFloat = Layout.imageMinimumHeight
+    var revealProgress: CGFloat = 1
+
+    override var intrinsicContentSize: CGSize {
+        let measuredWidth = resolvedMeasurementWidth(from: bounds.width)
+        guard measuredWidth > 0 else {
+            return CGSize(width: UIView.noIntrinsicMetric, height: scaledHeight(for: minimumMeasuredHeight))
+        }
+
+        return CGSize(width: UIView.noIntrinsicMetric, height: scaledHeight(for: measuredHeight(for: measuredWidth)))
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -35,14 +45,10 @@ final class PlaceholderBlockView: UIView {
     override func sizeThatFits(_ size: CGSize) -> CGSize {
         let measuredWidth = resolvedMeasurementWidth(from: size.width)
         guard measuredWidth > 0 else {
-            return CGSize(width: size.width, height: minimumMeasuredHeight)
+            return CGSize(width: size.width, height: scaledHeight(for: minimumMeasuredHeight))
         }
 
-        let measuredHeight = max(
-            minimumMeasuredHeight,
-            (Layout.contentInset * 2) + Layout.iconSize + Layout.stackSpacing + labelHeight(for: measuredWidth)
-        )
-        return CGSize(width: measuredWidth, height: measuredHeight)
+        return CGSize(width: measuredWidth, height: scaledHeight(for: measuredHeight(for: measuredWidth)))
     }
 
     override func layoutSubviews() {
@@ -107,6 +113,13 @@ final class PlaceholderBlockView: UIView {
 }
 
 private extension PlaceholderBlockView {
+    func measuredHeight(for width: CGFloat) -> CGFloat {
+        max(
+            minimumMeasuredHeight,
+            (Layout.contentInset * 2) + Layout.iconSize + Layout.stackSpacing + labelHeight(for: width)
+        )
+    }
+
     var minimumMeasuredHeight: CGFloat {
         max(minimumHeight, (Layout.contentInset * 2) + Layout.iconSize)
     }
@@ -158,8 +171,19 @@ private extension PlaceholderBlockView {
         return bounds.width
     }
 
+    func scaledHeight(for height: CGFloat) -> CGFloat {
+        ceil(max(0, height * revealProgress))
+    }
+
     func labelHeight(for width: CGFloat) -> CGFloat {
         let availableWidth = max(width - (Layout.contentInset * 2), 0)
         return label.sizeThatFits(CGSize(width: availableWidth, height: .greatestFiniteMagnitude)).height
+    }
+}
+
+extension PlaceholderBlockView: BlockRevealAnimating {
+    func currentRevealHeight() -> CGFloat {
+        let width = resolvedMeasurementWidth(from: bounds.width)
+        return scaledHeight(for: width > 0 ? measuredHeight(for: width) : minimumMeasuredHeight)
     }
 }

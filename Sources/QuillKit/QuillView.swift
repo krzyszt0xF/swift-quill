@@ -181,7 +181,10 @@ private extension QuillView {
             host.topAnchor.constraint(equalTo: topAnchor),
             host.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])
-        sequencer.onLayoutChange = { [weak self] in
+        sequencer.onLayoutChange = { [weak self] view in
+            if let self, let view {
+                self.renderer.containerView.invalidateBlockLayout(for: view)
+            }
             self?.scheduleHeightUpdate()
         }
         sequencer.onComplete = { [weak self] in
