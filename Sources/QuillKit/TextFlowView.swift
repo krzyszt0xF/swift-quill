@@ -20,6 +20,7 @@ final class TextFlowView: UIView {
 
     private(set) var lastRevealedIndex = 0
     private(set) var originalAttributedString: NSAttributedString?
+    var onLinkTap: ((URL) -> Void)?
 
     var totalCharacterCount: Int { originalAttributedString?.length ?? 0 }
 
@@ -51,11 +52,15 @@ final class TextFlowView: UIView {
 
         backgroundColor = .clear
         isOpaque = false
+        isUserInteractionEnabled = true
 
         translatesAutoresizingMaskIntoConstraints = false
         heightConstraint = heightAnchor.constraint(equalToConstant: 0)
         heightConstraint?.priority = .required
         heightConstraint?.isActive = true
+
+        let tapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleTapGesture(_:)))
+        addGestureRecognizer(tapGestureRecognizer)
     }
 
     @available(*, unavailable)
@@ -266,6 +271,28 @@ final class TextFlowView: UIView {
 
         return attributedString.attribute(.foregroundColor, at: index, effectiveRange: nil) as? UIColor
     }
+
+    func handleTap(at point: CGPoint) {
+        guard let url = linkURL(at: point) else { return }
+        onLinkTap?(url)
+    }
+
+    func linkURL(at point: CGPoint) -> URL? {
+        guard let characterIndex = resolvedCharacterIndex(at: point),
+              characterIndex < currentVisibleCharacterCount()
+        else {
+            return nil
+        }
+
+        let attributedString = originalAttributedString ?? textContentStorage.attributedString
+        guard let attributedString,
+              characterIndex >= 0,
+              characterIndex < attributedString.length else {
+            return nil
+        }
+
+        return attributedString.attribute(.link, at: characterIndex, effectiveRange: nil) as? URL
+    }
 }
 
 private extension TextFlowView {
@@ -273,6 +300,11 @@ private extension TextFlowView {
     static let sentenceCharacters: Set<unichar> = [0x002E, 0x0021, 0x003F, 0x000A]
     static let idleRevealPollInterval: TimeInterval = 0.016
     static let defaultIdleRevealTimeout: TimeInterval = 0.30
+
+    @objc func handleTapGesture(_ recognizer: UITapGestureRecognizer) {
+        guard recognizer.state == .ended else { return }
+        handleTap(at: recognizer.location(in: self))
+    }
 
     func resetStreamingState(clearTiming: Bool) {
         streamingRevealTask?.cancel()
@@ -581,6 +613,87 @@ private extension TextFlowView {
         textContainer.size = CGSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         textLayoutManager.textContainer = textContainer
         textContentStorage.addTextLayoutManager(textLayoutManager)
+    }
+
+    func findLayoutFragment(containing point: CGPoint) -> NSTextLayoutFragment? {
+        guard bounds.contains(point) else { return nil }
+
+        updateLayout()
+
+        var matchedFragment: NSTextLayoutFragment?
+        textLayoutManager.enumerateTextLayoutFragments(
+            from: textLayoutManager.documentRange.location,
+            options: [.ensuresLayout]
+        ) { fragment in
+            guard fragment.layoutFragmentFrame.contains(point) else {
+                return true
+            }
+
+            matchedFragment = fragment
+            return false
+        }
+
+        return matchedFragment
+    }
+
+    func resolvedCharacterIndex(at point: CGPoint) -> Int? {
+        guard let fragment = findLayoutFragment(containing: point) else {
+            return nil
+        }
+
+        let fragmentPoint = CGPoint(
+            x: point.x - fragment.layoutFragmentFrame.minX,
+            y: point.y - fragment.layoutFragmentFrame.minY
+        )
+        guard let lineFragment = fragment.textLineFragments.first(where: {
+            $0.typographicBounds.minY <= fragmentPoint.y && fragmentPoint.y <= $0.typographicBounds.maxY
+        }) else {
+            return nil
+        }
+
+        return resolvedCharacterIndex(
+            from: lineFragment,
+            in: fragment,
+            fragmentPoint: fragmentPoint
+        )
+    }
+
+    func resolvedCharacterIndex(
+        from lineFragment: NSTextLineFragment,
+        in fragment: NSTextLayoutFragment,
+        fragmentPoint: CGPoint
+    ) -> Int? {
+        guard lineFragment.characterRange.length > 0 else { return nil }
+
+        let lineBounds = lineFragment.typographicBounds
+        guard fragmentPoint.x >= lineBounds.minX,
+              fragmentPoint.x <= lineBounds.maxX else {
+            return nil
+        }
+
+        let linePoint = CGPoint(
+            x: fragmentPoint.x - lineBounds.minX,
+            y: fragmentPoint.y - lineBounds.minY
+        )
+        let lineCharacterIndex = lineFragment.characterIndex(for: linePoint)
+        let lineCharacterRange = lineFragment.characterRange
+        let elementCharacterIndex: Int
+        if lineCharacterIndex >= lineCharacterRange.location,
+           lineCharacterIndex < lineCharacterRange.upperBound {
+            elementCharacterIndex = lineCharacterIndex
+        } else {
+            elementCharacterIndex = lineCharacterRange.location + lineCharacterIndex
+        }
+
+        let clampedElementIndex = min(
+            max(elementCharacterIndex, lineCharacterRange.location),
+            lineCharacterRange.upperBound - 1
+        )
+        let paragraphStart = textContentStorage.offset(
+            from: textContentStorage.documentRange.location,
+            to: fragment.rangeInElement.location
+        )
+        return paragraphStart + clampedElementIndex
     }
 
     func shouldAnimateStreamingUpdate(with attributedString: NSAttributedString) -> Bool {

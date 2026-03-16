@@ -92,6 +92,126 @@ struct AttributedStringBuilderTests {
         #expect(linkForegroundColor == UIColor.systemBlue)
     }
 
+    @Test("Link applies single underline")
+    func linkUnderlineStyle() {
+        let result = AttributedStringBuilder.build(
+            from: segment(.paragraph(content: [.link(destination: "https://example.com", children: [.text("click")])]))
+        )
+
+        let underlineStyle = result.attribute(.underlineStyle, at: 0, effectiveRange: nil) as? Int
+        #expect(underlineStyle == NSUnderlineStyle.single.rawValue)
+    }
+
+    @Test("Link applies URL attribute for valid destination")
+    func linkURLAttribute() {
+        let result = AttributedStringBuilder.build(
+            from: segment(.paragraph(content: [.link(destination: "https://example.com", children: [.text("click")])]))
+        )
+
+        let linkURL = result.attribute(.link, at: 0, effectiveRange: nil) as? URL
+        #expect(linkURL == URL(string: "https://example.com"))
+    }
+
+    @Test("Link stays inert for invalid destination")
+    func invalidLinkDestinationIsInert() {
+        let result = AttributedStringBuilder.build(
+            from: segment(.paragraph(content: [.link(destination: " ", children: [.text("click")])]))
+        )
+
+        let linkForegroundColor = result.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
+        let underlineStyle = result.attribute(.underlineStyle, at: 0, effectiveRange: nil) as? Int
+        let linkURL = result.attribute(.link, at: 0, effectiveRange: nil) as? URL
+
+        #expect(linkForegroundColor == UIColor.systemBlue)
+        #expect(underlineStyle == NSUnderlineStyle.single.rawValue)
+        #expect(linkURL == nil)
+    }
+
+    @Test("Bare URL in text becomes tappable link")
+    func bareURLInTextBecomesLink() {
+        let result = AttributedStringBuilder.build(
+            from: segment(.paragraph(content: [.text("See https://developer.apple.com/documentation for docs")]))
+        )
+        let linkIndex = (result.string as NSString).range(of: "https://developer.apple.com/documentation").location
+
+        let linkForegroundColor = result.attribute(.foregroundColor, at: linkIndex, effectiveRange: nil) as? UIColor
+        let underlineStyle = result.attribute(.underlineStyle, at: linkIndex, effectiveRange: nil) as? Int
+        let linkURL = result.attribute(.link, at: linkIndex, effectiveRange: nil) as? URL
+
+        #expect(linkForegroundColor == UIColor.systemBlue)
+        #expect(underlineStyle == NSUnderlineStyle.single.rawValue)
+        #expect(linkURL == URL(string: "https://developer.apple.com/documentation"))
+    }
+
+    @Test("Bold link keeps bold trait and link styling")
+    func boldLinkFormatting() {
+        let result = AttributedStringBuilder.build(
+            from: segment(.paragraph(content: [.strong([.link(destination: "https://example.com", children: [.text("click")])])]))
+        )
+
+        let resultFont = font(in: result)
+        let linkForegroundColor = result.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
+        let underlineStyle = result.attribute(.underlineStyle, at: 0, effectiveRange: nil) as? Int
+
+        #expect(resultFont?.fontDescriptor.symbolicTraits.contains(.traitBold) == true)
+        #expect(linkForegroundColor == UIColor.systemBlue)
+        #expect(underlineStyle == NSUnderlineStyle.single.rawValue)
+    }
+
+    @Test("Heading link keeps heading font and link styling")
+    func headingLinkFormatting() {
+        let result = AttributedStringBuilder.build(
+            from: segment(.heading(level: 2, content: [.link(destination: "https://example.com", children: [.text("Heading")])]))
+        )
+
+        let resultFont = font(in: result)
+        let linkForegroundColor = result.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
+        let underlineStyle = result.attribute(.underlineStyle, at: 0, effectiveRange: nil) as? Int
+        let linkURL = result.attribute(.link, at: 0, effectiveRange: nil) as? URL
+
+        #expect(resultFont?.pointSize == 24)
+        #expect(resultFont?.fontDescriptor.symbolicTraits.contains(.traitBold) == true)
+        #expect(linkForegroundColor == UIColor.systemBlue)
+        #expect(underlineStyle == NSUnderlineStyle.single.rawValue)
+        #expect(linkURL == URL(string: "https://example.com"))
+    }
+
+    @Test("List item link keeps link styling")
+    func listItemLinkFormatting() {
+        let items = [
+            Block.ListItem(children: [.paragraph(content: [.link(destination: "https://example.com", children: [.text("item")])])]),
+        ]
+        let result = AttributedStringBuilder.build(from: segment(.unorderedList(items: items)))
+        let linkIndex = (result.string as NSString).range(of: "item").location
+
+        let linkForegroundColor = result.attribute(.foregroundColor, at: linkIndex, effectiveRange: nil) as? UIColor
+        let underlineStyle = result.attribute(.underlineStyle, at: linkIndex, effectiveRange: nil) as? Int
+        let linkURL = result.attribute(.link, at: linkIndex, effectiveRange: nil) as? URL
+
+        #expect(linkForegroundColor == UIColor.systemBlue)
+        #expect(underlineStyle == NSUnderlineStyle.single.rawValue)
+        #expect(linkURL == URL(string: "https://example.com"))
+    }
+
+    @Test("Blockquote link keeps link styling and blockquote depth")
+    func blockquoteLinkFormatting() {
+        let blockquote = Block.blockquote(children: [
+            .paragraph(content: [.link(destination: "https://example.com", children: [.text("quoted")])])
+        ])
+        let result = AttributedStringBuilder.build(from: segment(blockquote))
+        let linkIndex = (result.string as NSString).range(of: "quoted").location
+
+        let linkForegroundColor = result.attribute(.foregroundColor, at: linkIndex, effectiveRange: nil) as? UIColor
+        let underlineStyle = result.attribute(.underlineStyle, at: linkIndex, effectiveRange: nil) as? Int
+        let linkURL = result.attribute(.link, at: linkIndex, effectiveRange: nil) as? URL
+        let blockquoteDepth = result.attribute(.blockquoteDepth, at: linkIndex, effectiveRange: nil) as? Int
+
+        #expect(linkForegroundColor == UIColor.systemBlue)
+        #expect(underlineStyle == NSUnderlineStyle.single.rawValue)
+        #expect(linkURL == URL(string: "https://example.com"))
+        #expect(blockquoteDepth == 1)
+    }
+
     // MARK: - Multi-Block Tests
 
     @Test("Blocks separated by newlines")

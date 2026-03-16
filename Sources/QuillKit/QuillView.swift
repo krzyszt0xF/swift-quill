@@ -4,6 +4,12 @@ import UIKit
 @MainActor
 public final class QuillView: UIView {
     public var onHeightChange: ((_ old: CGFloat, _ new: CGFloat) -> Void)?
+    public var onLinkTap: ((URL) -> Void)? {
+        didSet {
+            renderer.onLinkTap = onLinkTap
+            renderer.rebindLinkTapHandlers()
+        }
+    }
 
     public var markdown: String? {
         didSet { renderStatic() }

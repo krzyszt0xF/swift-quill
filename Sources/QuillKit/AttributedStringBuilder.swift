@@ -298,12 +298,21 @@ private extension AttributedStringBuilder {
             return NSAttributedString()
         case .lineBreak:
             return NSAttributedString(string: "\n")
-        case let .link(_, children):
+        case let .link(destination, children):
             let result = NSMutableAttributedString()
             for child in children {
                 result.append(attributedString(for: child, baseFont: baseFont))
             }
-            result.addAttribute(.foregroundColor, value: UIColor.systemBlue, range: NSRange(location: 0, length: result.length))
+            let fullRange = NSRange(location: 0, length: result.length)
+            result.addAttribute(.foregroundColor, value: UIColor.systemBlue, range: fullRange)
+            result.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: fullRange)
+
+            let trimmedDestination = destination.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedDestination.isEmpty == false,
+               let url = URL(string: trimmedDestination) {
+                result.addAttribute(.link, value: url, range: fullRange)
+            }
+
             return result
         case let .strikethrough(children):
             let result = NSMutableAttributedString()
@@ -323,10 +332,7 @@ private extension AttributedStringBuilder {
             }
             return result
         case let .text(string):
-            return NSAttributedString(string: string, attributes: [
-                .font: baseFont,
-                .foregroundColor: UIColor.label,
-            ])
+            return makeTextAttributedString(string: string, baseFont: baseFont)
         }
     }
 }
@@ -334,6 +340,29 @@ private extension AttributedStringBuilder {
 // MARK: - Helpers
 
 private extension AttributedStringBuilder {
+    static let linkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+
+    static func makeTextAttributedString(string: String, baseFont: UIFont) -> NSAttributedString {
+        let result = NSMutableAttributedString(string: string, attributes: [
+            .font: baseFont,
+            .foregroundColor: UIColor.label,
+        ])
+        let fullRange = NSRange(location: 0, length: result.length)
+
+        linkDetector?.enumerateMatches(in: string, options: [], range: fullRange) { match, _, _ in
+            guard let match,
+                  let url = match.url else {
+                return
+            }
+
+            result.addAttribute(.foregroundColor, value: UIColor.systemBlue, range: match.range)
+            result.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: match.range)
+            result.addAttribute(.link, value: url, range: match.range)
+        }
+
+        return result
+    }
+
     static func plainText(from inlines: [Inline]) -> String {
         inlines.map { plainText(from: $0) }.joined()
     }
