@@ -1,6 +1,7 @@
 struct StreamBuffer {
     private var partialLine = ""
     private var pendingLines: [String] = []
+    private var listStack: [ListContext] = []
     private var state: State = .idle
 
     enum State: Equatable {
@@ -8,10 +9,15 @@ struct StreamBuffer {
         case codeFence(marker: Character, count: Int)
         case heading
         case idle
-        case list(ordered: Bool)
+        case list
         case paragraph
         case table
         case tableCandidate(headerLine: String)
+    }
+
+    struct ListContext: Equatable {
+        let indent: Int
+        let ordered: Bool
     }
 
     mutating func append(_ chunk: String) -> [ParserEvent] {
@@ -89,10 +95,11 @@ private extension StreamBuffer {
             return [.thematicBreak]
         }
 
-        if let marker = parseListMarker(trimmed) {
-            let content = extractListItemContent(trimmed, marker: marker)
-            state = .list(ordered: marker.ordered)
-            return [.startList(ordered: marker.ordered), .startListItem, .startParagraph, .text(content)]
+        if let marker = parseListMarker(line) {
+            let item = makeListItemContent(from: line, marker: marker)
+            state = .list
+            listStack = [ListContext(indent: marker.indent, ordered: marker.ordered)]
+            return [.startList(ordered: marker.ordered), item.startEvent, .startParagraph, .text(item.content)]
         }
 
         if trimmed.hasPrefix(">") {
@@ -134,10 +141,11 @@ private extension StreamBuffer {
             return [.endParagraph, .thematicBreak]
         }
 
-        if let marker = parseListMarker(trimmed) {
-            let content = extractListItemContent(trimmed, marker: marker)
-            state = .list(ordered: marker.ordered)
-            return [.endParagraph, .startList(ordered: marker.ordered), .startListItem, .startParagraph, .text(content)]
+        if let marker = parseListMarker(line) {
+            let item = makeListItemContent(from: line, marker: marker)
+            state = .list
+            listStack = [ListContext(indent: marker.indent, ordered: marker.ordered)]
+            return [.endParagraph, .startList(ordered: marker.ordered), item.startEvent, .startParagraph, .text(item.content)]
         }
 
         if trimmed.hasPrefix(">") {
@@ -146,7 +154,7 @@ private extension StreamBuffer {
             return [.endParagraph, .startBlockQuote, .startParagraph, .text(content)]
         }
 
-        return [.text(trimmed)]
+        return [.text(makeContinuationText(from: trimmed))]
     }
 
     mutating func processCodeFenceLine(
@@ -174,15 +182,15 @@ private extension StreamBuffer {
 
         if trimmed.isEmpty {
             state = .idle
-            return [.endParagraph, .endListItem, .endList]
+            return closeOpenLists()
         }
 
-        if let marker = parseListMarker(trimmed) {
-            let content = extractListItemContent(trimmed, marker: marker)
-            return [.endParagraph, .endListItem, .startListItem, .startParagraph, .text(content)]
+        if let marker = parseListMarker(line) {
+            let item = makeListItemContent(from: line, marker: marker)
+            return processListItemLine(item, marker: marker)
         }
 
-        return [.text(trimmed)]
+        return [.text(makeContinuationText(from: trimmed))]
     }
 
     mutating func processBlockquoteLine(_ line: String) -> [ParserEvent] {
@@ -195,7 +203,7 @@ private extension StreamBuffer {
 
         if trimmed.hasPrefix(">") {
             let content = extractBlockquoteContent(trimmed)
-            return [.text(content)]
+            return [.text(makeContinuationText(from: content))]
         }
 
         state = .idle
@@ -252,7 +260,7 @@ private extension StreamBuffer {
         case .idle:
             return []
         case .list:
-            return [.endParagraph, .endListItem, .endList]
+            return closeOpenLists()
         case .paragraph:
             return [.endParagraph]
         case .table:
@@ -263,6 +271,11 @@ private extension StreamBuffer {
     }
 
     // MARK: - Line Detection Helpers
+
+    func makeContinuationText(from text: String) -> String {
+        guard !text.isEmpty else { return text }
+        return " " + text
+    }
 
     func parseFenceOpener(_ line: String) -> (marker: Character, count: Int, language: String?)? {
         guard let first = line.first, first == "`" || first == "~" else { return nil }
@@ -341,34 +354,147 @@ private extension StreamBuffer {
     }
 
     struct ListMarker {
+        let indent: Int
         let ordered: Bool
         let length: Int
     }
 
-    func parseListMarker(_ line: String) -> ListMarker? {
-        if line.hasPrefix("- ") { return ListMarker(ordered: false, length: 2) }
-        if line.hasPrefix("* ") { return ListMarker(ordered: false, length: 2) }
-        if line.hasPrefix("+ ") { return ListMarker(ordered: false, length: 2) }
+    struct ListItemContent {
+        let checkbox: Block.Checkbox?
+        let content: String
 
-        var index = line.startIndex
-        while index < line.endIndex && line[index].isNumber {
-            index = line.index(after: index)
+        var startEvent: ParserEvent {
+            if let checkbox {
+                return .startTaskListItem(checkbox: checkbox)
+            }
+            return .startListItem
+        }
+    }
+
+    func parseListMarker(_ line: String) -> ListMarker? {
+        let indent = line.prefix { $0 == " " || $0 == "\t" }.count
+        let contentStart = line.index(line.startIndex, offsetBy: indent, limitedBy: line.endIndex) ?? line.endIndex
+        let content = line[contentStart...]
+
+        if content.hasPrefix("- ") { return ListMarker(indent: indent, ordered: false, length: indent + 2) }
+        if content.hasPrefix("* ") { return ListMarker(indent: indent, ordered: false, length: indent + 2) }
+        if content.hasPrefix("+ ") { return ListMarker(indent: indent, ordered: false, length: indent + 2) }
+
+        var index = content.startIndex
+        while index < content.endIndex && content[index].isNumber {
+            index = content.index(after: index)
         }
 
-        if index > line.startIndex && index < line.endIndex {
-            let afterDigits = line[index]
-            let nextIndex = line.index(after: index)
-            if (afterDigits == "." || afterDigits == ")") && nextIndex < line.endIndex && line[nextIndex] == " " {
-                let markerLen = line.distance(from: line.startIndex, to: nextIndex) + 1
-                return ListMarker(ordered: true, length: markerLen)
+        if index > content.startIndex && index < content.endIndex {
+            let afterDigits = content[index]
+            let nextIndex = content.index(after: index)
+            if (afterDigits == "." || afterDigits == ")") && nextIndex < content.endIndex && content[nextIndex] == " " {
+                let markerLength = content.distance(from: content.startIndex, to: nextIndex) + 1
+                return ListMarker(indent: indent, ordered: true, length: indent + markerLength)
             }
         }
 
         return nil
     }
 
-    func extractListItemContent(_ line: String, marker: ListMarker) -> String {
-        String(line.dropFirst(marker.length))
+    func makeListItemContent(from line: String, marker: ListMarker) -> ListItemContent {
+        let rawContent = String(line.dropFirst(marker.length))
+
+        guard let checkbox = makeTaskListCheckbox(from: rawContent) else {
+            return ListItemContent(checkbox: nil, content: rawContent)
+        }
+
+        return ListItemContent(
+            checkbox: checkbox.checkbox,
+            content: checkbox.content
+        )
+    }
+
+    func makeTaskListCheckbox(from content: String) -> (checkbox: Block.Checkbox, content: String)? {
+        if content.hasPrefix("[ ] ") {
+            return (.unchecked, String(content.dropFirst(4)))
+        }
+        if content == "[ ]" {
+            return (.unchecked, "")
+        }
+        if content.hasPrefix("[x] ") || content.hasPrefix("[X] ") {
+            return (.checked, String(content.dropFirst(4)))
+        }
+        if content == "[x]" || content == "[X]" {
+            return (.checked, "")
+        }
+
+        return nil
+    }
+
+    mutating func closeOpenLists() -> [ParserEvent] {
+        guard !listStack.isEmpty else { return [] }
+
+        var events: [ParserEvent] = [.endParagraph, .endListItem, .endList]
+        listStack.removeLast()
+
+        while !listStack.isEmpty {
+            events.append(.endListItem)
+            events.append(.endList)
+            listStack.removeLast()
+        }
+
+        return events
+    }
+
+    mutating func processListItemLine(
+        _ item: ListItemContent,
+        marker: ListMarker
+    ) -> [ParserEvent] {
+        guard let currentList = listStack.last else {
+            listStack = [ListContext(indent: marker.indent, ordered: marker.ordered)]
+            return [.startList(ordered: marker.ordered), item.startEvent, .startParagraph, .text(item.content)]
+        }
+
+        if marker.indent > currentList.indent {
+            listStack.append(ListContext(indent: marker.indent, ordered: marker.ordered))
+            return [.endParagraph, .startList(ordered: marker.ordered), item.startEvent, .startParagraph, .text(item.content)]
+        }
+
+        var events: [ParserEvent] = [.endParagraph, .endListItem]
+        while let activeList = listStack.last,
+              marker.indent < activeList.indent {
+            events.append(.endList)
+            listStack.removeLast()
+
+            if !listStack.isEmpty {
+                events.append(.endListItem)
+            }
+        }
+
+        guard let targetList = listStack.last else {
+            listStack = [ListContext(indent: marker.indent, ordered: marker.ordered)]
+            events.append(.startList(ordered: marker.ordered))
+            events.append(item.startEvent)
+            events.append(.startParagraph)
+            events.append(.text(item.content))
+            return events
+        }
+
+        if marker.indent == targetList.indent,
+           marker.ordered == targetList.ordered {
+            events.append(item.startEvent)
+            events.append(.startParagraph)
+            events.append(.text(item.content))
+            return events
+        }
+
+        if marker.indent == targetList.indent {
+            events.append(.endList)
+            listStack.removeLast()
+        }
+
+        listStack.append(ListContext(indent: marker.indent, ordered: marker.ordered))
+        events.append(.startList(ordered: marker.ordered))
+        events.append(item.startEvent)
+        events.append(.startParagraph)
+        events.append(.text(item.content))
+        return events
     }
 
     func extractBlockquoteContent(_ line: String) -> String {

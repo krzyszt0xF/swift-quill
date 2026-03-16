@@ -18,6 +18,7 @@ enum AttributedStringBuilder {
 
 extension NSAttributedString.Key {
     static let blockquoteDepth = NSAttributedString.Key("quill.blockquoteDepth")
+    static let structuralMarker = NSAttributedString.Key("quill.structuralMarker")
 }
 
 // MARK: - Block Conversion
@@ -107,7 +108,11 @@ private extension AttributedStringBuilder {
             if index > 0 {
                 result.append(NSAttributedString(string: "\n"))
             }
-            let marker = "\(Int(startIndex) + index).\t"
+            let marker = makeOrderedListMarker(
+                checkbox: item.checkbox,
+                itemIndex: index,
+                startIndex: startIndex
+            )
             let style = listParagraphStyle(level: nestingContext.listLevel, marker: marker, bodyFont: bodyFont)
             applyBlockquoteIndent(to: style, nestingContext: nestingContext)
 
@@ -115,6 +120,7 @@ private extension AttributedStringBuilder {
                 .font: bodyFont,
                 .foregroundColor: UIColor.label,
                 .paragraphStyle: style,
+                .structuralMarker: true,
             ])
 
             let childContext = NestingContext(
@@ -192,7 +198,10 @@ private extension AttributedStringBuilder {
             if index > 0 {
                 result.append(NSAttributedString(string: "\n"))
             }
-            let marker = "\(bulletChar)\t"
+            let marker = makeUnorderedListMarker(
+                bullet: bulletChar,
+                checkbox: item.checkbox
+            )
             let style = listParagraphStyle(level: nestingContext.listLevel, marker: marker, bodyFont: bodyFont)
             applyBlockquoteIndent(to: style, nestingContext: nestingContext)
 
@@ -200,6 +209,7 @@ private extension AttributedStringBuilder {
                 .font: bodyFont,
                 .foregroundColor: UIColor.label,
                 .paragraphStyle: style,
+                .structuralMarker: true,
             ])
 
             let childContext = NestingContext(
@@ -222,6 +232,37 @@ private extension AttributedStringBuilder {
         }
 
         return result
+    }
+
+    static func makeOrderedListMarker(
+        checkbox: Block.Checkbox?,
+        itemIndex: Int,
+        startIndex: UInt
+    ) -> String {
+        let prefix = "\(Int(startIndex) + itemIndex)."
+        guard let checkbox else {
+            return "\(prefix)\t"
+        }
+        return "\(prefix) \(makeTaskListMarker(for: checkbox))\t"
+    }
+
+    static func makeTaskListMarker(for checkbox: Block.Checkbox) -> String {
+        switch checkbox {
+        case .checked:
+            return "[x]"
+        case .unchecked:
+            return "[ ]"
+        }
+    }
+
+    static func makeUnorderedListMarker(
+        bullet: String,
+        checkbox: Block.Checkbox?
+    ) -> String {
+        guard let checkbox else {
+            return "\(bullet)\t"
+        }
+        return "\(makeTaskListMarker(for: checkbox))\t"
     }
 }
 

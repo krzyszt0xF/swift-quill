@@ -1,3 +1,4 @@
+import QuillCore
 @testable import QuillKit
 import QuillSharedTestSupport
 import Testing
@@ -115,6 +116,33 @@ struct TextFlowViewStreamingTests {
 
         view.layoutIfNeeded()
         #expect(view.intrinsicContentSize.height > hiddenBacklogHeight)
+    }
+
+    @Test("Structural markers are visible and occupy layout before text reveal")
+    func structuralMarkersOccupyInitialLayout() {
+        let items = [
+            Block.ListItem(children: [.paragraph(content: [.text("hello world")])]),
+        ]
+        let block = Block.unorderedList(items: items)
+        let segment = RenderNode.FlowSegment(blocks: [block])
+        let attributedString = AttributedStringBuilder.build(from: segment)
+
+        let view = TextFlowView(frame: CGRect(x: 0, y: 0, width: 320, height: 0))
+        view.configureStreaming(
+            with: attributedString,
+            charsPerStep: 1,
+            baseDuration: 10,
+            commaPause: 0,
+            sentencePause: 0
+        )
+        view.layoutIfNeeded()
+
+        let marker = "+\t"
+        for index in 0..<marker.count {
+            #expect(view.displayedForegroundColor(at: index) != UIColor.clear)
+        }
+        #expect(view.intrinsicContentSize.height > 0)
+        #expect(view.lastRevealedIndex == marker.count)
     }
 
     @Test("Prefix mismatch falls back to immediate full update")

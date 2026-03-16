@@ -30,6 +30,14 @@ package func reduce(_ events: [ParserEvent]) -> [Block] {
     return reducerState.blocks
 }
 
+package func tailPreview(after events: [ParserEvent]) -> Block? {
+    var state = BlockReducer.ReducerState()
+    for event in events {
+        BlockReducer.apply(event, to: &state)
+    }
+    return BlockReducer.makeTailPreview(from: state)
+}
+
 package func streamAndReduce(_ markdown: String, chunkSizes: [Int]) async -> [Block] {
     let chunks = chunk(markdown, sizes: chunkSizes)
     let controller = MarkdownStreamController()
