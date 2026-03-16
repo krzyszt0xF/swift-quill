@@ -56,7 +56,7 @@ struct StreamBufferTests {
         let events = buffer.append("Line one\nLine two\n\n")
         #expect(events == [
             .startParagraph, .text("Line one"),
-            .text("Line two"),
+            .text(" Line two"),
             .endParagraph,
         ])
     }
@@ -204,12 +204,45 @@ struct StreamBufferTests {
         ])
     }
 
+    @Test("Nested unordered list emits nested list events")
+    func nestedUnorderedList() {
+        var buffer = StreamBuffer()
+        let events = buffer.append("- outer\n  - inner\n- after\n\n")
+        #expect(events == [
+            .startList(ordered: false), .startListItem, .startParagraph, .text("outer"),
+            .endParagraph, .startList(ordered: false), .startListItem, .startParagraph, .text("inner"),
+            .endParagraph, .endListItem, .endList, .endListItem,
+            .startListItem, .startParagraph, .text("after"),
+            .endParagraph, .endListItem, .endList,
+        ])
+    }
+
     @Test("Ordered list item")
     func orderedListItem() {
         var buffer = StreamBuffer()
         let events = buffer.append("1. item\n\n")
         #expect(events == [
             .startList(ordered: true), .startListItem, .startParagraph, .text("item"),
+            .endParagraph, .endListItem, .endList,
+        ])
+    }
+
+    @Test("Task list item emits checked start event")
+    func checkedTaskListItem() {
+        var buffer = StreamBuffer()
+        let events = buffer.append("- [x] done\n\n")
+        #expect(events == [
+            .startList(ordered: false), .startTaskListItem(checkbox: .checked), .startParagraph, .text("done"),
+            .endParagraph, .endListItem, .endList,
+        ])
+    }
+
+    @Test("Task list item emits unchecked start event")
+    func uncheckedTaskListItem() {
+        var buffer = StreamBuffer()
+        let events = buffer.append("- [ ] pending\n\n")
+        #expect(events == [
+            .startList(ordered: false), .startTaskListItem(checkbox: .unchecked), .startParagraph, .text("pending"),
             .endParagraph, .endListItem, .endList,
         ])
     }
@@ -240,8 +273,19 @@ struct StreamBufferTests {
         let events = buffer.append("> line one\n> line two\n\n")
         #expect(events == [
             .startBlockQuote, .startParagraph, .text("line one"),
-            .text("line two"),
+            .text(" line two"),
             .endParagraph, .endBlockQuote,
+        ])
+    }
+
+    @Test("List continuation preserves word separator in text events")
+    func listContinuationSpacing() {
+        var buffer = StreamBuffer()
+        let events = buffer.append("- line one\nline two\n\n")
+        #expect(events == [
+            .startList(ordered: false), .startListItem, .startParagraph, .text("line one"),
+            .text(" line two"),
+            .endParagraph, .endListItem, .endList,
         ])
     }
 

@@ -161,6 +161,18 @@ struct AttributedStringBuilderTests {
         #expect(result.string.contains("4."))
     }
 
+    @Test("Task list renders checkbox marker")
+    func taskListMarker() {
+        let items = [
+            Block.ListItem(checkbox: .checked, children: [.paragraph(content: [.text("done")])]),
+            Block.ListItem(checkbox: .unchecked, children: [.paragraph(content: [.text("pending")])]),
+        ]
+        let result = AttributedStringBuilder.build(from: segment(.unorderedList(items: items)))
+
+        #expect(result.string.contains("[x]\t"))
+        #expect(result.string.contains("[ ]\t"))
+    }
+
     // MARK: - Blockquote Tests
 
     @Test("Blockquote has greater indentation than plain text")
@@ -206,6 +218,92 @@ struct AttributedStringBuilderTests {
         let quotedRange = (result.string as NSString).range(of: "quoted")
         let blockquoteDepth = result.attribute(.blockquoteDepth, at: quotedRange.location, effectiveRange: nil) as? Int
         #expect(blockquoteDepth == 1)
+    }
+
+    // MARK: - Structural Marker Tests
+
+    @Test("Unordered list has structuralMarker on bullet+tab characters")
+    func unorderedListStructuralMarker() {
+        let items = [
+            Block.ListItem(children: [.paragraph(content: [.text("alpha")])]),
+        ]
+        let result = AttributedStringBuilder.build(from: segment(.unorderedList(items: items)))
+
+        let markerString = "+\t"
+        let markerRange = NSRange(location: 0, length: markerString.count)
+        let hasMarker = result.attribute(.structuralMarker, at: 0, effectiveRange: nil) as? Bool
+        #expect(hasMarker == true)
+
+        var markerAttributeRange = NSRange()
+        result.attribute(.structuralMarker, at: 0, longestEffectiveRange: &markerAttributeRange, in: NSRange(location: 0, length: result.length))
+        #expect(markerAttributeRange.length == markerRange.length)
+
+        let textStart = markerString.count
+        let textMarker = result.attribute(.structuralMarker, at: textStart, effectiveRange: nil) as? Bool
+        #expect(textMarker == nil)
+    }
+
+    @Test("Ordered list has structuralMarker on number+dot+tab characters")
+    func orderedListStructuralMarker() {
+        let items = [
+            Block.ListItem(children: [.paragraph(content: [.text("first")])]),
+        ]
+        let result = AttributedStringBuilder.build(from: segment(.orderedList(startIndex: 1, items: items)))
+
+        let markerString = "1.\t"
+        let hasMarker = result.attribute(.structuralMarker, at: 0, effectiveRange: nil) as? Bool
+        #expect(hasMarker == true)
+
+        var markerAttributeRange = NSRange()
+        result.attribute(.structuralMarker, at: 0, longestEffectiveRange: &markerAttributeRange, in: NSRange(location: 0, length: result.length))
+        #expect(markerAttributeRange.length == markerString.count)
+
+        let textStart = markerString.count
+        let textMarker = result.attribute(.structuralMarker, at: textStart, effectiveRange: nil) as? Bool
+        #expect(textMarker == nil)
+    }
+
+    @Test("Task list has structuralMarker on checkbox marker characters")
+    func taskListStructuralMarker() {
+        let items = [
+            Block.ListItem(checkbox: .checked, children: [.paragraph(content: [.text("first")])]),
+        ]
+        let result = AttributedStringBuilder.build(from: segment(.unorderedList(items: items)))
+
+        let markerString = "[x]\t"
+        let hasMarker = result.attribute(.structuralMarker, at: 0, effectiveRange: nil) as? Bool
+        #expect(hasMarker == true)
+
+        var markerAttributeRange = NSRange()
+        result.attribute(.structuralMarker, at: 0, longestEffectiveRange: &markerAttributeRange, in: NSRange(location: 0, length: result.length))
+        #expect(markerAttributeRange.length == markerString.count)
+
+        let textStart = markerString.count
+        let textMarker = result.attribute(.structuralMarker, at: textStart, effectiveRange: nil) as? Bool
+        #expect(textMarker == nil)
+    }
+
+    @Test("Heading does NOT have structuralMarker")
+    func headingNoStructuralMarker() {
+        let result = AttributedStringBuilder.build(from: segment(.heading(level: 1, content: [.text("Title")])))
+
+        var hasStructuralMarker = false
+        result.enumerateAttribute(.structuralMarker, in: NSRange(location: 0, length: result.length)) { value, _, _ in
+            if value != nil { hasStructuralMarker = true }
+        }
+        #expect(hasStructuralMarker == false)
+    }
+
+    @Test("Blockquote does NOT have structuralMarker")
+    func blockquoteNoStructuralMarker() {
+        let blockquote = Block.blockquote(children: [.paragraph(content: [.text("quoted")])])
+        let result = AttributedStringBuilder.build(from: segment(blockquote))
+
+        var hasStructuralMarker = false
+        result.enumerateAttribute(.structuralMarker, in: NSRange(location: 0, length: result.length)) { value, _, _ in
+            if value != nil { hasStructuralMarker = true }
+        }
+        #expect(hasStructuralMarker == false)
     }
 
     // MARK: - Thematic Break Tests

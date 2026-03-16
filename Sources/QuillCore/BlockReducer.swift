@@ -45,7 +45,10 @@ package enum BlockReducer {
             state.currentContext = .list(ordered: ordered, items: [])
         case .startListItem:
             state.contextStack.append(state.currentContext)
-            state.currentContext = .listItem(blocks: [])
+            state.currentContext = .listItem(blocks: [], checkbox: nil)
+        case let .startTaskListItem(checkbox):
+            state.contextStack.append(state.currentContext)
+            state.currentContext = .listItem(blocks: [], checkbox: checkbox)
         case .startParagraph:
             state.contextStack.append(state.currentContext)
             state.currentContext = .paragraph
@@ -71,6 +74,12 @@ package enum BlockReducer {
 }
 
 package extension BlockReducer {
+    static func makeTailPreview(from state: ReducerState) -> Block? {
+        buildTailPreview(state: state)
+    }
+}
+
+package extension BlockReducer {
     struct ReducerState: Sendable {
         package var blocks: [Block] = []
         package var frozenCount: Int = 0
@@ -90,7 +99,7 @@ extension BlockReducer {
         case codeBlock(language: String?, code: String)
         case heading(level: Int)
         case list(ordered: Bool, items: [Block.ListItem])
-        case listItem(blocks: [Block])
+        case listItem(blocks: [Block], checkbox: Block.Checkbox?)
         case paragraph
         case table(rows: [[String]])
         case topLevel
@@ -116,9 +125,9 @@ private extension BlockReducer {
         case .blockquote(var children):
             children.append(block)
             state.currentContext = .blockquote(children: children)
-        case .listItem(var blocks):
+        case .listItem(var blocks, let checkbox):
             blocks.append(block)
-            state.currentContext = .listItem(blocks: blocks)
+            state.currentContext = .listItem(blocks: blocks, checkbox: checkbox)
         case .topLevel:
             state.blocks.append(block)
             state.frozenCount += 1
@@ -147,7 +156,7 @@ private extension BlockReducer {
         let inlines = state.currentInlines
         state.currentInlines = []
         state.currentContext = state.contextStack.removeLast()
-        emitBlock(.heading(level: level, content: inlines), state: &state)
+        emitBlock(.heading(level: level, content: makeRenderedInlines(from: inlines)), state: &state)
     }
 
     static func handleEndList(state: inout ReducerState) {
@@ -162,11 +171,11 @@ private extension BlockReducer {
     }
 
     static func handleEndListItem(state: inout ReducerState) {
-        guard case let .listItem(blocks) = state.currentContext else { return }
+        guard case let .listItem(blocks, checkbox) = state.currentContext else { return }
         state.currentContext = state.contextStack.removeLast()
 
         guard case .list(let ordered, var items) = state.currentContext else { return }
-        items.append(Block.ListItem(children: blocks))
+        items.append(Block.ListItem(checkbox: checkbox, children: blocks))
         state.currentContext = .list(ordered: ordered, items: items)
     }
 
@@ -175,7 +184,7 @@ private extension BlockReducer {
         let inlines = state.currentInlines
         state.currentInlines = []
         state.currentContext = state.contextStack.removeLast()
-        emitBlock(.paragraph(content: inlines), state: &state)
+        emitBlock(.paragraph(content: makeRenderedInlines(from: inlines)), state: &state)
     }
 
     static func handleEndTable(state: inout ReducerState) {
@@ -280,10 +289,10 @@ private extension BlockReducer {
                 part = ordered
                     ? .block(.orderedList(startIndex: 1, items: all))
                     : .block(.unorderedList(items: all))
-            case .listItem(let blocks):
+            case .listItem(let blocks, let checkbox):
                 var all = blocks
                 if case let .block(block) = part { all.append(block) }
-                part = .listItem(Block.ListItem(children: all))
+                part = .listItem(Block.ListItem(checkbox: checkbox, children: all))
             case .topLevel:
                 break
             }
@@ -313,23 +322,40 @@ private extension BlockReducer {
         case .codeBlock(let language, let code):
             return .block(.codeBlock(language: language, code: code))
         case .heading(let level):
-            let preview = collapseInlineStack(current: inlines, stack: inlineStack)
+            let parsed = makeRenderedInlines(from: inlines)
+            let preview = collapseInlineStack(current: parsed, stack: inlineStack)
             return preview.isEmpty ? .none : .block(.heading(level: level, content: preview))
         case .list(let ordered, let items):
             guard !items.isEmpty else { return .none }
             return ordered
                 ? .block(.orderedList(startIndex: 1, items: items))
                 : .block(.unorderedList(items: items))
-        case .listItem(let blocks):
-            return .listItem(Block.ListItem(children: blocks))
+        case .listItem(let blocks, let checkbox):
+            return .listItem(Block.ListItem(checkbox: checkbox, children: blocks))
         case .paragraph:
-            let preview = collapseInlineStack(current: inlines, stack: inlineStack)
+            let parsed = makeRenderedInlines(from: inlines)
+            let preview = collapseInlineStack(current: parsed, stack: inlineStack)
             return preview.isEmpty ? .none : .block(.paragraph(content: preview))
         case .table(let rows):
             return tablePreview(from: rows)
         case .topLevel:
             return .none
         }
+    }
+
+    static func makeRawInlineText(from inlines: [Inline]) -> String? {
+        var result = ""
+        for inline in inlines {
+            guard case let .text(content) = inline else { return nil }
+            result += content
+        }
+        return result
+    }
+
+    static func makeRenderedInlines(from inlines: [Inline]) -> [Inline] {
+        guard let rawText = makeRawInlineText(from: inlines) else { return inlines }
+        guard !rawText.isEmpty else { return inlines }
+        return InlineParser.parse(rawText)
     }
 
     static func tablePreview(from rows: [[String]]) -> TailPart {

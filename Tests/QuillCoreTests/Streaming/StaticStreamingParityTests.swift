@@ -51,6 +51,67 @@ struct StaticStreamingParityTests {
         #expect(staticBlocks == streamedBlocks)
     }
 
+    @Test("Task list matches between paths")
+    func taskListParity() async {
+        let markdown = """
+        - [x] done
+        - [ ] pending
+
+        """
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [3, 5, 4, 2, 6])
+
+        #expect(staticBlocks == streamedBlocks)
+    }
+
+    @Test("Nested unordered list matches between paths")
+    func nestedUnorderedListParity() async {
+        let markdown = """
+        - outer
+          - inner
+        - after
+
+        """
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [2, 4, 3, 5, 2])
+
+        #expect(staticBlocks == streamedBlocks)
+    }
+
+    @Test("Nested ordered list matches between paths")
+    func nestedOrderedListParity() async {
+        let markdown = """
+        1. first
+           1. nested
+           2. verification
+        2. second
+
+        """
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [3, 4, 5, 2, 6])
+
+        #expect(staticBlocks == streamedBlocks)
+    }
+
+    @Test("Nested task list matches between paths")
+    func nestedTaskListParity() async {
+        let markdown = """
+        - [x] heading
+          - [x] nested requirement
+          - [ ] nested follow-up
+        - [ ] full verification
+
+        """
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [3, 4, 6, 2, 5])
+
+        #expect(staticBlocks == streamedBlocks)
+    }
+
     @Test("Code fence with language matches between paths")
     func codeFenceParity() async {
         let markdown = "```swift\nlet x = 1\nlet y = 2\n```\n\n"
@@ -119,6 +180,36 @@ struct StaticStreamingParityTests {
 
         let staticBlocks = MarkdownParser.live.parse(markdown)
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [1])
+
+        #expect(staticBlocks == streamedBlocks)
+    }
+
+    @Test("Formatted paragraph matches between static and streaming paths")
+    func formattedParagraphParity() async {
+        let markdown = "**bold** and *italic* with `code`\n\n"
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [4, 5, 3, 7])
+
+        #expect(staticBlocks == streamedBlocks)
+    }
+
+    @Test("Link paragraph matches between static and streaming paths")
+    func linkParagraphParity() async {
+        let markdown = "Hello [link](http://url) world\n\n"
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [3, 6, 4, 5])
+
+        #expect(staticBlocks == streamedBlocks)
+    }
+
+    @Test("Nested formatting matches between static and streaming paths")
+    func nestedFormattingParity() async {
+        let markdown = "**bold *and italic***\n\n"
+
+        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [2, 4, 3, 5])
 
         #expect(staticBlocks == streamedBlocks)
     }

@@ -21,6 +21,7 @@ package enum ParserEvent: Equatable, Sendable {
     case startLink(destination: String)
     case startList(ordered: Bool)
     case startListItem
+    case startTaskListItem(checkbox: Block.Checkbox)
     case startParagraph
     case startStrikethrough
     case startStrong

@@ -90,4 +90,123 @@ struct StreamingRendererTailTests {
         #expect(renderer.renderedBlockViews.count == renderedViewCountBeforeTail + 1)
         #expect(renderer.renderedBlockViews.last is TextFlowView)
     }
+
+    // MARK: - Styled Tail Promotion Tests
+
+    @Test("Styled paragraph tail promotes to frozen")
+    func styledParagraphTailPromotes() {
+        let renderer = StreamingBlockRenderer()
+
+        let tailBlock: Block = .paragraph(content: [.text("Hello "), .strong([.text("world")])])
+        renderer.updateTail(block: tailBlock)
+        #expect(renderer.renderedBlockViews.count == 1)
+
+        let frozenBlock: Block = .paragraph(content: [.text("Hello "), .strong([.text("world")])])
+        let promoted = renderer.promoteTailIfMatching(frozenBlock)
+        #expect(promoted != nil)
+    }
+
+    @Test("Styled heading tail promotes to frozen")
+    func styledHeadingTailPromotes() {
+        let renderer = StreamingBlockRenderer()
+
+        let tailBlock: Block = .heading(level: 2, content: [.text("My "), .emphasis([.text("heading")])])
+        renderer.updateTail(block: tailBlock)
+        #expect(renderer.renderedBlockViews.count == 1)
+
+        let frozenBlock: Block = .heading(level: 2, content: [.text("My "), .emphasis([.text("heading")])])
+        let promoted = renderer.promoteTailIfMatching(frozenBlock)
+        #expect(promoted != nil)
+    }
+
+    @Test("Styled list tail promotes and has structural markers")
+    func styledListTailPromotes() {
+        let renderer = StreamingBlockRenderer()
+
+        let tailBlock: Block = .unorderedList(items: [
+            Block.ListItem(children: [.paragraph(content: [.strong([.text("bold item")])])])
+        ])
+        renderer.updateTail(block: tailBlock)
+        #expect(renderer.renderedBlockViews.count == 1)
+
+        let frozenBlock: Block = .unorderedList(items: [
+            Block.ListItem(children: [.paragraph(content: [.strong([.text("bold item")])])])
+        ])
+        let promoted = renderer.promoteTailIfMatching(frozenBlock)
+        #expect(promoted != nil)
+    }
+
+    @Test("Styled tail promotion preserves view instance")
+    func styledTailPromotionPreservesViewInstance() throws {
+        let renderer = StreamingBlockRenderer()
+
+        let tailBlock: Block = .paragraph(content: [.text("Hello "), .strong([.text("world")])])
+        renderer.updateTail(block: tailBlock)
+        let tailView = try #require(renderer.renderedBlockViews.last)
+
+        let frozenBlock: Block = .paragraph(content: [.text("Hello "), .strong([.text("world")])])
+        let promoted = renderer.promoteTailIfMatching(frozenBlock)
+
+        #expect(promoted === tailView)
+        #expect(renderer.renderedBlockViews.count == 1)
+        #expect(renderer.renderedBlockViews[0] === tailView)
+    }
+
+    // MARK: - Non-flow Block Baseline Tests
+
+    @Test("Code block tail shows language and growing content")
+    func codeBlockTailLanguageAndContent() throws {
+        let renderer = StreamingBlockRenderer()
+        renderer.tailConfiguration = .default
+
+        let tailBlock: Block = .codeBlock(language: "swift", code: "let x = 1\n")
+        renderer.updateTail(block: tailBlock)
+
+        let codeView = try #require(renderer.renderedBlockViews.last as? CodeBlockView)
+        #expect(codeView.currentLanguage == "swift")
+
+        let updatedBlock: Block = .codeBlock(language: "swift", code: "let x = 1\nlet y = 2\n")
+        renderer.updateTail(block: updatedBlock)
+
+        let updatedView = try #require(renderer.renderedBlockViews.last as? CodeBlockView)
+        #expect(updatedView === codeView)
+    }
+
+    @Test("Table tail shows PlaceholderBlockView with row count")
+    func tableTailPlaceholder() throws {
+        let renderer = StreamingBlockRenderer()
+
+        let header = Block.TableRow(cells: [
+            Block.TableCell(content: [.text("Name")]),
+            Block.TableCell(content: [.text("Age")]),
+        ])
+        let rows = [
+            Block.TableRow(cells: [
+                Block.TableCell(content: [.text("Alice")]),
+                Block.TableCell(content: [.text("30")]),
+            ]),
+        ]
+        let tailBlock: Block = .table(columnAlignments: [nil, nil], header: header, rows: rows)
+        renderer.updateTail(block: tailBlock)
+
+        let placeholder = try #require(renderer.renderedBlockViews.last as? PlaceholderBlockView)
+        #expect(placeholder != nil)
+    }
+
+    @Test("Image RenderNode produces PlaceholderBlockView")
+    func imageRenderNodePlaceholder() {
+        let view = RenderNodeViewFactory.view(for: .image(source: "https://example.com/img.png", title: "Photo"))
+        #expect(view is PlaceholderBlockView)
+    }
+
+    @Test("Image inline in paragraph flows through TextFlowView")
+    func imageInlineTailFlow() throws {
+        let renderer = StreamingBlockRenderer()
+
+        let tailBlock: Block = .paragraph(content: [.image(source: "https://example.com/img.png", title: "Photo", alt: [.text("A photo")])])
+        renderer.updateTail(block: tailBlock)
+
+        let tailView = try #require(renderer.renderedBlockViews.last as? TextFlowView)
+        #expect(tailView != nil)
+    }
 }

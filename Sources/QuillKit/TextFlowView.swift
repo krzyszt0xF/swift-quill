@@ -207,7 +207,11 @@ final class TextFlowView: UIView {
 
         workingAttributedString = workingString
         textContentStorage.attributedString = workingString
-        lastRevealedIndex = 0
+        lastRevealedIndex = revealImmediateStructuralMarkers(
+            in: workingString,
+            from: attributedString,
+            startingAt: 0
+        )
         setNeedsLayout()
         setNeedsDisplay()
     }
@@ -236,7 +240,11 @@ final class TextFlowView: UIView {
         }
 
         textContentStorage.attributedString = workingAttributedString
-        lastRevealedIndex = index
+        lastRevealedIndex = revealImmediateStructuralMarkers(
+            in: workingAttributedString,
+            from: originalAttributedString,
+            startingAt: index
+        )
         updateLayout()
         setNeedsDisplay()
 
@@ -296,10 +304,15 @@ private extension TextFlowView {
             in: NSRange(location: clampedVisibleCount, length: attributedString.length - clampedVisibleCount),
             within: workingString
         )
+        let revealedCharacterCount = revealImmediateStructuralMarkers(
+            in: workingString,
+            from: attributedString,
+            startingAt: clampedVisibleCount
+        )
 
         originalAttributedString = NSAttributedString(attributedString: attributedString)
         workingAttributedString = workingString
-        lastRevealedIndex = clampedVisibleCount
+        lastRevealedIndex = revealedCharacterCount
         textContentStorage.attributedString = workingString
         setNeedsLayout()
         setNeedsDisplay()
@@ -529,6 +542,37 @@ private extension TextFlowView {
 
         workingAttributedString.addAttribute(.foregroundColor, value: UIColor.clear, range: range)
         workingAttributedString.removeAttribute(.link, range: range)
+    }
+
+    func revealImmediateStructuralMarkers(
+        in working: NSMutableAttributedString,
+        from original: NSAttributedString,
+        startingAt start: Int
+    ) -> Int {
+        guard start < working.length else { return working.length }
+
+        var revealedCharacterCount = start
+        while revealedCharacterCount < working.length {
+            var markerRange = NSRange()
+            let marker = original.attribute(
+                .structuralMarker,
+                at: revealedCharacterCount,
+                longestEffectiveRange: &markerRange,
+                in: NSRange(location: 0, length: working.length)
+            )
+            guard marker != nil,
+                  markerRange.location == revealedCharacterCount
+            else {
+                break
+            }
+
+            original.enumerateAttributes(in: markerRange) { attributes, range, _ in
+                working.setAttributes(attributes, range: range)
+            }
+            revealedCharacterCount = markerRange.location + markerRange.length
+        }
+
+        return revealedCharacterCount
     }
 
     func setupTextContainer() {
