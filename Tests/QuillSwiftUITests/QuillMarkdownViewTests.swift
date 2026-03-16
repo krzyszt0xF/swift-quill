@@ -75,4 +75,19 @@ struct QuillMarkdownViewTests {
         #expect(view.markdown == "")
         #expect(view.currentMarkdown == "")
     }
+
+    @Test("onQuillLinkTap stores handler and applies it to QuillView")
+    func linkTapModifierAppliesHandler() {
+        var tappedURL: URL?
+        let markdownView = QuillMarkdownView(markdown: "[click](https://example.com)").onQuillLinkTap { url in
+            tappedURL = url
+        }
+        let view = QuillView()
+
+        markdownView.applyConfiguration(to: view)
+        view.onLinkTap?(URL(string: "https://example.com")!)
+
+        #expect(markdownView.linkTapHandler != nil)
+        #expect(tappedURL == URL(string: "https://example.com"))
+    }
 }

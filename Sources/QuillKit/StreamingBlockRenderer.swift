@@ -7,6 +7,7 @@ final class StreamingBlockRenderer {
     private(set) var frozenViewCount: Int = 0
     private(set) var stateRegistry: [BlockState] = []
 
+    var onLinkTap: ((URL) -> Void)?
     var tailConfiguration: TailConfiguration = .default
 
     var renderedBlockViews: [UIView] {
@@ -50,6 +51,16 @@ final class StreamingBlockRenderer {
     func invalidateHeightCaches() {
         containerView.invalidateAllHeightCaches()
         containerView.setNeedsLayout()
+    }
+
+    func rebindLinkTapHandlers() {
+        for view in containerView.blockViews {
+            applyLinkTapHandler(to: view)
+        }
+
+        if let tailView {
+            applyLinkTapHandler(to: tailView)
+        }
     }
 
     @discardableResult
@@ -195,6 +206,7 @@ private extension StreamingBlockRenderer {
         for insertion in insertions.sorted(by: { $0.offset < $1.offset }) {
             let state = newStates[insertion.offset]
             let view = RenderNodeViewFactory.view(for: state.node)
+            applyLinkTapHandler(to: view)
             containerView.insertBlock(view, at: min(insertion.offset, containerView.blockViews.count))
         }
 
@@ -202,6 +214,7 @@ private extension StreamingBlockRenderer {
         for (index, state) in newStates.enumerated() {
             if let oldNode = oldNodeByID[state.id], oldNode != state.node {
                 let view = RenderNodeViewFactory.view(for: state.node)
+                applyLinkTapHandler(to: view)
                 containerView.updateBlock(at: index, with: view)
             }
         }
@@ -245,6 +258,7 @@ private extension StreamingBlockRenderer {
 
         for node in nodes {
             let view = RenderNodeViewFactory.view(for: node)
+            applyLinkTapHandler(to: view)
 
             if hasTailView {
                 containerView.insertBlock(view, at: insertionIndex)
@@ -263,6 +277,11 @@ private extension StreamingBlockRenderer {
 // MARK: - Tail Management
 
 private extension StreamingBlockRenderer {
+    func applyLinkTapHandler(to view: UIView) {
+        guard let textFlowView = view as? TextFlowView else { return }
+        textFlowView.onLinkTap = onLinkTap
+    }
+
     enum TailDescriptor: Equatable {
         case code(language: String?)
         case flow
@@ -361,6 +380,7 @@ private extension StreamingBlockRenderer {
         }
 
         let view = RenderNodeViewFactory.view(for: node)
+        applyLinkTapHandler(to: view)
         if case .flow = node,
            let textFlowView = view as? TextFlowView {
             applyFlow(block: block, to: textFlowView, animateText: animateFlowText)
