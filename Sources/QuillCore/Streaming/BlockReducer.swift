@@ -67,7 +67,7 @@ package enum BlockReducer {
             emitBlock(.thematicBreak, state: &state)
         }
 
-        if let tail = buildTailPreview(state: state) {
+        if let tail = TailPreviewBuilder.buildTailPreview(state: state) {
             state.blocks.append(tail)
         }
     }
@@ -75,7 +75,7 @@ package enum BlockReducer {
 
 package extension BlockReducer {
     static func makeTailPreview(from state: ReducerState) -> Block? {
-        buildTailPreview(state: state)
+        TailPreviewBuilder.buildTailPreview(state: state)
     }
 }
 
@@ -117,7 +117,25 @@ extension BlockReducer {
         let kind: InlineKind
         let savedInlines: [Inline]
     }
+
+    static func wrapInline(_ kind: InlineKind, children: [Inline]) -> Inline {
+        switch kind {
+        case .code:
+            let text = children.compactMap { if case let .text(content) = $0 { content } else { nil } }.joined()
+            return .code(text)
+        case .emphasis:
+            return .emphasis(children)
+        case .link(let destination):
+            return .link(destination: destination, children: children)
+        case .strikethrough:
+            return .strikethrough(children)
+        case .strong:
+            return .strong(children)
+        }
+    }
 }
+
+// MARK: - Event Handlers
 
 private extension BlockReducer {
     static func emitBlock(_ block: Block, state: inout ReducerState) {
@@ -156,7 +174,7 @@ private extension BlockReducer {
         let inlines = state.currentInlines
         state.currentInlines = []
         state.currentContext = state.contextStack.removeLast()
-        emitBlock(.heading(level: level, content: makeRenderedInlines(from: inlines)), state: &state)
+        emitBlock(.heading(level: level, content: InlineRenderNormalizer.makeRenderedInlines(from: inlines)), state: &state)
     }
 
     static func handleEndList(state: inout ReducerState) {
@@ -184,7 +202,7 @@ private extension BlockReducer {
         let inlines = state.currentInlines
         state.currentInlines = []
         state.currentContext = state.contextStack.removeLast()
-        emitBlock(.paragraph(content: makeRenderedInlines(from: inlines)), state: &state)
+        emitBlock(.paragraph(content: InlineRenderNormalizer.makeRenderedInlines(from: inlines)), state: &state)
     }
 
     static func handleEndTable(state: inout ReducerState) {
@@ -238,132 +256,5 @@ private extension BlockReducer {
     static func pushInlineFrame(_ kind: InlineKind, state: inout ReducerState) {
         state.inlineStack.append(InlineFrame(kind: kind, savedInlines: state.currentInlines))
         state.currentInlines = []
-    }
-
-    static func wrapInline(_ kind: InlineKind, children: [Inline]) -> Inline {
-        switch kind {
-        case .code:
-            let text = children.compactMap { if case let .text(content) = $0 { content } else { nil } }.joined()
-            return .code(text)
-        case .emphasis:
-            return .emphasis(children)
-        case .link(let destination):
-            return .link(destination: destination, children: children)
-        case .strikethrough:
-            return .strikethrough(children)
-        case .strong:
-            return .strong(children)
-        }
-    }
-}
-
-// MARK: - Tail Preview
-
-private extension BlockReducer {
-    enum TailPart {
-        case block(Block)
-        case listItem(Block.ListItem)
-        case none
-    }
-
-    static func buildTailPreview(state: ReducerState) -> Block? {
-        if case .topLevel = state.currentContext { return nil }
-
-        var part = innerPart(
-            from: state.currentContext,
-            inlines: state.currentInlines,
-            inlineStack: state.inlineStack
-        )
-
-        for context in state.contextStack.reversed() {
-            switch context {
-            case .blockquote(let children):
-                var all = children
-                if case let .block(block) = part { all.append(block) }
-                part = .block(.blockquote(children: all))
-            case .codeBlock, .heading, .paragraph, .table:
-                break
-            case .list(let ordered, let items):
-                var all = items
-                if case let .listItem(item) = part { all.append(item) }
-                part = ordered
-                    ? .block(.orderedList(startIndex: 1, items: all))
-                    : .block(.unorderedList(items: all))
-            case .listItem(let blocks, let checkbox):
-                var all = blocks
-                if case let .block(block) = part { all.append(block) }
-                part = .listItem(Block.ListItem(checkbox: checkbox, children: all))
-            case .topLevel:
-                break
-            }
-            if case .topLevel = context { break }
-        }
-
-        if case let .block(block) = part { return block }
-        return nil
-    }
-
-    static func collapseInlineStack(current: [Inline], stack: [InlineFrame]) -> [Inline] {
-        var result = current
-        for frame in stack.reversed() {
-            result = frame.savedInlines + [wrapInline(frame.kind, children: result)]
-        }
-        return result
-    }
-
-    static func innerPart(
-        from context: OpenContext,
-        inlines: [Inline],
-        inlineStack: [InlineFrame]
-    ) -> TailPart {
-        switch context {
-        case .blockquote(let children):
-            return .block(.blockquote(children: children))
-        case .codeBlock(let language, let code):
-            return .block(.codeBlock(language: language, code: code))
-        case .heading(let level):
-            let parsed = makeRenderedInlines(from: inlines)
-            let preview = collapseInlineStack(current: parsed, stack: inlineStack)
-            return preview.isEmpty ? .none : .block(.heading(level: level, content: preview))
-        case .list(let ordered, let items):
-            guard !items.isEmpty else { return .none }
-            return ordered
-                ? .block(.orderedList(startIndex: 1, items: items))
-                : .block(.unorderedList(items: items))
-        case .listItem(let blocks, let checkbox):
-            return .listItem(Block.ListItem(checkbox: checkbox, children: blocks))
-        case .paragraph:
-            let parsed = makeRenderedInlines(from: inlines)
-            let preview = collapseInlineStack(current: parsed, stack: inlineStack)
-            return preview.isEmpty ? .none : .block(.paragraph(content: preview))
-        case .table(let rows):
-            return tablePreview(from: rows)
-        case .topLevel:
-            return .none
-        }
-    }
-
-    static func makeRawInlineText(from inlines: [Inline]) -> String? {
-        var result = ""
-        for inline in inlines {
-            guard case let .text(content) = inline else { return nil }
-            result += content
-        }
-        return result
-    }
-
-    static func makeRenderedInlines(from inlines: [Inline]) -> [Inline] {
-        guard let rawText = makeRawInlineText(from: inlines) else { return inlines }
-        guard !rawText.isEmpty else { return inlines }
-        return InlineParser.parse(rawText)
-    }
-
-    static func tablePreview(from rows: [[String]]) -> TailPart {
-        guard let headerCells = rows.first else { return .none }
-        let header = Block.TableRow(cells: headerCells.map { Block.TableCell(content: [.text($0)]) })
-        let dataRows = rows.dropFirst().map { row in
-            Block.TableRow(cells: row.map { Block.TableCell(content: [.text($0)]) })
-        }
-        return .block(.table(columnAlignments: [], header: header, rows: dataRows))
     }
 }
