@@ -4,9 +4,7 @@ import UIKit
 final class BlockContainerView: UIView {
     private(set) var blockViews: [UIView] = []
 
-    private var heightCache: [Int: CGFloat] = [:]
-    private var lastLayoutWidth: CGFloat = 0
-    private var measuredHeightByView: [ObjectIdentifier: (width: CGFloat, height: CGFloat)] = [:]
+    private var heightCache = BlockHeightCache()
     private var spacingAfter: [Int: CGFloat] = [:]
 
     override var intrinsicContentSize: CGSize {
@@ -38,19 +36,17 @@ final class BlockContainerView: UIView {
         view.translatesAutoresizingMaskIntoConstraints = false
         addSubview(view)
         applyStructuralSpacing(for: view, at: index)
-        invalidateHeightCache(from: index)
+        heightCache.invalidateFromIndex(index)
         setNeedsLayout()
     }
 
     func invalidateAllHeightCaches() {
-        heightCache.removeAll()
-        measuredHeightByView.removeAll()
+        heightCache.invalidateAll()
     }
 
     func invalidateBlockLayout(for view: UIView) {
         guard let index = blockViews.firstIndex(where: { $0 === view }) else { return }
-        heightCache.removeValue(forKey: index)
-        measuredHeightByView.removeValue(forKey: ObjectIdentifier(view))
+        heightCache.invalidateBlock(at: index, view: view)
         setNeedsLayout()
     }
 
@@ -59,8 +55,7 @@ final class BlockContainerView: UIView {
             view.removeFromSuperview()
         }
         blockViews.removeAll()
-        heightCache.removeAll()
-        measuredHeightByView.removeAll()
+        heightCache.invalidateAll()
         spacingAfter.removeAll()
         setNeedsLayout()
     }
@@ -68,25 +63,21 @@ final class BlockContainerView: UIView {
     func removeBlock(at index: Int) {
         let view = blockViews.remove(at: index)
         view.removeFromSuperview()
-        measuredHeightByView.removeValue(forKey: ObjectIdentifier(view))
+        heightCache.removeView(view)
         spacingAfter.removeValue(forKey: index)
         rebuildSpacingIndices(after: index)
-        invalidateHeightCache(from: index)
+        heightCache.invalidateFromIndex(index)
         setNeedsLayout()
     }
 
     func totalHeight(for width: CGFloat) -> CGFloat {
         guard !blockViews.isEmpty, width > 0 else { return 0 }
 
-        let widthDidChange = abs(width - lastLayoutWidth) > layoutTolerance
-        if widthDidChange {
-            heightCache.removeAll()
-            lastLayoutWidth = width
-        }
+        let widthDidChange = heightCache.handleWidthChange(width, tolerance: layoutTolerance)
 
         var total: CGFloat = 0
         for (index, view) in blockViews.enumerated() {
-            total += measureHeight(
+            total += heightCache.measureHeight(
                 for: view,
                 at: index,
                 width: width,
@@ -100,12 +91,12 @@ final class BlockContainerView: UIView {
     func updateBlock(at index: Int, with view: UIView) {
         let oldView = blockViews[index]
         oldView.removeFromSuperview()
-        measuredHeightByView.removeValue(forKey: ObjectIdentifier(oldView))
+        heightCache.removeView(oldView)
         blockViews[index] = view
         view.translatesAutoresizingMaskIntoConstraints = false
         addSubview(view)
         applyStructuralSpacing(for: view, at: index)
-        heightCache.removeValue(forKey: index)
+        heightCache.removeHeightEntry(at: index)
         setNeedsLayout()
     }
 }
@@ -114,15 +105,11 @@ private extension BlockContainerView {
     var layoutTolerance: CGFloat { 0.5 }
 
     func performRelayoutPass(for width: CGFloat) -> CGFloat {
-        let widthDidChange = abs(width - lastLayoutWidth) > layoutTolerance
-        if widthDidChange {
-            heightCache.removeAll()
-            lastLayoutWidth = width
-        }
+        let widthDidChange = heightCache.handleWidthChange(width, tolerance: layoutTolerance)
 
         var currentY: CGFloat = 0
         for (index, view) in blockViews.enumerated() {
-            let height = measureHeight(
+            let height = heightCache.measureHeight(
                 for: view,
                 at: index,
                 width: width,
@@ -152,74 +139,10 @@ private extension BlockContainerView {
             abs(lhs.height - rhs.height) <= layoutTolerance
     }
 
-    func invalidateHeightCache(from index: Int) {
-        for key in heightCache.keys where key >= index {
-            heightCache.removeValue(forKey: key)
-        }
-    }
-
     func layoutStructuredViewIfNeeded(_ view: UIView) {
         guard view is CodeBlockView || view is PlaceholderBlockView else { return }
         view.setNeedsLayout()
         view.layoutIfNeeded()
-    }
-
-    func measureHeight(
-        for view: UIView,
-        at index: Int,
-        width: CGFloat,
-        widthDidChange: Bool
-    ) -> CGFloat {
-        if let cached = heightCache[index] {
-            return cached
-        }
-
-        let viewID = ObjectIdentifier(view)
-        if !widthDidChange,
-           let measured = measuredHeightByView[viewID],
-           widthsAreEquivalent(measured.width, width),
-           measured.height > 0 {
-            heightCache[index] = measured.height
-            return measured.height
-        }
-
-        if !widthDidChange,
-           widthsAreEquivalent(view.bounds.width, width),
-           view.bounds.height > 0 {
-            view.layoutIfNeeded()
-            var height = view.intrinsicContentSize.height
-            if height <= 0 || height == UIView.noIntrinsicMetric {
-                height = view.bounds.height
-            }
-            if height > 0 {
-                heightCache[index] = height
-                measuredHeightByView[viewID] = (width: width, height: height)
-            }
-            return max(height, 0)
-        }
-
-        let hadWidthMismatch = widthsAreEquivalent(view.bounds.width, width) == false
-        if hadWidthMismatch {
-            var frame = view.frame
-            frame.size.width = width
-            view.frame = frame
-        }
-
-        if widthDidChange || hadWidthMismatch || view.bounds.height <= 0 {
-            view.layoutIfNeeded()
-        }
-
-        var height = view.intrinsicContentSize.height
-        if height <= 0 || height == UIView.noIntrinsicMetric {
-            height = view.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
-        }
-
-        if height > 0 {
-            heightCache[index] = height
-            measuredHeightByView[viewID] = (width: width, height: height)
-        }
-
-        return max(height, 0)
     }
 
     func rebuildSpacingIndices(after removedIndex: Int) {
@@ -232,9 +155,5 @@ private extension BlockContainerView {
             }
         }
         spacingAfter = newSpacing
-    }
-
-    func widthsAreEquivalent(_ lhs: CGFloat, _ rhs: CGFloat) -> Bool {
-        abs(lhs - rhs) <= layoutTolerance
     }
 }

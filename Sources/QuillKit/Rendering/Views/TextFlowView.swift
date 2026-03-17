@@ -1,46 +1,24 @@
 import UIKit
 
 final class TextFlowView: UIView {
-    private struct StreamingProfile {
-        var charsPerStep: Int
-        var baseDuration: TimeInterval
-        var commaPause: TimeInterval
-        var jitterMax: TimeInterval
-        var sentencePause: TimeInterval
-    }
-
-    private struct RevealFadeConfiguration {
-        var initialAlpha: CGFloat = 0.2
-        var duration: TimeInterval = 0.08
-
-        var isEnabled: Bool {
-            initialAlpha < 1 && duration > 0
-        }
-    }
-
-    private(set) var lastRevealedIndex = 0
-    private(set) var originalAttributedString: NSAttributedString?
+    var lastRevealedIndex: Int { revealController.lastRevealedIndex }
+    var originalAttributedString: NSAttributedString? { revealController.originalAttributedString }
     var onLinkTap: ((URL) -> Void)?
 
-    var totalCharacterCount: Int { originalAttributedString?.length ?? 0 }
+    var totalCharacterCount: Int { revealController.totalCharacterCount }
 
     private let textContentStorage = NSTextContentStorage()
     private let textContainer = NSTextContainer()
     private let textLayoutManager = NSTextLayoutManager()
     private var heightConstraint: NSLayoutConstraint?
-    private var workingAttributedString: NSMutableAttributedString?
     private var streamingRevealTask: Task<Void, Never>?
     private var deferredStreamingStartTask: Task<Void, Never>?
-    private var streamingProfile: StreamingProfile?
-    private var pendingStreamingStartTime: TimeInterval?
-    private var lastStreamingUpdateTime: TimeInterval?
-    private var previousStreamingTargetLength = 0
-    private var streamingIdleTimeout: TimeInterval = 0.30
-    private var revealFadeConfiguration = RevealFadeConfiguration()
     private var revealFadeTasks: [UUID: Task<Void, Never>] = [:]
-    private var revealFadeGeneration = 0
-    private var cachedPrefixHeight: CGFloat = 0
-    private var cachedPrefixHeightKey: (revealIndex: Int, width: CGFloat) = (-1, 0)
+
+    private var renderer = TextFlowRenderer()
+    private var revealController = TextFlowRevealController()
+    private var layoutController = TextFlowLayoutController()
+    private let linkInteraction = TextFlowLinkInteraction()
 
     override var intrinsicContentSize: CGSize {
         CGSize(width: UIView.noIntrinsicMetric, height: heightConstraint?.constant ?? 0)
@@ -80,15 +58,16 @@ final class TextFlowView: UIView {
     override func draw(_ rect: CGRect) {
         guard let context = UIGraphicsGetCurrentContext() else { return }
 
-        textLayoutManager.enumerateTextLayoutFragments(
-            from: textLayoutManager.documentRange.location,
-            options: [.ensuresLayout]
-        ) { fragment in
-            fragment.draw(at: fragment.layoutFragmentFrame.origin, in: context)
-            return true
-        }
+        renderer.draw(textLayoutManager: textLayoutManager, in: context)
 
-        drawBlockquoteBars(in: context)
+        if let attributedString = textContentStorage.attributedString {
+            renderer.drawBlockquoteBars(
+                attributedString: attributedString,
+                textLayoutManager: textLayoutManager,
+                textContentStorage: textContentStorage,
+                in: context
+            )
+        }
     }
 
     override func layoutSubviews() {
@@ -98,10 +77,10 @@ final class TextFlowView: UIView {
 
     func configure(with attributedString: NSAttributedString) {
         resetStreamingState(clearTiming: true)
-        originalAttributedString = nil
-        workingAttributedString = nil
-        lastRevealedIndex = attributedString.length
-        previousStreamingTargetLength = attributedString.length
+        revealController.setOriginalAttributedString(nil)
+        revealController.workingAttributedString = nil
+        revealController.setLastRevealedIndex(attributedString.length)
+        revealController.previousStreamingTargetLength = attributedString.length
         textContentStorage.attributedString = attributedString
         setNeedsLayout()
         setNeedsDisplay()
@@ -120,19 +99,24 @@ final class TextFlowView: UIView {
         revealInitialAlpha: CGFloat = 1,
         revealFadeDuration: TimeInterval = 0
     ) {
-        guard shouldAnimateStreamingUpdate(with: attributedString) else {
+        guard revealController.shouldAnimateStreamingUpdate(
+            with: attributedString,
+            currentStorageAttributedString: textContentStorage.attributedString
+        ) else {
             configure(with: attributedString)
             return
         }
 
-        let visibleCharacterCount = currentVisibleCharacterCount()
+        let visibleCharacterCount = revealController.currentVisibleCharacterCount(
+            currentStorageLength: textContentStorage.attributedString?.length ?? 0
+        )
         guard attributedString.length > visibleCharacterCount else {
             configure(with: attributedString)
             return
         }
 
         let now = Date.timeIntervalSinceReferenceDate
-        updateStreamCadence(now: now)
+        revealController.updateStreamCadence(now: now)
         let resolvedCharsPerStep = max(1, charsPerStep)
         let resolvedBaseDuration = max(0.001, baseDuration)
         let resolvedCommaPause = max(0, commaPause)
@@ -143,14 +127,14 @@ final class TextFlowView: UIView {
         let resolvedIdleTimeout = max(0.05, idleTimeout)
         let resolvedRevealInitialAlpha = min(max(0, revealInitialAlpha), 1)
         let resolvedRevealFadeDuration = max(0, revealFadeDuration)
-        previousStreamingTargetLength = attributedString.length
-        streamingIdleTimeout = resolvedIdleTimeout
-        revealFadeConfiguration = RevealFadeConfiguration(
+        revealController.previousStreamingTargetLength = attributedString.length
+        revealController.streamingIdleTimeout = resolvedIdleTimeout
+        revealController.revealFadeConfiguration = TextFlowRevealController.RevealFadeConfiguration(
             initialAlpha: resolvedRevealInitialAlpha,
             duration: resolvedRevealFadeDuration
         )
 
-        streamingProfile = StreamingProfile(
+        revealController.streamingProfile = TextFlowRevealController.StreamingProfile(
             charsPerStep: resolvedCharsPerStep,
             baseDuration: resolvedBaseDuration,
             commaPause: resolvedCommaPause,
@@ -158,7 +142,14 @@ final class TextFlowView: UIView {
             sentencePause: resolvedSentencePause
         )
 
-        installStreamingTarget(attributedString, visibleCharacterCount: visibleCharacterCount)
+        cancelRevealFadeTasks()
+        let workingString = revealController.installStreamingTarget(
+            attributedString,
+            visibleCharacterCount: visibleCharacterCount
+        )
+        textContentStorage.attributedString = workingString
+        setNeedsLayout()
+        setNeedsDisplay()
 
         let backlog = attributedString.length - visibleCharacterCount
         if shouldDeferStreamingStart(
@@ -174,7 +165,7 @@ final class TextFlowView: UIView {
             return
         }
 
-        pendingStreamingStartTime = nil
+        revealController.pendingStreamingStartTime = nil
         deferredStreamingStartTask?.cancel()
         deferredStreamingStartTask = nil
         startStreamingRevealIfNeeded()
@@ -183,46 +174,29 @@ final class TextFlowView: UIView {
     func finishReveal() {
         resetStreamingState(clearTiming: true)
 
-        if let originalAttributedString {
-            textContentStorage.attributedString = originalAttributedString
-            lastRevealedIndex = originalAttributedString.length
-            self.originalAttributedString = nil
-            workingAttributedString = nil
-            previousStreamingTargetLength = lastRevealedIndex
+        if let restoredString = revealController.finishReveal(
+            currentAttributedStringLength: textContentStorage.attributedString?.length ?? 0
+        ) {
+            textContentStorage.attributedString = restoredString
             setNeedsDisplay()
             return
         }
-
-        lastRevealedIndex = textContentStorage.attributedString?.length ?? 0
-        previousStreamingTargetLength = lastRevealedIndex
     }
 
     func prepareForReveal() {
         resetStreamingState(clearTiming: true)
 
-        guard originalAttributedString == nil,
-              let attributedString = textContentStorage.attributedString,
-              attributedString.length > 0 else { return }
-
-        originalAttributedString = NSAttributedString(attributedString: attributedString)
-        let workingString = NSMutableAttributedString(attributedString: attributedString)
-        let fullRange = NSRange(location: 0, length: workingString.length)
-        workingString.addAttribute(.foregroundColor, value: UIColor.clear, range: fullRange)
-        workingString.removeAttribute(.link, range: fullRange)
-
-        workingAttributedString = workingString
-        textContentStorage.attributedString = workingString
-        lastRevealedIndex = revealImmediateStructuralMarkers(
-            in: workingString,
-            from: attributedString,
-            startingAt: 0
-        )
-        setNeedsLayout()
-        setNeedsDisplay()
+        if let workingString = revealController.prepareForReveal(
+            currentAttributedString: textContentStorage.attributedString
+        ) {
+            textContentStorage.attributedString = workingString
+            setNeedsLayout()
+            setNeedsDisplay()
+        }
     }
 
     func configureRevealFade(initialAlpha: CGFloat, duration: TimeInterval) {
-        revealFadeConfiguration = RevealFadeConfiguration(
+        revealController.revealFadeConfiguration = TextFlowRevealController.RevealFadeConfiguration(
             initialAlpha: min(max(0, initialAlpha), 1),
             duration: max(0, duration)
         )
@@ -230,31 +204,16 @@ final class TextFlowView: UIView {
 
     @discardableResult
     func revealCharacters(upTo index: Int) -> Bool {
-        guard let originalAttributedString,
-              let workingAttributedString,
-              index > lastRevealedIndex,
-              index <= originalAttributedString.length else { return false }
-
         let oldHeight = heightConstraint?.constant ?? 0
 
-        let revealRange = NSRange(location: lastRevealedIndex, length: index - lastRevealedIndex)
-        if revealFadeConfiguration.isEnabled {
-            applyAttributes(in: revealRange, alphaMultiplier: revealFadeConfiguration.initialAlpha)
-        } else {
-            applyAttributes(in: revealRange, alphaMultiplier: nil)
-        }
+        guard let result = revealController.applyReveal(upTo: index) else { return false }
 
-        textContentStorage.attributedString = workingAttributedString
-        lastRevealedIndex = revealImmediateStructuralMarkers(
-            in: workingAttributedString,
-            from: originalAttributedString,
-            startingAt: index
-        )
+        textContentStorage.attributedString = revealController.workingAttributedString
         updateLayout()
         setNeedsDisplay()
 
-        if revealFadeConfiguration.isEnabled {
-            scheduleRevealFade(for: revealRange, generation: revealFadeGeneration)
+        if revealController.revealFadeConfiguration.isEnabled {
+            scheduleRevealFade(for: result.revealRange, generation: revealController.revealFadeGeneration)
         }
 
         let newHeight = heightConstraint?.constant ?? 0
@@ -278,29 +237,22 @@ final class TextFlowView: UIView {
     }
 
     func linkURL(at point: CGPoint) -> URL? {
-        guard let characterIndex = resolvedCharacterIndex(at: point),
-              characterIndex < currentVisibleCharacterCount()
-        else {
-            return nil
-        }
-
-        let attributedString = originalAttributedString ?? textContentStorage.attributedString
-        guard let attributedString,
-              characterIndex >= 0,
-              characterIndex < attributedString.length else {
-            return nil
-        }
-
-        return attributedString.attribute(.link, at: characterIndex, effectiveRange: nil) as? URL
+        let visibleCharacterCount = revealController.currentVisibleCharacterCount(
+            currentStorageLength: textContentStorage.attributedString?.length ?? 0
+        )
+        return linkInteraction.linkURL(
+            at: point,
+            visibleCharacterCount: visibleCharacterCount,
+            textLayoutManager: textLayoutManager,
+            textContentStorage: textContentStorage,
+            bounds: bounds,
+            originalAttributedString: revealController.originalAttributedString,
+            updateLayout: { [weak self] in self?.updateLayout() }
+        )
     }
 }
 
 private extension TextFlowView {
-    static let commaCharacters: Set<unichar> = [0x002C, 0xFF0C, 0x3001]
-    static let sentenceCharacters: Set<unichar> = [0x002E, 0x0021, 0x003F, 0x000A]
-    static let idleRevealPollInterval: TimeInterval = 0.016
-    static let defaultIdleRevealTimeout: TimeInterval = 0.30
-
     @objc func handleTapGesture(_ recognizer: UITapGestureRecognizer) {
         guard recognizer.state == .ended else { return }
         handleTap(at: recognizer.location(in: self))
@@ -311,72 +263,21 @@ private extension TextFlowView {
         streamingRevealTask = nil
         deferredStreamingStartTask?.cancel()
         deferredStreamingStartTask = nil
-        streamingProfile = nil
-        pendingStreamingStartTime = nil
         cancelRevealFadeTasks()
-
-        cachedPrefixHeightKey = (-1, 0)
-
-        if clearTiming {
-            lastStreamingUpdateTime = nil
-            previousStreamingTargetLength = 0
-            streamingIdleTimeout = Self.defaultIdleRevealTimeout
-        }
-    }
-
-    func updateStreamCadence(now: TimeInterval) {
-        lastStreamingUpdateTime = now
-    }
-
-    func installStreamingTarget(_ attributedString: NSAttributedString, visibleCharacterCount: Int) {
-        cancelRevealFadeTasks()
-        let clampedVisibleCount = min(max(0, visibleCharacterCount), attributedString.length)
-        let workingString = NSMutableAttributedString(attributedString: attributedString)
-        hideCharacters(
-            in: NSRange(location: clampedVisibleCount, length: attributedString.length - clampedVisibleCount),
-            within: workingString
-        )
-        let revealedCharacterCount = revealImmediateStructuralMarkers(
-            in: workingString,
-            from: attributedString,
-            startingAt: clampedVisibleCount
-        )
-
-        originalAttributedString = NSAttributedString(attributedString: attributedString)
-        workingAttributedString = workingString
-        lastRevealedIndex = revealedCharacterCount
-        textContentStorage.attributedString = workingString
-        setNeedsLayout()
-        setNeedsDisplay()
+        revealController.resetStreamingState(clearTiming: clearTiming)
+        layoutController.resetCache()
     }
 
     func cancelRevealFadeTasks() {
-        revealFadeGeneration &+= 1
         for task in revealFadeTasks.values {
             task.cancel()
         }
         revealFadeTasks.removeAll()
     }
 
-    func applyAttributes(in revealRange: NSRange, alphaMultiplier: CGFloat?) {
-        guard let originalAttributedString,
-              let workingAttributedString else {
-            return
-        }
-
-        originalAttributedString.enumerateAttributes(in: revealRange) { attributes, range, _ in
-            var resolvedAttributes = attributes
-            if let alphaMultiplier {
-                let baseColor = (attributes[.foregroundColor] as? UIColor) ?? .label
-                resolvedAttributes[.foregroundColor] = baseColor.withAlphaComponent(baseColor.cgColor.alpha * alphaMultiplier)
-            }
-            workingAttributedString.setAttributes(resolvedAttributes, range: range)
-        }
-    }
-
     func scheduleRevealFade(for revealRange: NSRange, generation: Int) {
-        let midpointAlpha = revealFadeConfiguration.initialAlpha + ((1 - revealFadeConfiguration.initialAlpha) * 0.5)
-        let stepDelay = revealFadeConfiguration.duration / 2
+        let midpointAlpha = revealController.midpointAlpha()
+        let stepDelay = revealController.fadeStepDelay()
         let taskID = UUID()
 
         let task = Task { @MainActor [weak self] in
@@ -388,12 +289,12 @@ private extension TextFlowView {
 
             guard let self,
                   !Task.isCancelled,
-                  self.revealFadeGeneration == generation else {
+                  self.revealController.revealFadeGeneration == generation else {
                 return
             }
 
-            self.applyAttributes(in: revealRange, alphaMultiplier: midpointAlpha)
-            if let workingAttributedString = self.workingAttributedString {
+            self.revealController.applyAttributes(in: revealRange, alphaMultiplier: midpointAlpha)
+            if let workingAttributedString = self.revealController.workingAttributedString {
                 self.textContentStorage.attributedString = workingAttributedString
                 self.setNeedsDisplay()
             }
@@ -403,12 +304,12 @@ private extension TextFlowView {
             }
 
             guard !Task.isCancelled,
-                  self.revealFadeGeneration == generation else {
+                  self.revealController.revealFadeGeneration == generation else {
                 return
             }
 
-            self.applyAttributes(in: revealRange, alphaMultiplier: nil)
-            if let workingAttributedString = self.workingAttributedString {
+            self.revealController.applyAttributes(in: revealRange, alphaMultiplier: nil)
+            if let workingAttributedString = self.revealController.workingAttributedString {
                 self.textContentStorage.attributedString = workingAttributedString
                 self.setNeedsDisplay()
             }
@@ -427,29 +328,29 @@ private extension TextFlowView {
               maxStartDelay > 0,
               backlog < startBufferCharacters
         else {
-            pendingStreamingStartTime = nil
+            revealController.pendingStreamingStartTime = nil
             return false
         }
 
-        if pendingStreamingStartTime == nil {
-            pendingStreamingStartTime = now
+        if revealController.pendingStreamingStartTime == nil {
+            revealController.pendingStreamingStartTime = now
         }
 
-        guard let pendingStreamingStartTime else {
+        guard let pendingStartTime = revealController.pendingStreamingStartTime else {
             return false
         }
 
-        return (now - pendingStreamingStartTime) < maxStartDelay
+        return (now - pendingStartTime) < maxStartDelay
     }
 
     func scheduleDeferredStreamingStart(now: TimeInterval, maxStartDelay: TimeInterval) {
         guard maxStartDelay > 0 else {
-            pendingStreamingStartTime = nil
+            revealController.pendingStreamingStartTime = nil
             startStreamingRevealIfNeeded()
             return
         }
 
-        let elapsed = pendingStreamingStartTime.map { max(0, now - $0) } ?? 0
+        let elapsed = revealController.pendingStreamingStartTime.map { max(0, now - $0) } ?? 0
         let remaining = max(0.001, maxStartDelay - elapsed)
 
         deferredStreamingStartTask?.cancel()
@@ -457,7 +358,7 @@ private extension TextFlowView {
             try? await Task.sleep(for: .seconds(remaining))
             guard let self, !Task.isCancelled else { return }
 
-            self.pendingStreamingStartTime = nil
+            self.revealController.pendingStreamingStartTime = nil
             self.deferredStreamingStartTask = nil
             self.startStreamingRevealIfNeeded()
         }
@@ -465,7 +366,7 @@ private extension TextFlowView {
 
     func startStreamingRevealIfNeeded() {
         guard streamingRevealTask == nil,
-              streamingProfile != nil
+              revealController.streamingProfile != nil
         else {
             return
         }
@@ -474,32 +375,32 @@ private extension TextFlowView {
             guard let self else { return }
 
             while !Task.isCancelled {
-                guard let profile = self.streamingProfile,
-                      let originalAttributedString = self.originalAttributedString
+                guard let profile = self.revealController.streamingProfile,
+                      let originalAttributedString = self.revealController.originalAttributedString
                 else {
                     break
                 }
 
                 let totalCharacters = originalAttributedString.length
-                if self.lastRevealedIndex >= totalCharacters {
+                if self.revealController.lastRevealedIndex >= totalCharacters {
                     let now = Date.timeIntervalSinceReferenceDate
-                    let idleSinceLastUpdate = now - (self.lastStreamingUpdateTime ?? now)
-                    if idleSinceLastUpdate >= self.streamingIdleTimeout {
-                        self.originalAttributedString = nil
-                        self.workingAttributedString = nil
-                        self.streamingProfile = nil
+                    let idleSinceLastUpdate = now - (self.revealController.lastStreamingUpdateTime ?? now)
+                    if idleSinceLastUpdate >= self.revealController.streamingIdleTimeout {
+                        self.revealController.setOriginalAttributedString(nil)
+                        self.revealController.workingAttributedString = nil
+                        self.revealController.streamingProfile = nil
                         self.streamingRevealTask = nil
                         return
                     }
 
-                    try? await Task.sleep(for: .seconds(Self.idleRevealPollInterval))
+                    try? await Task.sleep(for: .seconds(TextFlowRevealController.idleRevealPollInterval))
                     continue
                 }
 
-                let nextIndex = min(self.lastRevealedIndex + profile.charsPerStep, totalCharacters)
-                let delayDuration = self.streamingDelay(
+                let nextIndex = min(self.revealController.lastRevealedIndex + profile.charsPerStep, totalCharacters)
+                let delayDuration = self.revealController.streamingDelay(
                     in: originalAttributedString.string as NSString,
-                    from: self.lastRevealedIndex,
+                    from: self.revealController.lastRevealedIndex,
                     to: nextIndex,
                     baseDuration: profile.baseDuration,
                     commaPause: profile.commaPause,
@@ -516,97 +417,6 @@ private extension TextFlowView {
         }
     }
 
-    func currentVisibleCharacterCount() -> Int {
-        if let originalAttributedString,
-           let workingAttributedString,
-           originalAttributedString.length == workingAttributedString.length {
-            return lastRevealedIndex
-        }
-
-        return textContentStorage.attributedString?.length ?? 0
-    }
-
-    func currentVisiblePrefix() -> NSAttributedString {
-        let visibleCharacterCount = currentVisibleCharacterCount()
-
-        if let originalAttributedString,
-           visibleCharacterCount <= originalAttributedString.length {
-            return originalAttributedString.attributedSubstring(
-                from: NSRange(location: 0, length: visibleCharacterCount)
-            )
-        }
-
-        guard let currentAttributedString = textContentStorage.attributedString else {
-            return NSAttributedString(string: "")
-        }
-
-        return currentAttributedString.attributedSubstring(
-            from: NSRange(location: 0, length: min(visibleCharacterCount, currentAttributedString.length))
-        )
-    }
-
-    func drawBlockquoteBars(in context: CGContext) {
-        guard let attributedString = textContentStorage.attributedString else {
-            return
-        }
-
-        let fullRange = NSRange(location: 0, length: attributedString.length)
-
-        attributedString.enumerateAttribute(.blockquoteDepth, in: fullRange) { value, range, _ in
-            guard let depth = value as? Int, depth > 0 else {
-                return
-            }
-
-            let yExtents = yRange(for: range)
-            guard yExtents.max > yExtents.min else {
-                return
-            }
-
-            let xOrigin = CGFloat(depth - 1) * 16
-            let barRect = CGRect(x: xOrigin, y: yExtents.min, width: 3, height: yExtents.max - yExtents.min)
-            context.setFillColor(UIColor.systemGray3.cgColor)
-            context.fill(barRect)
-        }
-    }
-
-    func hideCharacters(in range: NSRange, within workingAttributedString: NSMutableAttributedString) {
-        guard range.length > 0 else { return }
-
-        workingAttributedString.addAttribute(.foregroundColor, value: UIColor.clear, range: range)
-        workingAttributedString.removeAttribute(.link, range: range)
-    }
-
-    func revealImmediateStructuralMarkers(
-        in working: NSMutableAttributedString,
-        from original: NSAttributedString,
-        startingAt start: Int
-    ) -> Int {
-        guard start < working.length else { return working.length }
-
-        var revealedCharacterCount = start
-        while revealedCharacterCount < working.length {
-            var markerRange = NSRange()
-            let marker = original.attribute(
-                .structuralMarker,
-                at: revealedCharacterCount,
-                longestEffectiveRange: &markerRange,
-                in: NSRange(location: 0, length: working.length)
-            )
-            guard marker != nil,
-                  markerRange.location == revealedCharacterCount
-            else {
-                break
-            }
-
-            original.enumerateAttributes(in: markerRange) { attributes, range, _ in
-                working.setAttributes(attributes, range: range)
-            }
-            revealedCharacterCount = markerRange.location + markerRange.length
-        }
-
-        return revealedCharacterCount
-    }
-
     func setupTextContainer() {
         textContainer.lineFragmentPadding = 0
         textContainer.lineBreakMode = .byWordWrapping
@@ -615,244 +425,19 @@ private extension TextFlowView {
         textContentStorage.addTextLayoutManager(textLayoutManager)
     }
 
-    func findLayoutFragment(containing point: CGPoint) -> NSTextLayoutFragment? {
-        guard bounds.contains(point) else { return nil }
-
-        updateLayout()
-
-        var matchedFragment: NSTextLayoutFragment?
-        textLayoutManager.enumerateTextLayoutFragments(
-            from: textLayoutManager.documentRange.location,
-            options: [.ensuresLayout]
-        ) { fragment in
-            guard fragment.layoutFragmentFrame.contains(point) else {
-                return true
-            }
-
-            matchedFragment = fragment
-            return false
-        }
-
-        return matchedFragment
-    }
-
-    func resolvedCharacterIndex(at point: CGPoint) -> Int? {
-        guard let fragment = findLayoutFragment(containing: point) else {
-            return nil
-        }
-
-        let fragmentPoint = CGPoint(
-            x: point.x - fragment.layoutFragmentFrame.minX,
-            y: point.y - fragment.layoutFragmentFrame.minY
-        )
-        guard let lineFragment = fragment.textLineFragments.first(where: {
-            $0.typographicBounds.minY <= fragmentPoint.y && fragmentPoint.y <= $0.typographicBounds.maxY
-        }) else {
-            return nil
-        }
-
-        return resolvedCharacterIndex(
-            from: lineFragment,
-            in: fragment,
-            fragmentPoint: fragmentPoint
-        )
-    }
-
-    func resolvedCharacterIndex(
-        from lineFragment: NSTextLineFragment,
-        in fragment: NSTextLayoutFragment,
-        fragmentPoint: CGPoint
-    ) -> Int? {
-        guard lineFragment.characterRange.length > 0 else { return nil }
-
-        let lineBounds = lineFragment.typographicBounds
-        guard fragmentPoint.x >= lineBounds.minX,
-              fragmentPoint.x <= lineBounds.maxX else {
-            return nil
-        }
-
-        let linePoint = CGPoint(
-            x: fragmentPoint.x - lineBounds.minX,
-            y: fragmentPoint.y - lineBounds.minY
-        )
-        let lineCharacterIndex = lineFragment.characterIndex(for: linePoint)
-        let lineCharacterRange = lineFragment.characterRange
-        let elementCharacterIndex: Int
-        if lineCharacterIndex >= lineCharacterRange.location,
-           lineCharacterIndex < lineCharacterRange.upperBound {
-            elementCharacterIndex = lineCharacterIndex
-        } else {
-            elementCharacterIndex = lineCharacterRange.location + lineCharacterIndex
-        }
-
-        let clampedElementIndex = min(
-            max(elementCharacterIndex, lineCharacterRange.location),
-            lineCharacterRange.upperBound - 1
-        )
-        let paragraphStart = textContentStorage.offset(
-            from: textContentStorage.documentRange.location,
-            to: fragment.rangeInElement.location
-        )
-        return paragraphStart + clampedElementIndex
-    }
-
-    func shouldAnimateStreamingUpdate(with attributedString: NSAttributedString) -> Bool {
-        let visiblePrefix = currentVisiblePrefix()
-        guard visiblePrefix.length <= attributedString.length else {
-            return false
-        }
-
-        let nextPrefix = attributedString.attributedSubstring(
-            from: NSRange(location: 0, length: visiblePrefix.length)
-        )
-        return visiblePrefix.isEqual(to: nextPrefix)
-    }
-
-    func streamingDelay(
-        in sourceString: NSString,
-        from startIndex: Int,
-        to endIndex: Int,
-        baseDuration: TimeInterval,
-        commaPause: TimeInterval,
-        jitterMax: TimeInterval,
-        sentencePause: TimeInterval
-    ) -> TimeInterval {
-        let lowerBound = max(0, startIndex)
-        let upperBound = max(lowerBound, min(endIndex, sourceString.length))
-        var extraDuration: TimeInterval = 0
-
-        if lowerBound < upperBound {
-            for index in lowerBound..<upperBound {
-                let scalar = sourceString.character(at: index)
-                if Self.sentenceCharacters.contains(scalar) {
-                    extraDuration = max(extraDuration, sentencePause)
-                } else if Self.commaCharacters.contains(scalar) {
-                    extraDuration = max(extraDuration, commaPause)
-                }
-            }
-        }
-
-        let jitter = jitterMax > 0 ? Double.random(in: 0...jitterMax) : 0
-        return baseDuration + extraDuration + jitter
-    }
-
-    func computeFullLayoutHeight() -> CGFloat {
-        var maxY: CGFloat = 0
-        textLayoutManager.enumerateTextLayoutFragments(
-            from: textLayoutManager.documentRange.location,
-            options: [.ensuresLayout]
-        ) { fragment in
-            let fragmentMaxY = fragment.layoutFragmentFrame.maxY
-            if fragmentMaxY > maxY {
-                maxY = fragmentMaxY
-            }
-            return true
-        }
-        return maxY
-    }
-
     func updateLayout() {
         textContainer.size = CGSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude)
         textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
 
-        let height: CGFloat
-        if let originalAttributedString {
-            let total = originalAttributedString.length
-            if lastRevealedIndex == 0 {
-                height = 0
-            } else if lastRevealedIndex >= total {
-                height = computeFullLayoutHeight()
-            } else {
-                height = visiblePrefixHeight(forWidth: bounds.width)
-            }
-        } else {
-            var maxY = computeFullLayoutHeight()
-            if maxY == 0,
-               let attributedString = textContentStorage.attributedString,
-               attributedString.length > 0 {
-                let boundingSize = CGSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude)
-                maxY = attributedString.boundingRect(
-                    with: boundingSize,
-                    options: [.usesLineFragmentOrigin],
-                    context: nil
-                ).height
-            }
-            height = maxY
-        }
+        let height = layoutController.computeHeight(
+            textLayoutManager: textLayoutManager,
+            textContentStorage: textContentStorage,
+            originalAttributedString: revealController.originalAttributedString,
+            lastRevealedIndex: revealController.lastRevealedIndex,
+            boundsWidth: bounds.width
+        )
 
         heightConstraint?.constant = ceil(height)
         invalidateIntrinsicContentSize()
-    }
-
-    func visiblePrefixHeight(forWidth width: CGFloat) -> CGFloat {
-        guard width > 0,
-              lastRevealedIndex > 0,
-              let originalAttributedString,
-              lastRevealedIndex < originalAttributedString.length
-        else {
-            return 0
-        }
-
-        let key = (revealIndex: lastRevealedIndex, width: width)
-        if key == cachedPrefixHeightKey {
-            return cachedPrefixHeight
-        }
-
-        let visiblePrefix = originalAttributedString.attributedSubstring(
-            from: NSRange(location: 0, length: lastRevealedIndex)
-        )
-        let boundingSize = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
-        let height = ceil(
-            visiblePrefix.boundingRect(
-                with: boundingSize,
-                options: [.usesLineFragmentOrigin],
-                context: nil
-            ).height
-        )
-
-        cachedPrefixHeight = height
-        cachedPrefixHeightKey = key
-        return height
-    }
-
-    func yRange(for characterRange: NSRange) -> (min: CGFloat, max: CGFloat) {
-        var minY: CGFloat = .greatestFiniteMagnitude
-        var maxY: CGFloat = 0
-
-        guard let startLocation = textLayoutManager.location(
-            textLayoutManager.documentRange.location,
-            offsetBy: characterRange.location
-        ) else { return (0, 0) }
-
-        guard let endLocation = textLayoutManager.location(
-            startLocation,
-            offsetBy: characterRange.length
-        ) else { return (0, 0) }
-
-        let textRange = NSTextRange(location: startLocation, end: endLocation)
-
-        textLayoutManager.enumerateTextLayoutFragments(
-            from: textRange?.location,
-            options: [.ensuresLayout]
-        ) { fragment in
-            let location = fragment.rangeInElement.location
-            guard let textRange,
-                  location.compare(textRange.endLocation) != .orderedDescending
-            else {
-                return false
-            }
-
-            let frame = fragment.layoutFragmentFrame
-            if frame.minY < minY {
-                minY = frame.minY
-            }
-            if frame.maxY > maxY {
-                maxY = frame.maxY
-            }
-
-            return true
-        }
-
-        return (minY == .greatestFiniteMagnitude ? 0 : minY, maxY)
     }
 }
