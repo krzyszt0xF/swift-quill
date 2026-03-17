@@ -66,13 +66,13 @@ struct TextFlowViewLinkTests {
             commaPause: 0,
             sentencePause: 0
         )
-        view.layoutIfNeeded()
+        layoutStandaloneView(view)
 
         let hiddenURL = view.linkURL(at: CGPoint(x: 8, y: 1))
         #expect(hiddenURL == nil)
 
         _ = view.revealCharacters(upTo: 2)
-        view.layoutIfNeeded()
+        layoutStandaloneView(view)
 
         let revealedURL = view.linkURL(at: CGPoint(x: 8, y: midLineY(in: view)))
         #expect(revealedURL == URL(string: "https://example.com"))
@@ -94,7 +94,7 @@ struct TextFlowViewLinkTests {
             sentencePause: 0
         )
         _ = view.revealCharacters(upTo: attributedString.length)
-        view.layoutIfNeeded()
+        layoutStandaloneView(view)
 
         let url = view.linkURL(at: CGPoint(x: 8, y: midLineY(in: view)))
         #expect(url == URL(string: "https://example.com"))
@@ -105,8 +105,16 @@ private extension TextFlowViewLinkTests {
     func makeConfiguredView(from segment: RenderNode.FlowSegment) -> TextFlowView {
         let view = TextFlowView(frame: CGRect(x: 0, y: 0, width: 320, height: 0))
         view.configure(with: AttributedStringBuilder.build(from: segment))
-        view.layoutIfNeeded()
+        layoutStandaloneView(view)
         return view
+    }
+
+    func layoutStandaloneView(_ view: TextFlowView) {
+        view.layoutIfNeeded()
+        var frame = view.frame
+        frame.size.height = ceil(max(1, view.intrinsicContentSize.height))
+        view.frame = frame
+        view.layoutIfNeeded()
     }
 
     func midLineY(in view: TextFlowView) -> CGFloat {

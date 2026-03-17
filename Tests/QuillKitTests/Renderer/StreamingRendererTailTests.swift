@@ -189,8 +189,7 @@ struct StreamingRendererTailTests {
         let tailBlock: Block = .table(columnAlignments: [nil, nil], header: header, rows: rows)
         renderer.updateTail(block: tailBlock)
 
-        let placeholder = try #require(renderer.renderedBlockViews.last as? PlaceholderBlockView)
-        #expect(placeholder != nil)
+        try #require(renderer.renderedBlockViews.last is PlaceholderBlockView)
     }
 
     @Test("Image RenderNode produces PlaceholderBlockView")
@@ -206,7 +205,6 @@ struct StreamingRendererTailTests {
         let tailBlock: Block = .paragraph(content: [.image(source: "https://example.com/img.png", title: "Photo", alt: [.text("A photo")])])
         renderer.updateTail(block: tailBlock)
 
-        let tailView = try #require(renderer.renderedBlockViews.last as? TextFlowView)
-        #expect(tailView != nil)
+        try #require(renderer.renderedBlockViews.last is TextFlowView)
     }
 }
