@@ -8,30 +8,28 @@ struct TextFlowLinkInteraction {
         textContentStorage: NSTextContentStorage,
         bounds: CGRect,
         originalAttributedString: NSAttributedString?,
-        updateLayout: () -> Void
-    ) -> URL? {
-        guard let characterIndex = resolvedCharacterIndex(
-            at: point,
-            textLayoutManager: textLayoutManager,
-            textContentStorage: textContentStorage,
-            bounds: bounds,
-            updateLayout: updateLayout
-        ),
-              characterIndex < visibleCharacterCount
-        else {
-            return nil
+        updateLayout: () -> Void) -> URL? {
+            let characterIndex = resolvedCharacterIndex(
+                at: point,
+                textLayoutManager: textLayoutManager,
+                textContentStorage: textContentStorage,
+                bounds: bounds,
+                updateLayout: updateLayout)
+            guard
+                let characterIndex,
+                characterIndex < visibleCharacterCount
+            else { return nil }
+            
+            let attributedString = originalAttributedString ?? textContentStorage.attributedString
+            guard let attributedString,
+                  characterIndex >= 0,
+                  characterIndex < attributedString.length else {
+                return nil
+            }
+            
+            return attributedString.attribute(.link, at: characterIndex, effectiveRange: nil) as? URL
         }
-
-        let attributedString = originalAttributedString ?? textContentStorage.attributedString
-        guard let attributedString,
-              characterIndex >= 0,
-              characterIndex < attributedString.length else {
-            return nil
-        }
-
-        return attributedString.attribute(.link, at: characterIndex, effectiveRange: nil) as? URL
-    }
-
+    
     func findLayoutFragment(
         containing point: CGPoint,
         textLayoutManager: NSTextLayoutManager,
@@ -128,6 +126,7 @@ struct TextFlowLinkInteraction {
             from: textContentStorage.documentRange.location,
             to: fragment.rangeInElement.location
         )
+        
         return paragraphStart + clampedElementIndex
     }
 }

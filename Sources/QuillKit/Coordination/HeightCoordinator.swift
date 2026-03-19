@@ -1,7 +1,7 @@
 import UIKit
 
 @MainActor
-final class QuillHeightCoordinator {
+final class HeightCoordinator {
     var onHeightChange: ((_ old: CGFloat, _ new: CGFloat) -> Void)?
 
     private var heightInvalidationScheduled = false
@@ -15,6 +15,7 @@ final class QuillHeightCoordinator {
 
     func handleWidthChange(newWidth: CGFloat) -> Bool {
         guard newWidth != previousWidth else { return false }
+        
         previousWidth = newWidth
         return true
     }
@@ -29,18 +30,24 @@ final class QuillHeightCoordinator {
         configuration: LayoutConfiguration
     ) {
         guard !heightInvalidationScheduled else { return }
+        
         heightInvalidationScheduled = true
 
         let coalescingInterval = max(0, configuration.heightMeasurementCoalescingInterval)
         heightUpdateTask?.cancel()
         heightUpdateTask = Task { [weak self, weak hostView, weak containerView] in
-            guard let self, let hostView, let containerView else { return }
+            guard
+                let self,
+                let hostView,
+                let containerView
+            else { return }
 
             if coalescingInterval > 0 {
                 try? await Task.sleep(for: .seconds(coalescingInterval))
             }
 
             guard !Task.isCancelled else { return }
+            
             self.measureAndNotify(
                 hostView: hostView,
                 containerView: containerView,
@@ -50,7 +57,7 @@ final class QuillHeightCoordinator {
     }
 }
 
-private extension QuillHeightCoordinator {
+private extension HeightCoordinator {
     func measureAndNotify(
         hostView: UIView,
         containerView: UIView,

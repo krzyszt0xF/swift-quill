@@ -67,6 +67,7 @@ enum ListParsingHelpers {
         events.append(item.startEvent)
         events.append(.startParagraph)
         events.append(.text(item.content))
+        
         return events
     }
 }

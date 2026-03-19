@@ -8,7 +8,7 @@ import UIKit
 struct StreamingRendererTailTests {
     @Test("Clear tail removes the tail view")
     func clearTailRemovesTailView() {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let frozenBlocks: [Block] = [
             .paragraph(content: [.text("F1")]),
@@ -25,7 +25,7 @@ struct StreamingRendererTailTests {
 
     @Test("Frozen prefix identity through full pipeline")
     func frozenPrefixRemainsStableAcrossTailChanges() {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let initialBlocks: [Block] = [
             .paragraph(content: [.text("F1")]),
@@ -56,7 +56,7 @@ struct StreamingRendererTailTests {
 
     @Test("Tail promotion keeps the same view instance")
     func tailPromotionKeepsViewIdentity() throws {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let tailBlock: Block = .paragraph(content: [.text("mutable frontier")])
         renderer.updateTail(block: tailBlock)
@@ -71,7 +71,7 @@ struct StreamingRendererTailTests {
 
     @Test("Tail update adds view after frozen content")
     func tailUpdateAddsViewAfterFrozenContent() {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let frozenBlocks: [Block] = [
             .paragraph(content: [.text("F1")]),
@@ -95,7 +95,7 @@ struct StreamingRendererTailTests {
 
     @Test("Styled paragraph tail promotes to frozen")
     func styledParagraphTailPromotes() {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let tailBlock: Block = .paragraph(content: [.text("Hello "), .strong([.text("world")])])
         renderer.updateTail(block: tailBlock)
@@ -108,7 +108,7 @@ struct StreamingRendererTailTests {
 
     @Test("Styled heading tail promotes to frozen")
     func styledHeadingTailPromotes() {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let tailBlock: Block = .heading(level: 2, content: [.text("My "), .emphasis([.text("heading")])])
         renderer.updateTail(block: tailBlock)
@@ -121,7 +121,7 @@ struct StreamingRendererTailTests {
 
     @Test("Styled list tail promotes and has structural markers")
     func styledListTailPromotes() {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let tailBlock: Block = .unorderedList(items: [
             Block.ListItem(children: [.paragraph(content: [.strong([.text("bold item")])])])
@@ -138,7 +138,7 @@ struct StreamingRendererTailTests {
 
     @Test("Styled tail promotion preserves view instance")
     func styledTailPromotionPreservesViewInstance() throws {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let tailBlock: Block = .paragraph(content: [.text("Hello "), .strong([.text("world")])])
         renderer.updateTail(block: tailBlock)
@@ -156,7 +156,7 @@ struct StreamingRendererTailTests {
 
     @Test("Code block tail shows language and growing content")
     func codeBlockTailLanguageAndContent() throws {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
         renderer.tailConfiguration = .default
 
         let tailBlock: Block = .codeBlock(language: "swift", code: "let x = 1\n")
@@ -174,7 +174,7 @@ struct StreamingRendererTailTests {
 
     @Test("Table tail shows PlaceholderBlockView with row count")
     func tableTailPlaceholder() throws {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let header = Block.TableRow(cells: [
             Block.TableCell(content: [.text("Name")]),
@@ -194,13 +194,13 @@ struct StreamingRendererTailTests {
 
     @Test("Image RenderNode produces PlaceholderBlockView")
     func imageRenderNodePlaceholder() {
-        let view = RenderNodeViewFactory.view(for: .image(source: "https://example.com/img.png", title: "Photo"))
+        let view = RenderNodeViewFactory.live.makeView(.image(source: "https://example.com/img.png", title: "Photo"))
         #expect(view is PlaceholderBlockView)
     }
 
     @Test("Image inline in paragraph flows through TextFlowView")
     func imageInlineTailFlow() throws {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let tailBlock: Block = .paragraph(content: [.image(source: "https://example.com/img.png", title: "Photo", alt: [.text("A photo")])])
         renderer.updateTail(block: tailBlock)

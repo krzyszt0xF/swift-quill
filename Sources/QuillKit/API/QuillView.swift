@@ -3,27 +3,24 @@ import UIKit
 
 @MainActor
 public final class QuillView: UIView {
+    public private(set) var currentMarkdown: String?
+    
     public var onHeightChange: ((_ old: CGFloat, _ new: CGFloat) -> Void)? {
         didSet { heightCoordinator.onHeightChange = onHeightChange }
     }
 
     public var onLinkTap: ((URL) -> Void)? {
-        didSet {
-            renderer.onLinkTap = onLinkTap
-            renderer.rebindLinkTapHandlers()
-        }
+        didSet { streamCoordinator.onLinkTap = onLinkTap }
     }
 
     public var markdown: String? {
         didSet { renderStatic() }
     }
 
-    public private(set) var currentMarkdown: String?
-
     public var streamingMode: StreamingMode = .bufferedModules {
         didSet {
-            internalConfiguration.streamingMode = streamingMode
-            applyInternalConfiguration()
+            configuration.streamingMode = streamingMode
+            streamCoordinator.applyConfiguration(configuration)
         }
     }
 
@@ -31,48 +28,47 @@ public final class QuillView: UIView {
         didSet { applyPreset() }
     }
 
-    private var internalConfiguration = QuillConfigurationMapper.resolve(.balanced)
-
-    private let heightCoordinator = QuillHeightCoordinator()
-    private let renderer: StreamingBlockRenderer
-    private let sequencer = RevealSequencer()
-    private let streamCoordinator: QuillStreamCoordinator
-
-    public init(frame: CGRect = .zero, streamingPreset: QuillStreamingPreset = .balanced) {
-        self.streamingPreset = streamingPreset
-        self.internalConfiguration = QuillConfigurationMapper.resolve(streamingPreset)
-        self.renderer = StreamingBlockRenderer()
-        self.streamCoordinator = QuillStreamCoordinator(renderer: renderer, sequencer: sequencer)
-        super.init(frame: frame)
-        commonInit()
-        applyInternalConfiguration()
-    }
-
-    init(frame: CGRect, internalConfiguration: QuillRenderConfiguration) {
-        self.streamingMode = internalConfiguration.streamingMode
-        self.internalConfiguration = internalConfiguration
-        self.renderer = StreamingBlockRenderer()
-        self.streamCoordinator = QuillStreamCoordinator(renderer: renderer, sequencer: sequencer)
-        super.init(frame: frame)
-        commonInit()
-        applyInternalConfiguration()
+    private var configuration = RenderConfiguration(preset: .balanced)
+    private let heightCoordinator: HeightCoordinator
+    private let markdownParser: MarkdownParser
+    private let streamCoordinator: StreamCoordinator
+    
+    public convenience init(frame: CGRect = .zero, preset: QuillStreamingPreset) {
+        self.init(frame: frame)
+        self.streamingPreset = preset
+        applyPreset()
     }
 
     public override init(frame: CGRect) {
-        self.renderer = StreamingBlockRenderer()
-        self.streamCoordinator = QuillStreamCoordinator(renderer: renderer, sequencer: sequencer)
+        let dependencies = Dependencies.live
+        heightCoordinator = dependencies.heightCoordinator
+        markdownParser = dependencies.markdownParser
+        streamCoordinator = dependencies.streamCoordinator
         super.init(frame: frame)
-        commonInit()
-        applyInternalConfiguration()
+        setup()
     }
 
     public required init?(coder: NSCoder) {
-        self.renderer = StreamingBlockRenderer()
-        self.streamCoordinator = QuillStreamCoordinator(renderer: renderer, sequencer: sequencer)
+        let dependencies = Dependencies.live
+        heightCoordinator = dependencies.heightCoordinator
+        markdownParser = dependencies.markdownParser
+        streamCoordinator = dependencies.streamCoordinator
         super.init(coder: coder)
-        commonInit()
-        applyInternalConfiguration()
+        setup()
     }
+    
+    package init(
+        frame: CGRect = .zero,
+        configuration: RenderConfiguration,
+        dependencies: Dependencies) {
+            heightCoordinator = dependencies.heightCoordinator
+            markdownParser = dependencies.markdownParser
+            streamCoordinator = dependencies.streamCoordinator
+            super.init(frame: frame)
+            setup()
+            self.configuration = configuration
+            streamCoordinator.applyConfiguration(configuration)
+        }
 
     public func append(_ chunk: String) {
         let needsRestart = !streamCoordinator.hasActiveController
@@ -83,23 +79,22 @@ public final class QuillView: UIView {
         streamCoordinator.append(
             chunk,
             currentMarkdown: previousContent,
-            configuration: internalConfiguration,
+            configuration: configuration,
             needsRestart: needsRestart
         )
     }
 
     public func cancelStreaming() {
-        streamCoordinator.cancelStreaming(configuration: internalConfiguration)
+        streamCoordinator.cancelStreaming(configuration: configuration)
     }
 
     public func finish() {
-        streamCoordinator.finish(configuration: internalConfiguration)
+        streamCoordinator.finish(configuration: configuration)
     }
 
     public func reset() {
         currentMarkdown = nil
-        streamCoordinator.resetStreamRendering()
-        sequencer.reset()
+        streamCoordinator.reset()
         heightCoordinator.resetLastNotifiedHeight()
     }
 
@@ -111,11 +106,37 @@ public final class QuillView: UIView {
     }
 }
 
-// MARK: - Setup
-
 private extension QuillView {
-    func commonInit() {
-        let host = renderer.hostView
+    func applyPreset() {
+        configuration = RenderConfiguration(preset: streamingPreset)
+        configuration.streamingMode = streamingMode
+        streamCoordinator.applyConfiguration(configuration)
+    }
+
+    func renderStatic() {
+        currentMarkdown = markdown
+
+        guard let markdown, !markdown.isEmpty else {
+            streamCoordinator.reset()
+            heightCoordinator.resetLastNotifiedHeight()
+            return
+        }
+
+        let blocks = markdownParser.parse(markdown)
+        streamCoordinator.renderStatic(blocks: blocks)
+        scheduleHeightUpdate()
+    }
+
+    func scheduleHeightUpdate() {
+        heightCoordinator.scheduleHeightUpdate(
+            hostView: self,
+            containerView: streamCoordinator.hostView,
+            configuration: configuration.layout
+        )
+    }
+    
+    func setup() {
+        let host = streamCoordinator.hostView
         host.translatesAutoresizingMaskIntoConstraints = false
         addSubview(host)
 
@@ -129,50 +150,9 @@ private extension QuillView {
             host.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])
 
-        sequencer.onLayoutChange = { [weak self] view in
-            if let self, let view {
-                self.renderer.containerView.invalidateBlockLayout(for: view)
-            }
-            self?.scheduleHeightUpdate()
-        }
-        sequencer.onComplete = { [weak self] in
-            self?.scheduleHeightUpdate()
-        }
-
+        streamCoordinator.applyConfiguration(configuration)
         streamCoordinator.onHeightInvalidated = { [weak self] in
             self?.scheduleHeightUpdate()
         }
-    }
-
-    func applyPreset() {
-        internalConfiguration = QuillConfigurationMapper.resolve(streamingPreset)
-        internalConfiguration.streamingMode = streamingMode
-        applyInternalConfiguration()
-    }
-
-    func applyInternalConfiguration() {
-        streamCoordinator.applyConfiguration(internalConfiguration)
-    }
-
-    func renderStatic() {
-        streamCoordinator.resetStreamRendering()
-        currentMarkdown = markdown
-
-        guard let markdown, !markdown.isEmpty else {
-            heightCoordinator.resetLastNotifiedHeight()
-            return
-        }
-
-        let blocks = MarkdownParser.live.parse(markdown)
-        renderer.update(blocks: blocks, frozenCount: blocks.count)
-        scheduleHeightUpdate()
-    }
-
-    func scheduleHeightUpdate() {
-        heightCoordinator.scheduleHeightUpdate(
-            hostView: self,
-            containerView: renderer.hostView,
-            configuration: internalConfiguration.layout
-        )
     }
 }

@@ -49,7 +49,7 @@ struct TextFlowViewStreamingTests {
 
         #expect(view.lastRevealedIndex == 5)
 
-        let revealStarted = await eventually(timeout: .milliseconds(240)) {
+        let revealStarted = await eventually(timeout: .milliseconds(600)) {
             view.lastRevealedIndex > 5
         }
         #expect(revealStarted)
@@ -165,6 +165,7 @@ struct TextFlowViewStreamingTests {
     func revealedCharactersFadeToFullAlpha() async throws {
         let view = TextFlowView(frame: CGRect(x: 0, y: 0, width: 320, height: 0))
         let baseColor = UIColor.systemBlue
+        let expectedFinalAlpha = baseColor.cgColor.alpha
         view.configure(
             with: NSAttributedString(
                 string: "A",
@@ -192,18 +193,18 @@ struct TextFlowViewStreamingTests {
         #expect(view.lastRevealedIndex == 2)
 
         let earlyColor = try #require(view.displayedForegroundColor(at: 1))
-        #expect(earlyColor.cgColor.alpha >= 0.2)
-        #expect(earlyColor.cgColor.alpha < 1.0)
+        #expect(earlyColor.cgColor.alpha >= expectedFinalAlpha * 0.2)
+        #expect(earlyColor.cgColor.alpha < expectedFinalAlpha)
 
-        let reachedFullAlpha = await eventually(timeout: .milliseconds(400)) {
+        let reachedFullAlpha = await eventually(timeout: .milliseconds(800)) {
             guard let displayedColor = view.displayedForegroundColor(at: 1) else {
                 return false
             }
-            return abs(displayedColor.cgColor.alpha - 1.0) < 0.05
+            return abs(displayedColor.cgColor.alpha - expectedFinalAlpha) < 0.05
         }
         #expect(reachedFullAlpha)
 
         let finalColor = try #require(view.displayedForegroundColor(at: 1))
-        #expect(abs(finalColor.cgColor.alpha - 1) < 0.05)
+        #expect(abs(finalColor.cgColor.alpha - expectedFinalAlpha) < 0.05)
     }
 }

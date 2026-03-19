@@ -28,11 +28,13 @@ enum StreamLineClassifier {
         if content.hasPrefix(" ") {
             content = String(content.dropFirst())
         }
+        
         return content
     }
 
     static func extractHeadingContent(_ line: String, level: Int) -> String {
         let prefixCount = level + 1
+        
         return String(line.dropFirst(prefixCount)).trimmingCharacters(in: .whitespaces)
     }
 
@@ -58,6 +60,7 @@ enum StreamLineClassifier {
 
         let stripped = line.replacingOccurrences(of: " ", with: "")
         let allowed: Set<Character> = ["|", "-", ":"]
+        
         return stripped.allSatisfy { allowed.contains($0) }
     }
 
@@ -74,6 +77,7 @@ enum StreamLineClassifier {
 
     static func makeContinuationText(from text: String) -> String {
         guard !text.isEmpty else { return text }
+        
         return " " + text
     }
 

@@ -5,7 +5,7 @@ package enum BlockReducer {
         }
 
         switch event {
-        case .codeBlockText(let text):
+        case let .codeBlockText(text):
             handleCodeBlockText(text, state: &state)
         case .endBlockQuote:
             handleEndBlockQuote(state: &state)
@@ -121,11 +121,13 @@ extension BlockReducer {
     static func wrapInline(_ kind: InlineKind, children: [Inline]) -> Inline {
         switch kind {
         case .code:
-            let text = children.compactMap { if case let .text(content) = $0 { content } else { nil } }.joined()
+            let text = children
+                .compactMap { if case let .text(content) = $0 { content } else { nil } }
+                .joined()
             return .code(text)
         case .emphasis:
             return .emphasis(children)
-        case .link(let destination):
+        case let .link(destination):
             return .link(destination: destination, children: children)
         case .strikethrough:
             return .strikethrough(children)
@@ -140,7 +142,7 @@ extension BlockReducer {
 private extension BlockReducer {
     static func emitBlock(_ block: Block, state: inout ReducerState) {
         switch state.currentContext {
-        case .blockquote(var children):
+        case var .blockquote(children):
             children.append(block)
             state.currentContext = .blockquote(children: children)
         case .listItem(var blocks, let checkbox):

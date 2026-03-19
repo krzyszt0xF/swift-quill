@@ -19,8 +19,6 @@ struct BlockVisitor: MarkupVisitor {
         }
         return blocks
     }
-
-    // MARK: - Block-Level Nodes
     
     mutating func visitBlockQuote(_ blockQuote: BlockQuote) -> [Block] {
         var children: [Block] = []
@@ -100,10 +98,10 @@ struct BlockVisitor: MarkupVisitor {
     mutating func visitHTMLBlock(_ htmlBlock: HTMLBlock) -> [Block] {
         [.htmlBlock(rawHTML: htmlBlock.rawHTML)]
     }
+}
 
-    // MARK: - Table Helpers
-
-    private func convert(tableHead: Table.Head) -> Block.TableRow {
+private extension BlockVisitor {
+    func convert(tableHead: Table.Head) -> Block.TableRow {
         var cells: [Block.TableCell] = []
         for cell in tableHead.cells {
             cells.append(Block.TableCell(content: convertInlines(cell)))
@@ -112,7 +110,7 @@ struct BlockVisitor: MarkupVisitor {
         return Block.TableRow(cells: cells)
     }
 
-    private func convert(tableRow: Table.Row) -> Block.TableRow {
+    func convert(tableRow: Table.Row) -> Block.TableRow {
         var cells: [Block.TableCell] = []
         for cell in tableRow.cells {
             cells.append(Block.TableCell(content: convertInlines(cell)))
@@ -121,9 +119,7 @@ struct BlockVisitor: MarkupVisitor {
         return Block.TableRow(cells: cells)
     }
 
-    // MARK: - Inline Conversion
-
-    private func convertInline(_ markup: Markup) -> [Inline] {
+    func convertInline(_ markup: Markup) -> [Inline] {
         switch markup {
         case let code as InlineCode:
             return [.code(code.code)]
@@ -165,7 +161,7 @@ struct BlockVisitor: MarkupVisitor {
         }
     }
     
-    private func convertInlines(_ container: some Markup) -> [Inline] {
+    func convertInlines(_ container: some Markup) -> [Inline] {
         var inlines: [Inline] = []
         for child in container.children {
             inlines.append(contentsOf: convertInline(child))

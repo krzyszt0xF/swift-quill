@@ -46,6 +46,7 @@ final class BlockContainerView: UIView {
 
     func invalidateBlockLayout(for view: UIView) {
         guard let index = blockViews.firstIndex(where: { $0 === view }) else { return }
+        
         heightCache.invalidateBlock(at: index, view: view)
         setNeedsLayout()
     }
@@ -66,6 +67,7 @@ final class BlockContainerView: UIView {
         heightCache.removeView(view)
         spacingAfter.removeValue(forKey: index)
         rebuildSpacingIndices(after: index)
+        
         heightCache.invalidateFromIndex(index)
         setNeedsLayout()
     }
@@ -92,10 +94,12 @@ final class BlockContainerView: UIView {
         let oldView = blockViews[index]
         oldView.removeFromSuperview()
         heightCache.removeView(oldView)
+        
         blockViews[index] = view
         view.translatesAutoresizingMaskIntoConstraints = false
         addSubview(view)
         applyStructuralSpacing(for: view, at: index)
+        
         heightCache.removeHeightEntry(at: index)
         setNeedsLayout()
     }
@@ -141,6 +145,7 @@ private extension BlockContainerView {
 
     func layoutStructuredViewIfNeeded(_ view: UIView) {
         guard view is CodeBlockView || view is PlaceholderBlockView else { return }
+        
         view.setNeedsLayout()
         view.layoutIfNeeded()
     }

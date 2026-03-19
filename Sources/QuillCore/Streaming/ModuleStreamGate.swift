@@ -14,22 +14,6 @@ package struct ModuleStreamGateConfiguration: Equatable, Sendable {
 }
 
 package struct ModuleStreamGate: Sendable {
-    package struct AppendResult: Equatable, Sendable {
-        package var committedChunks: [String]
-        package var hasPendingText: Bool
-        package var hasPendingStructure: Bool
-
-        package init(
-            committedChunks: [String],
-            hasPendingText: Bool,
-            hasPendingStructure: Bool
-        ) {
-            self.committedChunks = committedChunks
-            self.hasPendingText = hasPendingText
-            self.hasPendingStructure = hasPendingStructure
-        }
-    }
-
     private var accumulatedText = ""
     private var configuration: ModuleStreamGateConfiguration
     private var lastSafePosition = 0
@@ -81,14 +65,11 @@ package struct ModuleStreamGate: Sendable {
     }
 
     package mutating func commitIfOverdue(now: TimeInterval) -> [String] {
-        guard let pendingSince, now - pendingSince >= configuration.maxBufferingDelay else {
-            return []
-        }
-        guard detectPendingStructure(in: accumulatedText) == nil else {
-            return []
-        }
-
-        guard let boundary = timeoutBoundary(from: lastSafePosition) else {
+        guard
+            let pendingSince, now - pendingSince >= configuration.maxBufferingDelay,
+            detectPendingStructure(in: accumulatedText) == nil,
+            let boundary = timeoutBoundary(from: lastSafePosition)
+        else {
             return []
         }
 
@@ -97,6 +78,7 @@ package struct ModuleStreamGate: Sendable {
             compactCommittedPrefix()
         }
         self.pendingSince = hasPendingText ? now : nil
+        
         return committed
     }
 
@@ -105,7 +87,24 @@ package struct ModuleStreamGate: Sendable {
         accumulatedText = ""
         lastSafePosition = 0
         pendingSince = nil
+        
         return remaining
+    }
+    
+    package struct AppendResult: Equatable, Sendable {
+        package var committedChunks: [String]
+        package var hasPendingText: Bool
+        package var hasPendingStructure: Bool
+
+        package init(
+            committedChunks: [String],
+            hasPendingText: Bool,
+            hasPendingStructure: Bool
+        ) {
+            self.committedChunks = committedChunks
+            self.hasPendingText = hasPendingText
+            self.hasPendingStructure = hasPendingStructure
+        }
     }
 }
 
@@ -152,11 +151,13 @@ private extension ModuleStreamGate {
 
     mutating func commit(upTo boundary: Int) -> [String] {
         guard boundary > lastSafePosition else { return [] }
+        
         let module = rawText(from: lastSafePosition, to: boundary)
         lastSafePosition = boundary
         guard module.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
             return []
         }
+        
         return [module]
     }
 
@@ -282,17 +283,15 @@ private extension ModuleStreamGate {
         guard startPosition < accumulatedText.count else { return nil }
 
         let remaining = rawText(from: startPosition, to: accumulatedText.count)
-        guard remaining.count >= configuration.minModuleLength * 2 else {
-            return nil
-        }
-
-        guard let range = remaining.range(of: "\n\n", options: .backwards) else {
-            return nil
-        }
+        guard
+            remaining.count >= configuration.minModuleLength * 2,
+            let range = remaining.range(of: "\n\n", options: .backwards)
+        else { return nil }
 
         let distance = remaining.distance(from: remaining.startIndex, to: range.upperBound)
         let boundary = startPosition + distance
         guard boundary > startPosition else { return nil }
+        
         return boundary
     }
 

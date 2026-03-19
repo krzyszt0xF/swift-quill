@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 func fittedSize(for view: UIView, proposal: ProposedViewSize) -> CGSize? {
     let screenWidth = view.window?.screen.bounds.width ?? UIScreen.main.bounds.width
     let fallbackWidth = max(view.bounds.width, screenWidth)
@@ -25,5 +26,6 @@ func fittedSize(for view: UIView, proposal: ProposedViewSize) -> CGSize? {
     )
 
     CATransaction.commit()
+    
     return CGSize(width: width, height: max(1, size.height))
 }

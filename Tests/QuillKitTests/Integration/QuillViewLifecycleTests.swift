@@ -62,9 +62,9 @@ struct QuillViewLifecycleTests {
             bufferingDelay: 1.0
         )
 
-        let fastConfiguration = QuillConfigurationMapper.resolve(tooFastPreset)
-        let slowConfiguration = QuillConfigurationMapper.resolve(tooSlowPreset)
-        let balancedConfiguration = QuillConfigurationMapper.resolve(.balanced)
+        let fastConfiguration = RenderConfiguration(preset: tooFastPreset)
+        let slowConfiguration = RenderConfiguration(preset: tooSlowPreset)
+        let balancedConfiguration = RenderConfiguration(preset: .balanced)
 
         #expect(fastConfiguration.typewriter.lowQueue.baseDuration < balancedConfiguration.typewriter.lowQueue.baseDuration)
         #expect(slowConfiguration.typewriter.lowQueue.baseDuration > balancedConfiguration.typewriter.lowQueue.baseDuration)
@@ -105,7 +105,7 @@ struct QuillViewLifecycleTests {
 
     @Test("preset change applies without crash")
     func presetSwitchPreservesUsableState() {
-        let view = QuillView(frame: CGRect(x: 0, y: 0, width: 320, height: 0), streamingPreset: .balanced)
+        let view = QuillView(frame: CGRect(x: 0, y: 0, width: 320, height: 0))
         view.streamingPreset = .snappy
         view.streamingPreset = .longForm
         view.streamingPreset = .balanced

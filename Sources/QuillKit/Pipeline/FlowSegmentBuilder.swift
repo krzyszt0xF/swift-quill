@@ -26,9 +26,6 @@ extension Block {
 }
 
 enum FlowSegmentBuilder {
-
-    // MARK: - Build
-
     static func build(from blocks: [Block]) -> [RenderNode] {
         var nodes: [RenderNode] = []
         var buffer: [Block] = []
@@ -86,18 +83,18 @@ enum FlowSegmentBuilder {
 
         return nodeCount
     }
+}
 
-    // MARK: - Private
+private extension FlowSegmentBuilder {
+    static let flowSoftCap = 10
 
-    private static let flowSoftCap = 10
-
-    private static func flush(_ buffer: inout [Block], into nodes: inout [RenderNode]) {
+    static func flush(_ buffer: inout [Block], into nodes: inout [RenderNode]) {
         guard !buffer.isEmpty else { return }
         nodes.append(.flow(RenderNode.FlowSegment(blocks: buffer)))
         buffer.removeAll()
     }
 
-    private static func structuralNode(for block: Block) -> RenderNode {
+    static func structuralNode(for block: Block) -> RenderNode {
         switch block {
         case let .codeBlock(language, code):
             return .codeBlock(language: language, code: code)

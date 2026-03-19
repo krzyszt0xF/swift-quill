@@ -15,7 +15,7 @@ struct QuillViewIntegrationTests {
         let streamedView = makeStableBlocksQuillView()
         let staticView = makeStableBlocksQuillView()
         let fullMarkdown = mixedMarkdownFixture
-        let markdownChunks = chunk(fullMarkdown, sizes: [3, 7, 5, 9, 4])
+        let markdownChunks = fullMarkdown.chunked(sizes: [3, 7, 5, 9, 4])
 
         for chunk in markdownChunks {
             streamedView.append(chunk)
@@ -54,7 +54,7 @@ struct QuillViewIntegrationTests {
     func finishFlushesBufferedTail() async {
         let view = makeStableBlocksQuillView()
         let incompleteMarkdown = "# Title\n\n```swift\nlet x = 1"
-        let markdownChunks = chunk(incompleteMarkdown, sizes: [5, 8, 6])
+        let markdownChunks = incompleteMarkdown.chunked(sizes: [5, 8, 6])
 
         for chunk in markdownChunks {
             view.append(chunk)
@@ -145,7 +145,7 @@ struct QuillViewIntegrationTests {
     func modeEquivalence(mode: StreamingMode) async {
         let view = makeQuillView(mode: mode)
         let fullMarkdown = mixedMarkdownFixture
-        let markdownChunks = chunk(fullMarkdown, sizes: [4, 9, 6])
+        let markdownChunks = fullMarkdown.chunked(sizes: [4, 9, 6])
 
         for chunk in markdownChunks {
             view.append(chunk)
@@ -159,14 +159,12 @@ struct QuillViewIntegrationTests {
 
     @Test("same markdown produces identical currentMarkdown across presets", arguments: [QuillStreamingPreset.balanced, .snappy, .longForm])
     func presetEquivalence(preset: QuillStreamingPreset) async {
-        let view = QuillView(
-            frame: CGRect(x: 0, y: 0, width: 320, height: 0),
-            streamingPreset: preset
-        )
+        let view = QuillView(frame: CGRect(x: 0, y: 0, width: 320, height: 0))
+        view.streamingPreset = preset
         view.layoutIfNeeded()
 
         let fullMarkdown = mixedMarkdownFixture
-        let markdownChunks = chunk(fullMarkdown, sizes: [4, 9, 6])
+        let markdownChunks = fullMarkdown.chunked(sizes: [4, 9, 6])
 
         for chunk in markdownChunks {
             view.append(chunk)
@@ -184,7 +182,7 @@ struct QuillViewIntegrationTests {
     func chunkBoundariesInsideSyntaxPreserveOutput() async {
         let codeFenceView = makeStableBlocksQuillView()
         let codeFenceMarkdown = "```swift\nlet x = 1\n```\n\n"
-        let codeFenceChunks = chunk(codeFenceMarkdown, sizes: [2, 3, 4])
+        let codeFenceChunks = codeFenceMarkdown.chunked(sizes: [2, 3, 4])
 
         for chunk in codeFenceChunks {
             codeFenceView.append(chunk)
@@ -197,7 +195,7 @@ struct QuillViewIntegrationTests {
 
         let boldTextView = makeStableBlocksQuillView()
         let boldMarkdown = "**bold text**\n\n"
-        let boldChunks = chunk(boldMarkdown, sizes: [1])
+        let boldChunks = boldMarkdown.chunked(sizes: [1])
 
         for chunk in boldChunks {
             boldTextView.append(chunk)
@@ -242,7 +240,7 @@ struct QuillViewIntegrationTests {
     func rapidSuccessiveAppendsAccumulateMarkdown() async {
         let view = makeStableBlocksQuillView()
         let fullMarkdown = mixedMarkdownFixture
-        let markdownChunks = chunk(fullMarkdown, sizes: [2, 3])
+        let markdownChunks = fullMarkdown.chunked(sizes: [2, 3])
 
         for chunk in markdownChunks {
             view.append(chunk)

@@ -20,6 +20,7 @@ struct TextFlowLayoutController {
             }
             return true
         }
+        
         return maxY
     }
 
@@ -55,6 +56,7 @@ struct TextFlowLayoutController {
                     context: nil
                 ).height
             }
+            
             return maxY
         }
     }
@@ -67,9 +69,7 @@ struct TextFlowLayoutController {
         guard width > 0,
               lastRevealedIndex > 0,
               lastRevealedIndex < originalAttributedString.length
-        else {
-            return 0
-        }
+        else { return 0 }
 
         let key = (revealIndex: lastRevealedIndex, width: width)
         if key == cachedPrefixHeightKey {
@@ -90,6 +90,7 @@ struct TextFlowLayoutController {
 
         cachedPrefixHeight = height
         cachedPrefixHeightKey = key
+        
         return height
     }
 }

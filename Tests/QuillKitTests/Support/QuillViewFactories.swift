@@ -28,7 +28,7 @@ func makeQuillView(
     mode: StreamingMode = .stableBlocks,
     bufferedStreamConfiguration: BufferedStreamConfiguration? = nil
 ) -> QuillView {
-    var configuration = QuillRenderConfiguration(
+    var configuration = RenderConfiguration(
         streamingMode: mode,
         performanceProfile: .balanced,
         typewriter: .balanced,
@@ -42,10 +42,10 @@ func makeQuillView(
             maxBufferingDelay: 0.1
         )
     }
-
     let view = QuillView(
         frame: CGRect(x: 0, y: 0, width: 320, height: 0),
-        internalConfiguration: configuration
+        configuration: configuration,
+        dependencies: .live
     )
     view.layoutIfNeeded()
     return view

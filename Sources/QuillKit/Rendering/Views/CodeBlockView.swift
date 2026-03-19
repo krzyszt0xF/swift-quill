@@ -1,15 +1,6 @@
 import UIKit
 
 final class CodeBlockView: UIView {
-    private enum Layout {
-        static let codeHorizontalInset: CGFloat = 12
-        static let codeVerticalInset: CGFloat = 12
-        static let headerToCodeSpacing: CGFloat = 8
-        static let minimumVisibleCodeHeight: CGFloat = 18
-        static let pillHeight: CGFloat = 20
-        static let pillTrailingInset: CGFloat = 8
-    }
-
     private let headerView = UIView()
     private let languagePill = PaddedLabel()
     private let scrollView = UIScrollView()
@@ -88,6 +79,29 @@ final class CodeBlockView: UIView {
         setNeedsLayout()
     }
 }
+
+extension CodeBlockView: BlockRevealAnimating {
+    var minimumMeasuredHeight: CGFloat {
+        let headerHeight = (currentLanguage?.isEmpty == false) ? Layout.pillHeight + Layout.headerToCodeSpacing : 0
+        return (Layout.codeVerticalInset * 2) + headerHeight + Layout.minimumVisibleCodeHeight
+    }
+
+    func measuredHeight(for width: CGFloat) -> CGFloat {
+        let availableWidth = max(width - (Layout.codeHorizontalInset * 2), 0)
+        let codeHeight = max(
+            Layout.minimumVisibleCodeHeight,
+            textView.sizeThatFits(CGSize(width: availableWidth, height: .greatestFiniteMagnitude)).height
+        )
+        let headerHeight = headerHeightConstraint?.constant ?? 0
+        let contentTopSpacing = contentTopConstraint?.constant ?? 0
+
+        return max(
+            minimumMeasuredHeight,
+            Layout.codeVerticalInset + headerHeight + contentTopSpacing + codeHeight + Layout.codeVerticalInset
+        )
+    }
+}
+
 
 private extension CodeBlockView {
     func trimmedCode(_ code: String) -> String {
@@ -187,24 +201,13 @@ private extension CodeBlockView {
     }
 }
 
-extension CodeBlockView: BlockRevealAnimating {
-    var minimumMeasuredHeight: CGFloat {
-        let headerHeight = (currentLanguage?.isEmpty == false) ? Layout.pillHeight + Layout.headerToCodeSpacing : 0
-        return (Layout.codeVerticalInset * 2) + headerHeight + Layout.minimumVisibleCodeHeight
-    }
-
-    func measuredHeight(for width: CGFloat) -> CGFloat {
-        let availableWidth = max(width - (Layout.codeHorizontalInset * 2), 0)
-        let codeHeight = max(
-            Layout.minimumVisibleCodeHeight,
-            textView.sizeThatFits(CGSize(width: availableWidth, height: .greatestFiniteMagnitude)).height
-        )
-        let headerHeight = headerHeightConstraint?.constant ?? 0
-        let contentTopSpacing = contentTopConstraint?.constant ?? 0
-
-        return max(
-            minimumMeasuredHeight,
-            Layout.codeVerticalInset + headerHeight + contentTopSpacing + codeHeight + Layout.codeVerticalInset
-        )
+private extension CodeBlockView {
+    enum Layout {
+        static let codeHorizontalInset: CGFloat = 12
+        static let codeVerticalInset: CGFloat = 12
+        static let headerToCodeSpacing: CGFloat = 8
+        static let minimumVisibleCodeHeight: CGFloat = 18
+        static let pillHeight: CGFloat = 20
+        static let pillTrailingInset: CGFloat = 8
     }
 }

@@ -2,9 +2,7 @@ import QuillKit
 import SwiftUI
 
 /// Streaming markdown view backed by QuillView and driven by an AsyncSequence.
-public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable
-    where S.Element == String
-{
+public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable where S.Element == String {
     let chunks: S
     let linkTapHandler: ((URL) -> Void)?
     let mode: StreamingMode
@@ -13,17 +11,17 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable
 
     public init(
         chunks: S,
-        preset: QuillStreamingPreset = .balanced,
         mode: StreamingMode = .bufferedModules,
-        onError: (@Sendable (Error) -> Void)? = nil
-    ) {
-        self.chunks = chunks
-        self.linkTapHandler = nil
-        self.mode = mode
-        self.onError = onError
-        self.preset = preset
-    }
-
+        onError: (@Sendable (Error) -> Void)? = nil,
+        preset: QuillStreamingPreset = .balanced) {
+            self.init(
+                chunks: chunks,
+                linkTapHandler: nil,
+                mode: mode,
+                onError: onError,
+                preset: preset)
+        }
+    
     private init(
         chunks: S,
         linkTapHandler: ((URL) -> Void)?,
@@ -46,6 +44,7 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable
         let coordinator = context.coordinator
         applyConfiguration(to: coordinator.quillView)
         coordinator.subscribe(to: chunks, onError: onError)
+        
         return coordinator.quillView
     }
 
@@ -82,9 +81,11 @@ public extension QuillStreamView {
 extension QuillStreamView {
     func applyConfiguration(to view: QuillView) {
         view.onLinkTap = linkTapHandler
+        
         if view.streamingPreset != preset {
             view.streamingPreset = preset
         }
+        
         if view.streamingMode != mode {
             view.streamingMode = mode
         }
@@ -99,7 +100,7 @@ public extension QuillStreamView {
         private var subscriptionTask: Task<Void, Never>?
 
         init(preset: QuillStreamingPreset, mode: StreamingMode) {
-            self.quillView = QuillView(streamingPreset: preset)
+            self.quillView = QuillView(preset: preset)
             self.quillView.streamingMode = mode
             self.quillView.onHeightChange = { [weak quillView] _, _ in
                 quillView?.invalidateIntrinsicContentSize()
@@ -115,26 +116,32 @@ public extension QuillStreamView {
         func subscribe(to chunks: S, onError: (@Sendable (Error) -> Void)?) {
             cancel()
             generation += 1
+            
             let currentGeneration = generation
             quillView.reset()
 
             subscriptionTask = Task { [weak self] in
                 guard let self else { return }
+                
                 do {
                     for try await chunk in chunks {
                         guard !Task.isCancelled,
                               self.generation == currentGeneration
                         else { break }
+                        
                         self.quillView.append(chunk)
                     }
+                    
                     guard !Task.isCancelled,
                           self.generation == currentGeneration
                     else { return }
+                    
                     self.quillView.finish()
                 } catch {
                     guard !Task.isCancelled,
                           self.generation == currentGeneration
                     else { return }
+                    
                     self.quillView.cancelStreaming()
                     onError?(error)
                 }

@@ -7,8 +7,7 @@ public struct QuillMarkdownView: UIViewRepresentable {
     let linkTapHandler: ((URL) -> Void)?
 
     public init(markdown: String) {
-        self.markdown = markdown
-        self.linkTapHandler = nil
+        self.init(markdown: markdown, linkTapHandler: nil)
     }
 
     private init(markdown: String, linkTapHandler: ((URL) -> Void)?) {
@@ -19,17 +18,17 @@ public struct QuillMarkdownView: UIViewRepresentable {
     public func makeUIView(context: Context) -> QuillView {
         let view = QuillView()
         applyConfiguration(to: view)
+        
         return view
     }
-
+    
     public func sizeThatFits(
         _ proposal: ProposedViewSize,
         uiView: QuillView,
-        context: Context
-    ) -> CGSize? {
-        fittedSize(for: uiView, proposal: proposal)
-    }
-
+        context: Context) -> CGSize? {
+            fittedSize(for: uiView, proposal: proposal)
+        }
+    
     public func updateUIView(_ uiView: QuillView, context: Context) {
         applyConfiguration(to: uiView)
     }
@@ -45,6 +44,7 @@ extension QuillMarkdownView {
     func applyConfiguration(to view: QuillView) {
         view.onLinkTap = linkTapHandler
         guard view.markdown != markdown else { return }
+        
         view.markdown = markdown
     }
 }

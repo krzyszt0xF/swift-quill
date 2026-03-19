@@ -1,17 +1,10 @@
 import UIKit
 
 struct RevealTaskQueue {
-    enum AnimationTask {
-        case block(UIView)
-        case label(UILabel)
-        case show(UIView)
-        case text(TextFlowView)
-    }
-
-    private(set) var tasks: [AnimationTask] = []
-
     var isEmpty: Bool { tasks.isEmpty }
     var count: Int { tasks.count }
+    
+    private(set) var tasks: [AnimationTask] = []
 
     mutating func append(_ task: AnimationTask) {
         tasks.append(task)
@@ -92,5 +85,14 @@ struct RevealTaskQueue {
 
         view.alpha = 0
         tasks.append(.block(view))
+    }
+}
+
+extension RevealTaskQueue {
+    enum AnimationTask {
+        case block(UIView)
+        case label(UILabel)
+        case show(UIView)
+        case text(TextFlowView)
     }
 }

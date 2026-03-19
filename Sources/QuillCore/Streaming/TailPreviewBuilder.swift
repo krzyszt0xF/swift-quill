@@ -16,29 +16,35 @@ enum TailPreviewBuilder {
 
         for context in state.contextStack.reversed() {
             switch context {
-            case .blockquote(let children):
+            case let .blockquote(children):
                 var all = children
                 if case let .block(block) = part { all.append(block) }
                 part = .block(.blockquote(children: all))
+                
             case .codeBlock, .heading, .paragraph, .table:
                 break
-            case .list(let ordered, let items):
+                
+            case let .list(ordered, items):
                 var all = items
                 if case let .listItem(item) = part { all.append(item) }
                 part = ordered
                     ? .block(.orderedList(startIndex: 1, items: all))
                     : .block(.unorderedList(items: all))
-            case .listItem(let blocks, let checkbox):
+                
+            case let .listItem(blocks, checkbox):
                 var all = blocks
                 if case let .block(block) = part { all.append(block) }
                 part = .listItem(Block.ListItem(checkbox: checkbox, children: all))
+                
             case .topLevel:
                 break
             }
+            
             if case .topLevel = context { break }
         }
 
         if case let .block(block) = part { return block }
+        
         return nil
     }
 }
@@ -49,6 +55,7 @@ private extension TailPreviewBuilder {
         for frame in stack.reversed() {
             result = frame.savedInlines + [BlockReducer.wrapInline(frame.kind, children: result)]
         }
+        
         return result
     }
 
@@ -58,26 +65,26 @@ private extension TailPreviewBuilder {
         inlineStack: [BlockReducer.InlineFrame]
     ) -> TailPart {
         switch context {
-        case .blockquote(let children):
+        case let .blockquote(children):
             return .block(.blockquote(children: children))
-        case .codeBlock(let language, let code):
+        case let .codeBlock(language, code):
             return .block(.codeBlock(language: language, code: code))
-        case .heading(let level):
+        case let .heading(level):
             let parsed = InlineRenderNormalizer.makeRenderedInlines(from: inlines)
             let preview = collapseInlineStack(current: parsed, stack: inlineStack)
             return preview.isEmpty ? .none : .block(.heading(level: level, content: preview))
-        case .list(let ordered, let items):
+        case let .list(ordered, items):
             guard !items.isEmpty else { return .none }
             return ordered
                 ? .block(.orderedList(startIndex: 1, items: items))
                 : .block(.unorderedList(items: items))
-        case .listItem(let blocks, let checkbox):
+        case let .listItem(blocks, checkbox):
             return .listItem(Block.ListItem(checkbox: checkbox, children: blocks))
         case .paragraph:
             let parsed = InlineRenderNormalizer.makeRenderedInlines(from: inlines)
             let preview = collapseInlineStack(current: parsed, stack: inlineStack)
             return preview.isEmpty ? .none : .block(.paragraph(content: preview))
-        case .table(let rows):
+        case let .table(rows):
             return tablePreview(from: rows)
         case .topLevel:
             return .none
@@ -86,6 +93,7 @@ private extension TailPreviewBuilder {
 
     static func tablePreview(from rows: [[String]]) -> TailPart {
         guard let headerCells = rows.first else { return .none }
+        
         let header = Block.TableRow(cells: headerCells.map { Block.TableCell(content: [.text($0)]) })
         let dataRows = rows.dropFirst().map { row in
             Block.TableRow(cells: row.map { Block.TableCell(content: [.text($0)]) })

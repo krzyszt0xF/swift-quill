@@ -33,6 +33,7 @@ struct StreamBuffer {
         }
 
         partialLine = String(segments.last ?? "")
+        
         return events
     }
 
@@ -45,6 +46,7 @@ struct StreamBuffer {
         }
 
         events.append(contentsOf: closeCurrentBlock())
+        
         return events
     }
 }
@@ -114,6 +116,7 @@ private extension StreamBuffer {
         }
 
         state = .paragraph
+        
         return [.startParagraph, .text(trimmed)]
     }
 
@@ -241,6 +244,7 @@ private extension StreamBuffer {
         }
 
         let cells = StreamLineClassifier.parseTableCells(trimmed)
+        
         return [.tableRow(cells)]
     }
 

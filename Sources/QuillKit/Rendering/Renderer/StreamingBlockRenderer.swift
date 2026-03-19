@@ -8,7 +8,7 @@ final class StreamingBlockRenderer {
     var stateRegistry: [BlockState] { frozenRenderer.stateRegistry }
 
     var onLinkTap: ((URL) -> Void)?
-    var tailConfiguration: TailConfiguration = .default
+    var tailConfiguration: TailConfiguration = .init(aggressiveness: .balanced)
 
     var renderedBlockViews: [UIView] {
         containerView.blockViews
@@ -19,8 +19,18 @@ final class StreamingBlockRenderer {
     }
 
     let containerView = BlockContainerView()
-    private var frozenRenderer = FrozenBlockRenderer()
-    private var tailRenderer = TailRenderer()
+    private let nodeViewFactory: RenderNodeViewFactory
+    private var frozenRenderer: FrozenBlockRenderer
+    private var tailRenderer: TailRenderer
+
+    init(
+        frozenRenderer: FrozenBlockRenderer,
+        nodeViewFactory: RenderNodeViewFactory,
+        tailRenderer: TailRenderer) {
+            self.nodeViewFactory = nodeViewFactory
+            self.frozenRenderer = frozenRenderer
+            self.tailRenderer = tailRenderer
+        }
 
     func append(blocks: [Block]) -> [UIView] {
         let nodes = FlowSegmentBuilder.build(from: blocks)
@@ -52,6 +62,7 @@ final class StreamingBlockRenderer {
         )
 
         tailRenderer.clearPromotedTail(containerView: containerView)
+        
         return tailView
     }
 
@@ -108,7 +119,15 @@ final class StreamingBlockRenderer {
     )
 }
 
-// MARK: - View Lifecycle
+extension StreamingBlockRenderer {
+    static var live: StreamingBlockRenderer {
+        StreamingBlockRenderer(
+            frozenRenderer: .live,
+            nodeViewFactory: .live,
+            tailRenderer: .live
+        )
+    }
+}
 
 private extension StreamingBlockRenderer {
     func addViews(for nodes: ArraySlice<RenderNode>) -> [UIView] {
@@ -117,7 +136,7 @@ private extension StreamingBlockRenderer {
         var insertionIndex = max(0, containerView.blockViews.count - (hasTailView ? 1 : 0))
 
         for node in nodes {
-            let view = RenderNodeViewFactory.view(for: node)
+            let view = nodeViewFactory.makeView(node)
             FrozenBlockRenderer.applyLinkTapHandler(to: view, handler: onLinkTap)
 
             if hasTailView {

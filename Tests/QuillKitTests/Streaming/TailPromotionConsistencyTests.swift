@@ -26,7 +26,7 @@ struct TailPromotionConsistencyTests {
         | mode | streaming |
         """
 
-        let markdownChunks = chunk(markdown, sizes: [3, 7, 5, 9, 4, 11, 6])
+        let markdownChunks = markdown.chunked(sizes: [3, 7, 5, 9, 4, 11, 6])
 
         let hybridView = makeHybridTailQuillView()
         let stableView = makeStableBlocksQuillView()

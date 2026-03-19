@@ -393,7 +393,8 @@ private extension TextFlowView {
                         return
                     }
 
-                    try? await Task.sleep(for: .seconds(TextFlowRevealController.idleRevealPollInterval))
+                    let revealPollInterval = TimeInterval(0.016)
+                    try? await Task.sleep(for: .seconds(revealPollInterval))
                     continue
                 }
 

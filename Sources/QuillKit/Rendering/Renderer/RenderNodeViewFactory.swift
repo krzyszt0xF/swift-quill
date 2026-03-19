@@ -2,8 +2,12 @@ import QuillCore
 import UIKit
 
 @MainActor
-enum RenderNodeViewFactory {
-    static func view(for node: RenderNode) -> UIView {
+struct RenderNodeViewFactory {
+    var makeView: (RenderNode) -> UIView
+}
+
+extension RenderNodeViewFactory {
+    static let live = RenderNodeViewFactory { node in
         switch node {
         case let .codeBlock(language, code):
             let view = CodeBlockView()

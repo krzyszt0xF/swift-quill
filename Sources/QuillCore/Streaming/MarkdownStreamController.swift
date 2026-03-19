@@ -17,6 +17,7 @@ package actor MarkdownStreamController {
 
         let (stream, newContinuation) = AsyncStream.makeStream(of: ParserEvent.self)
         continuation = newContinuation
+        
         return stream
     }
 

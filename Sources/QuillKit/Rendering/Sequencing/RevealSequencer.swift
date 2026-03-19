@@ -2,31 +2,6 @@ import UIKit
 
 @MainActor
 final class RevealSequencer {
-    struct ResolvedTiming: Equatable, Sendable {
-        var charsPerStep: Int
-        var baseDuration: TimeInterval
-        var elementGapDuration: TimeInterval
-        var commaPause: TimeInterval
-        var sentencePause: TimeInterval
-        var jitterMax: TimeInterval
-
-        init(
-            charsPerStep: Int,
-            baseDuration: TimeInterval,
-            elementGapDuration: TimeInterval,
-            commaPause: TimeInterval,
-            sentencePause: TimeInterval,
-            jitterMax: TimeInterval
-        ) {
-            self.charsPerStep = max(1, charsPerStep)
-            self.baseDuration = max(0.001, baseDuration)
-            self.elementGapDuration = max(0, elementGapDuration)
-            self.commaPause = max(0, commaPause)
-            self.sentencePause = max(0, sentencePause)
-            self.jitterMax = max(0, jitterMax)
-        }
-    }
-
     var onComplete: (() -> Void)?
     var onLayoutChange: ((UIView?) -> Void)?
     private var isRunning = false
@@ -36,25 +11,30 @@ final class RevealSequencer {
     private var blockRevealStartTime: TimeInterval = 0
     private var currentTask: RevealTaskQueue.AnimationTask?
     private var currentTaskToken: UUID?
-    private var currentTiming: ResolvedTiming
+    private var currentTiming: RevealTiming
+    private let generateID: () -> UUID
+    private let now: () -> TimeInterval
+    private let scheduleAfter: (_ delay: TimeInterval, _ operation: @escaping @MainActor () -> Void) -> Void
+    private let sleep: (Duration) async -> Void
     private var taskQueue = RevealTaskQueue()
     private var watchdogTask: Task<Void, Never>?
 
     private var typewriterConfiguration: TypewriterConfiguration = .balanced
     private var performanceProfile: PerformanceProfile = .balanced
-    private var fixedTimingOverride: ResolvedTiming?
+    private var fixedTimingOverride: RevealTiming?
     private var minimumTextAnimationWindow: TimeInterval = 0
-
-    init() {
-        currentTiming = ResolvedTiming(
-            charsPerStep: 6,
-            baseDuration: 0.012,
-            elementGapDuration: 0.03,
-            commaPause: 0.015,
-            sentencePause: 0.045,
-            jitterMax: 0.005
-        )
-    }
+    
+    init(
+        generateID: @escaping () -> UUID,
+        now: @escaping () -> TimeInterval,
+        scheduleAfter: @escaping (_ delay: TimeInterval, _ operation: @escaping @MainActor () -> Void) -> Void,
+        sleep: @escaping (Duration) async -> Void) {
+            self.generateID = generateID
+            self.now = now
+            self.scheduleAfter = scheduleAfter
+            self.sleep = sleep
+            currentTiming = .live
+        }
 
     func applyConfiguration(
         typewriter: TypewriterConfiguration,
@@ -80,29 +60,32 @@ final class RevealSequencer {
         completeAll()
     }
 
-    func resolvedTiming(forPendingTaskCount pendingTaskCount: Int) -> ResolvedTiming {
-        RevealTimingResolver.resolveTiming(
-            pendingTaskCount: pendingTaskCount,
-            typewriterConfiguration: typewriterConfiguration,
-            performanceProfile: performanceProfile,
-            fixedTimingOverride: fixedTimingOverride
-        )
-    }
-
-    func resolveTextTiming(_ timing: ResolvedTiming, totalCharacters: Int) -> ResolvedTiming {
-        RevealTimingResolver.resolveTextTiming(
-            timing,
-            totalCharacters: totalCharacters,
-            minimumTextAnimationWindow: minimumTextAnimationWindow
-        )
-    }
-
-    func setFixedTiming(_ timing: ResolvedTiming?) {
+    func setFixedTiming(_ timing: RevealTiming?) {
         fixedTimingOverride = timing
     }
 
     func setMinimumTextAnimationWindow(_ duration: TimeInterval) {
         minimumTextAnimationWindow = max(0, duration)
+    }
+}
+
+extension RevealSequencer {
+    static var live: RevealSequencer {
+        RevealSequencer(
+            generateID: UUID.init,
+            now: { Date.timeIntervalSinceReferenceDate },
+            scheduleAfter: { delay, operation in
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(delay))
+                    guard !Task.isCancelled else { return }
+                    
+                    operation()
+                }
+            },
+            sleep: { duration in
+                try? await Task.sleep(for: duration)
+            }
+        )
     }
 }
 
@@ -130,10 +113,13 @@ private extension RevealSequencer {
 
         isRunning = true
         let task = taskQueue.removeFirst()
-        let token = UUID()
+        let token = generateID()
         currentTask = task
         currentTaskToken = token
-        currentTiming = resolvedTiming(forPendingTaskCount: taskQueue.count)
+        currentTiming = fixedTimingOverride ?? RevealTiming(
+            pendingTaskCount: taskQueue.count,
+            typewriterConfiguration: typewriterConfiguration,
+            performanceProfile: performanceProfile)
         feedWatchdog()
 
         switch task {
@@ -144,7 +130,11 @@ private extension RevealSequencer {
                 UIView.animate(withDuration: RevealAnimator.blockRevealDuration, animations: {
                     view.alpha = 1
                 }) { [weak self] _ in
-                    guard let self, self.currentTaskToken == token else { return }
+                    guard
+                        let self,
+                        self.currentTaskToken == token
+                    else { return }
+                    
                     self.onLayoutChange?(view)
                     self.finishCurrentTask(withGap: true)
                 }
@@ -154,7 +144,11 @@ private extension RevealSequencer {
             UIView.animate(withDuration: 0.1, animations: {
                 label.alpha = 1
             }) { [weak self] _ in
-                guard let self, self.currentTaskToken == token else { return }
+                guard
+                    let self,
+                    self.currentTaskToken == token
+                else { return }
+                
                 self.finishCurrentTask(withGap: false)
             }
 
@@ -163,7 +157,11 @@ private extension RevealSequencer {
             UIView.animate(withDuration: 0.15, animations: {
                 view.alpha = 1
             }) { [weak self] _ in
-                guard let self, self.currentTaskToken == token else { return }
+                guard
+                    let self,
+                    self.currentTaskToken == token
+                else { return }
+                
                 self.finishCurrentTask(withGap: true)
             }
 
@@ -171,7 +169,9 @@ private extension RevealSequencer {
             if textView.totalCharacterCount == 0 {
                 finishCurrentTask(withGap: false)
             } else {
-                let textTiming = resolveTextTiming(currentTiming, totalCharacters: textView.totalCharacterCount)
+                let textTiming = currentTiming.next(
+                    totalCharacters: textView.totalCharacterCount,
+                    minimumTextAnimationWindow: minimumTextAnimationWindow)
                 typeNextBatch(textView: textView, from: 0, token: token, timing: textTiming)
             }
         }
@@ -183,7 +183,7 @@ private extension RevealSequencer {
         currentTaskToken = nil
 
         if withGap, currentTiming.elementGapDuration > 0 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + currentTiming.elementGapDuration) { [weak self] in
+            scheduleAfter(currentTiming.elementGapDuration) { [weak self] in
                 self?.runNext()
             }
         } else {
@@ -205,7 +205,7 @@ private extension RevealSequencer {
             return
         }
 
-        let elapsed = Date.timeIntervalSinceReferenceDate - blockRevealStartTime
+        let elapsed = now() - blockRevealStartTime
         let (easedProgress, isComplete) = RevealAnimator.advanceBlockRevealProgress(elapsed: elapsed)
 
         if revealable.setBlockRevealProgress(easedProgress) {
@@ -231,7 +231,7 @@ private extension RevealSequencer {
 
         cancelBlockRevealAnimation()
         blockRevealView = view
-        blockRevealStartTime = Date.timeIntervalSinceReferenceDate
+        blockRevealStartTime = now()
 
         UIView.animate(withDuration: RevealAnimator.blockRevealDuration) {
             view.alpha = 1
@@ -243,7 +243,7 @@ private extension RevealSequencer {
             while !Task.isCancelled {
                 self.advanceBlockRevealAnimation()
                 guard self.blockRevealView != nil else { return }
-                try? await Task.sleep(for: .milliseconds(16))
+                await self.sleep(.milliseconds(16))
             }
         }
     }
@@ -258,11 +258,12 @@ private extension RevealSequencer {
         textView: TextFlowView,
         from currentIndex: Int,
         token: UUID,
-        timing: ResolvedTiming
+        timing: RevealTiming
     ) {
         guard currentTaskToken == token else { return }
+        
         feedWatchdog()
-
+        
         let total = textView.totalCharacterCount
         guard currentIndex < total else {
             onLayoutChange?(textView)
@@ -277,13 +278,11 @@ private extension RevealSequencer {
             onLayoutChange?(textView)
         }
 
-        let delay = RevealTimingResolver.calculateDelay(
-            originalString: textView.originalAttributedString,
+        let delay = timing.delay(
             from: currentIndex,
             to: nextIndex,
-            timing: timing
-        )
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            originalString: textView.originalAttributedString)
+        scheduleAfter(delay) { [weak self] in
             self?.typeNextBatch(textView: textView, from: nextIndex, token: token, timing: timing)
         }
     }
@@ -300,15 +299,18 @@ private extension RevealSequencer {
     func feedWatchdog() {
         watchdogTask?.cancel()
         watchdogTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(Self.watchdogTimeout))
-
+            guard let self else { return }
+            
+            await self.sleep(.seconds(Self.watchdogTimeout))
             guard !Task.isCancelled else { return }
-            self?.handleWatchdogTimeout()
+            
+            self.handleWatchdogTimeout()
         }
     }
 
     func handleWatchdogTimeout() {
         guard isRunning else { return }
+        
         RevealAnimator.completeTask(currentTask, cancelBlockReveal: cancelBlockRevealAnimation)
         finishCurrentTask(withGap: false)
     }

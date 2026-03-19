@@ -12,6 +12,11 @@ struct TailRenderer {
     private(set) var tailBlock: Block?
     private(set) var tailDescriptor: TailDescriptor?
     private(set) weak var tailView: UIView?
+    private let nodeViewFactory: RenderNodeViewFactory
+
+    init(nodeViewFactory: RenderNodeViewFactory) {
+        self.nodeViewFactory = nodeViewFactory
+    }
 
     mutating func clearTail(containerView: BlockContainerView) {
         guard let tailView else {
@@ -112,6 +117,12 @@ struct TailRenderer {
     }
 }
 
+extension TailRenderer {
+    static var live: Self {
+        TailRenderer(nodeViewFactory: .live)
+    }
+}
+
 // MARK: - View Creation
 
 private extension TailRenderer {
@@ -183,7 +194,7 @@ private extension TailRenderer {
             return UIView()
         }
 
-        let view = RenderNodeViewFactory.view(for: node)
+        let view = nodeViewFactory.makeView(node)
         FrozenBlockRenderer.applyLinkTapHandler(to: view, handler: linkTapHandler)
         if case .flow = node,
            let textFlowView = view as? TextFlowView {

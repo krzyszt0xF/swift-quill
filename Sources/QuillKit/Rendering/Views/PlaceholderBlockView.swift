@@ -2,14 +2,6 @@ import QuillCore
 import UIKit
 
 final class PlaceholderBlockView: UIView {
-    private enum Layout {
-        static let contentInset: CGFloat = 12
-        static let imageMinimumHeight: CGFloat = 96
-        static let stackSpacing: CGFloat = 4
-        static let tableMinimumHeight: CGFloat = 110
-        static let iconSize: CGFloat = 44
-    }
-
     private let iconView = UIImageView()
     private let label = UILabel()
     private var minimumHeight: CGFloat = Layout.imageMinimumHeight
@@ -102,6 +94,19 @@ final class PlaceholderBlockView: UIView {
     }
 }
 
+extension PlaceholderBlockView: BlockRevealAnimating {
+    var minimumMeasuredHeight: CGFloat {
+        max(minimumHeight, (Layout.contentInset * 2) + Layout.iconSize)
+    }
+
+    func measuredHeight(for width: CGFloat) -> CGFloat {
+        max(
+            minimumMeasuredHeight,
+            (Layout.contentInset * 2) + Layout.iconSize + Layout.stackSpacing + labelHeight(for: width)
+        )
+    }
+}
+
 private extension PlaceholderBlockView {
     static func plainText(from inlines: [Inline]) -> String {
         inlines.map { plainText(from: $0) }.joined()
@@ -147,17 +152,12 @@ private extension PlaceholderBlockView {
         let availableWidth = max(width - (Layout.contentInset * 2), 0)
         return label.sizeThatFits(CGSize(width: availableWidth, height: .greatestFiniteMagnitude)).height
     }
-}
-
-extension PlaceholderBlockView: BlockRevealAnimating {
-    var minimumMeasuredHeight: CGFloat {
-        max(minimumHeight, (Layout.contentInset * 2) + Layout.iconSize)
-    }
-
-    func measuredHeight(for width: CGFloat) -> CGFloat {
-        max(
-            minimumMeasuredHeight,
-            (Layout.contentInset * 2) + Layout.iconSize + Layout.stackSpacing + labelHeight(for: width)
-        )
+    
+    enum Layout {
+        static let contentInset: CGFloat = 12
+        static let imageMinimumHeight: CGFloat = 96
+        static let stackSpacing: CGFloat = 4
+        static let tableMinimumHeight: CGFloat = 110
+        static let iconSize: CGFloat = 44
     }
 }

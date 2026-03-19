@@ -5,6 +5,16 @@ import UIKit
 struct FrozenBlockRenderer {
     private(set) var frozenViewCount: Int = 0
     private(set) var stateRegistry: [BlockState] = []
+    private let generateID: () -> UUID
+    private let nodeViewFactory: RenderNodeViewFactory
+
+    init(
+        generateID: @escaping () -> UUID,
+        nodeViewFactory: RenderNodeViewFactory
+    ) {
+        self.generateID = generateID
+        self.nodeViewFactory = nodeViewFactory
+    }
 
     mutating func applyContainerUpdate(
         nodes: [RenderNode],
@@ -41,7 +51,7 @@ struct FrozenBlockRenderer {
 
         for insertion in insertions.sorted(by: { $0.offset < $1.offset }) {
             let state = newStates[insertion.offset]
-            let view = RenderNodeViewFactory.view(for: state.node)
+            let view = nodeViewFactory.makeView(state.node)
             Self.applyLinkTapHandler(to: view, handler: linkTapHandler)
             containerView.insertBlock(view, at: min(insertion.offset, containerView.blockViews.count))
         }
@@ -49,7 +59,7 @@ struct FrozenBlockRenderer {
         let oldNodeByID = Dictionary(oldStates.map { ($0.id, $0.node) }, uniquingKeysWith: { _, new in new })
         for (index, state) in newStates.enumerated() {
             if let oldNode = oldNodeByID[state.id], oldNode != state.node {
-                let view = RenderNodeViewFactory.view(for: state.node)
+                let view = nodeViewFactory.makeView(state.node)
                 Self.applyLinkTapHandler(to: view, handler: linkTapHandler)
                 containerView.updateBlock(at: index, with: view)
             }
@@ -65,7 +75,17 @@ struct FrozenBlockRenderer {
 
     static func applyLinkTapHandler(to view: UIView, handler: ((URL) -> Void)?) {
         guard let textFlowView = view as? TextFlowView else { return }
+        
         textFlowView.onLinkTap = handler
+    }
+}
+
+extension FrozenBlockRenderer {
+    static var live: Self {
+        FrozenBlockRenderer(
+            generateID: UUID.init,
+            nodeViewFactory: .live
+        )
     }
 }
 
@@ -85,7 +105,7 @@ private extension FrozenBlockRenderer {
                 ))
             } else {
                 newStates.append(BlockState(
-                    id: UUID(),
+                    id: generateID(),
                     isFrozen: isFrozen,
                     node: node
                 ))

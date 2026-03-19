@@ -1,23 +1,6 @@
 import UIKit
 
 struct TextFlowRevealController {
-    struct StreamingProfile {
-        var charsPerStep: Int
-        var baseDuration: TimeInterval
-        var commaPause: TimeInterval
-        var jitterMax: TimeInterval
-        var sentencePause: TimeInterval
-    }
-
-    struct RevealFadeConfiguration {
-        var initialAlpha: CGFloat = 0.2
-        var duration: TimeInterval = 0.08
-
-        var isEnabled: Bool {
-            initialAlpha < 1 && duration > 0
-        }
-    }
-
     private(set) var lastRevealedIndex = 0
     private(set) var originalAttributedString: NSAttributedString?
     var workingAttributedString: NSMutableAttributedString?
@@ -28,11 +11,6 @@ struct TextFlowRevealController {
     var streamingIdleTimeout: TimeInterval = 0.30
     var revealFadeConfiguration = RevealFadeConfiguration()
     var revealFadeGeneration = 0
-
-    static let commaCharacters: Set<unichar> = [0x002C, 0xFF0C, 0x3001]
-    static let sentenceCharacters: Set<unichar> = [0x002E, 0x0021, 0x003F, 0x000A]
-    static let idleRevealPollInterval: TimeInterval = 0.016
-    static let defaultIdleRevealTimeout: TimeInterval = 0.30
 
     var totalCharacterCount: Int { originalAttributedString?.length ?? 0 }
 
@@ -52,7 +30,7 @@ struct TextFlowRevealController {
         if clearTiming {
             lastStreamingUpdateTime = nil
             previousStreamingTargetLength = 0
-            streamingIdleTimeout = Self.defaultIdleRevealTimeout
+            streamingIdleTimeout = 0.3
         }
     }
 
@@ -80,16 +58,19 @@ struct TextFlowRevealController {
         originalAttributedString = NSAttributedString(attributedString: attributedString)
         workingAttributedString = workingString
         lastRevealedIndex = revealedCharacterCount
+        
         return workingString
     }
 
     mutating func applyReveal(
         upTo index: Int
     ) -> (revealRange: NSRange, newRevealedIndex: Int)? {
-        guard let originalAttributedString,
-              let workingAttributedString,
-              index > lastRevealedIndex,
-              index <= originalAttributedString.length else { return nil }
+        guard
+            let originalAttributedString,
+            let workingAttributedString,
+            index > lastRevealedIndex,
+            index <= originalAttributedString.length
+        else { return nil }
 
         let revealRange = NSRange(location: lastRevealedIndex, length: index - lastRevealedIndex)
         if revealFadeConfiguration.isEnabled {
@@ -104,15 +85,18 @@ struct TextFlowRevealController {
             startingAt: index
         )
         lastRevealedIndex = newRevealedIndex
+        
         return (revealRange, newRevealedIndex)
     }
 
     mutating func prepareForReveal(
         currentAttributedString: NSAttributedString?
     ) -> NSMutableAttributedString? {
-        guard originalAttributedString == nil,
-              let attributedString = currentAttributedString,
-              attributedString.length > 0 else { return nil }
+        guard
+            originalAttributedString == nil,
+            let attributedString = currentAttributedString,
+            attributedString.length > 0
+        else { return nil }
 
         originalAttributedString = NSAttributedString(attributedString: attributedString)
         let workingString = NSMutableAttributedString(attributedString: attributedString)
@@ -138,11 +122,13 @@ struct TextFlowRevealController {
             self.originalAttributedString = nil
             workingAttributedString = nil
             previousStreamingTargetLength = lastRevealedIndex
+            
             return result
         }
 
         lastRevealedIndex = currentAttributedStringLength
         previousStreamingTargetLength = lastRevealedIndex
+        
         return nil
     }
 
@@ -206,11 +192,14 @@ struct TextFlowRevealController {
         var extraDuration: TimeInterval = 0
 
         if lowerBound < upperBound {
+            let commaCharacters: Set<unichar> = [0x002C, 0xFF0C, 0x3001]
+            let sentenceCharacters: Set<unichar> = [0x002E, 0x0021, 0x003F, 0x000A]
+            
             for index in lowerBound..<upperBound {
                 let scalar = sourceString.character(at: index)
-                if Self.sentenceCharacters.contains(scalar) {
+                if sentenceCharacters.contains(scalar) {
                     extraDuration = max(extraDuration, sentencePause)
-                } else if Self.commaCharacters.contains(scalar) {
+                } else if commaCharacters.contains(scalar) {
                     extraDuration = max(extraDuration, commaPause)
                 }
             }
@@ -222,9 +211,8 @@ struct TextFlowRevealController {
 
     func applyAttributes(in revealRange: NSRange, alphaMultiplier: CGFloat?) {
         guard let originalAttributedString,
-              let workingAttributedString else {
-            return
-        }
+              let workingAttributedString
+        else { return }
 
         originalAttributedString.enumerateAttributes(in: revealRange) { attributes, range, _ in
             var resolvedAttributes = attributes
@@ -280,5 +268,24 @@ struct TextFlowRevealController {
 
     func fadeStepDelay() -> TimeInterval {
         revealFadeConfiguration.duration / 2
+    }
+}
+
+extension TextFlowRevealController {
+    struct StreamingProfile {
+        var charsPerStep: Int
+        var baseDuration: TimeInterval
+        var commaPause: TimeInterval
+        var jitterMax: TimeInterval
+        var sentencePause: TimeInterval
+    }
+
+    struct RevealFadeConfiguration {
+        var initialAlpha: CGFloat = 0.2
+        var duration: TimeInterval = 0.08
+
+        var isEnabled: Bool {
+            initialAlpha < 1 && duration > 0
+        }
     }
 }

@@ -6,6 +6,7 @@ enum InlineScanner {
     static func advance(_ parser: inout InlineParser.Parser, by token: String) {
         for _ in token {
             guard parser.position < parser.source.endIndex else { return }
+            
             advance(&parser)
         }
     }
@@ -13,6 +14,7 @@ enum InlineScanner {
     static func advancePastIncompleteDestination(_ parser: inout InlineParser.Parser) {
         while parser.position < parser.source.endIndex {
             guard !checkWhitespace(parser.source[parser.position]) else { return }
+            
             advance(&parser)
         }
     }
@@ -20,6 +22,7 @@ enum InlineScanner {
     static func checkCanStartEmphasis(_ parser: InlineParser.Parser) -> Bool {
         let nextPosition = parser.source.index(after: parser.position)
         guard nextPosition < parser.source.endIndex else { return false }
+        
         return !checkWhitespace(parser.source[nextPosition])
     }
 
