@@ -8,7 +8,7 @@ import UIKit
 struct BlockStateDiffTests {
     @Test("Distinct structural siblings receive distinct state IDs")
     func distinctStructuralSiblingsReceiveDistinctStateIDs() {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let blocks: [Block] = [
             .paragraph(content: [.text("A")]),
@@ -33,7 +33,7 @@ struct BlockStateDiffTests {
 
     @Test("Fresh IDs after reset")
     func freshIDsAppearAfterReset() {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let blocks: [Block] = [
             .paragraph(content: [.text("A")]),
@@ -55,9 +55,9 @@ struct BlockStateDiffTests {
         #expect(newStateIDs[1] != oldStateIDs[1])
     }
 
-    @Test("Frozen prefix immutability: no operations target frozen indices on tail update")
-    func frozenPrefixRemainsImmutableDuringTailUpdate() {
-        let renderer = StreamingBlockRenderer()
+    @Test("Frozen prefix remains immutable when a trailing block appears in a later snapshot")
+    func frozenPrefixRemainsImmutableWhenSnapshotGrows() {
+        let renderer = makeStreamingBlockRenderer()
 
         let initialBlocks: [Block] = [
             .paragraph(content: [.text("F1")]),
@@ -89,7 +89,7 @@ struct BlockStateDiffTests {
 
     @Test("Insert detection appends new block at end")
     func insertDetectionAppendsNewBlockAtEnd() {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let initialBlocks: [Block] = [
             .paragraph(content: [.text("A")]),
@@ -111,7 +111,7 @@ struct BlockStateDiffTests {
 
     @Test("Mixed operations: grow from three to four blocks")
     func mixedOperationsPreserveFrozenStateIDs() {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let initialBlocks: [Block] = [
             .paragraph(content: [.text("P1")]),
@@ -138,7 +138,7 @@ struct BlockStateDiffTests {
 
     @Test("Remove detection drops block when frozen count increases past it")
     func removeDetectionDropsBlockWhenItDisappears() {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let initialBlocks: [Block] = [
             .paragraph(content: [.text("A")]),
@@ -162,7 +162,7 @@ struct BlockStateDiffTests {
 
     @Test("Stable IDs persist for frozen blocks across updates")
     func stableIDsPersistForFrozenBlocksAcrossUpdates() {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let initialBlocks: [Block] = [
             .paragraph(content: [.text("A")]),
@@ -189,7 +189,7 @@ struct BlockStateDiffTests {
 
     @Test("Update detection replaces content for same ID")
     func updateDetectionReplacesContentForSameID() {
-        let renderer = StreamingBlockRenderer()
+        let renderer = makeStreamingBlockRenderer()
 
         let initialBlocks: [Block] = [
             .paragraph(content: [.text("A")]),

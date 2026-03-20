@@ -142,6 +142,23 @@ struct StreamControllerTests {
         #expect(events.starts(with: [.startHeading(level: 1), .text("Title"), .endHeading]))
     }
 
+    @Test("Append before events installation keeps pending events")
+    func appendBeforeEventsKeepsPendingEvents() async {
+        let controller = MarkdownStreamController()
+
+        await controller.append("Hello\n\n")
+        await controller.finish()
+
+        let eventStream = await controller.events()
+
+        var events: [ParserEvent] = []
+        for await event in eventStream {
+            events.append(event)
+        }
+
+        #expect(events == [.startParagraph, .text("Hello"), .endParagraph])
+    }
+
     @Test("Mixed document chunks reduce into multiple block types")
     func mixedDocumentChunksReduceToExpectedBlockTypes() async {
         let controller = MarkdownStreamController()

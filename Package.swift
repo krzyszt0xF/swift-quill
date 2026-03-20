@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "swift-quill",
-    platforms: [.iOS(.v17)],
+    platforms: [.iOS(.v16)],
     products: [
         .library(name: "QuillCore", targets: ["QuillCore"]),
         .library(name: "QuillKit", targets: ["QuillKit"]),

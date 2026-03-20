@@ -5,10 +5,10 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("Tail Promotion Consistency")
-struct TailPromotionConsistencyTests {
-    @Test("Hybrid and stable modes converge to identical final node signatures")
-    func hybridMatchesStableAfterFinish() async throws {
+@Suite("Streaming Mode Consistency")
+struct StreamingModeConsistencyTests {
+    @Test("Buffered and stable modes converge to identical final node signatures")
+    func bufferedMatchesStableAfterFinish() async throws {
         let markdown = """
         # Title
 
@@ -26,32 +26,35 @@ struct TailPromotionConsistencyTests {
         | mode | streaming |
         """
 
-        let markdownChunks = chunk(markdown, sizes: [3, 7, 5, 9, 4, 11, 6])
+        let markdownChunks = markdown.chunked(sizes: [3, 7, 5, 9, 4, 11, 6])
 
-        let hybridView = makeHybridTailQuillView()
+        let bufferedView = makeBufferedModulesQuillView(
+            minModuleLength: 1,
+            maxBufferingDelay: 0.1
+        )
         let stableView = makeStableBlocksQuillView()
 
         for chunk in markdownChunks {
-            hybridView.append(chunk)
+            bufferedView.append(chunk)
             stableView.append(chunk)
             await wait(for: .milliseconds(12))
         }
 
-        hybridView.finish()
+        bufferedView.finish()
         stableView.finish()
 
         let signaturesMatched = await eventually(timeout: .milliseconds(800)) {
-            viewSignatures(for: hybridView) == viewSignatures(for: stableView)
+            viewSignatures(for: bufferedView) == viewSignatures(for: stableView)
         }
         #expect(signaturesMatched)
 
-        let hybridContainer = try #require(containerView(for: hybridView))
-        let hybridSignatures = hybridContainer.blockViews.map(viewSignature)
+        let bufferedContainer = try #require(containerView(for: bufferedView))
+        let bufferedSignatures = bufferedContainer.blockViews.map(viewSignature)
 
-        #expect(hybridSignatures.contains("code"))
-        #expect(hybridSignatures.contains("table"))
-        #expect(hybridSignatures.filter { $0 == "code" }.count == 1)
-        #expect(hybridSignatures.filter { $0 == "table" }.count == 1)
-        #expect(hybridSignatures.filter { $0 == "flow" }.count >= 1)
+        #expect(bufferedSignatures.contains("code"))
+        #expect(bufferedSignatures.contains("table"))
+        #expect(bufferedSignatures.filter { $0 == "code" }.count == 1)
+        #expect(bufferedSignatures.filter { $0 == "table" }.count == 1)
+        #expect(bufferedSignatures.filter { $0 == "flow" }.count >= 1)
     }
 }

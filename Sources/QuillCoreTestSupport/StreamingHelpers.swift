@@ -3,23 +3,22 @@ import QuillSharedTestSupport
 
 package func collectEvents(
     from controller: MarkdownStreamController,
-    feeding chunks: [String]
-) async -> [ParserEvent] {
-    let eventStream = await controller.events()
-
-    Task {
-        for chunk in chunks {
-            await controller.append(chunk)
+    feeding chunks: [String]) async -> [ParserEvent] {
+        let eventStream = await controller.events()
+        
+        Task {
+            for chunk in chunks {
+                await controller.append(chunk)
+            }
+            await controller.finish()
         }
-        await controller.finish()
-    }
-
-    var collectedEvents: [ParserEvent] = []
-    for await event in eventStream {
-        collectedEvents.append(event)
-    }
-
-    return collectedEvents
+        
+        var collectedEvents: [ParserEvent] = []
+        for await event in eventStream {
+            collectedEvents.append(event)
+        }
+        
+        return collectedEvents
 }
 
 package func reduce(_ events: [ParserEvent]) -> [Block] {
@@ -30,16 +29,8 @@ package func reduce(_ events: [ParserEvent]) -> [Block] {
     return reducerState.blocks
 }
 
-package func tailPreview(after events: [ParserEvent]) -> Block? {
-    var state = BlockReducer.ReducerState()
-    for event in events {
-        BlockReducer.apply(event, to: &state)
-    }
-    return BlockReducer.makeTailPreview(from: state)
-}
-
 package func streamAndReduce(_ markdown: String, chunkSizes: [Int]) async -> [Block] {
-    let chunks = chunk(markdown, sizes: chunkSizes)
+    let chunks = markdown.chunked(sizes: chunkSizes)
     let controller = MarkdownStreamController()
     let eventStream = await controller.events()
 

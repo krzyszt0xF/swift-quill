@@ -12,12 +12,21 @@ struct RevealSequencerProfileTests {
 
     @Test("Balanced profile resolves expected queue tiers")
     func balancedProfileResolvesExpectedQueueTiers() {
-        let sequencer = RevealSequencer()
-        sequencer.applyConfiguration(typewriter: .balanced, performanceProfile: .balanced)
-
-        let lowQueueTiming = sequencer.resolvedTiming(forPendingTaskCount: 1)
-        let mediumQueueTiming = sequencer.resolvedTiming(forPendingTaskCount: 4)
-        let highQueueTiming = sequencer.resolvedTiming(forPendingTaskCount: 10)
+        let lowQueueTiming = RevealTiming(
+            pendingTaskCount: 1,
+            typewriterConfiguration: .balanced,
+            performanceProfile: .balanced
+        )
+        let mediumQueueTiming = RevealTiming(
+            pendingTaskCount: 4,
+            typewriterConfiguration: .balanced,
+            performanceProfile: .balanced
+        )
+        let highQueueTiming = RevealTiming(
+            pendingTaskCount: 10,
+            typewriterConfiguration: .balanced,
+            performanceProfile: .balanced
+        )
 
         #expect(lowQueueTiming.charsPerStep == 6)
         #expect(mediumQueueTiming.charsPerStep == 8)
@@ -37,37 +46,35 @@ struct RevealSequencerProfileTests {
 
     @Test("Fade configuration does not affect resolved pacing")
     func fadeConfigurationDoesNotAffectResolvedTiming() {
-        let sequencer = RevealSequencer()
         let baselineConfiguration = TypewriterConfiguration.balanced
         var fadingConfiguration = TypewriterConfiguration.balanced
         fadingConfiguration.textRevealInitialAlpha = 0.05
         fadingConfiguration.textRevealFadeDuration = 0.30
 
-        sequencer.applyConfiguration(typewriter: baselineConfiguration, performanceProfile: .balanced)
-        let baselineTiming = sequencer.resolvedTiming(forPendingTaskCount: 6)
-
-        sequencer.applyConfiguration(typewriter: fadingConfiguration, performanceProfile: .balanced)
-        let fadingTiming = sequencer.resolvedTiming(forPendingTaskCount: 6)
+        let baselineTiming = RevealTiming(
+            pendingTaskCount: 6,
+            typewriterConfiguration: baselineConfiguration,
+            performanceProfile: .balanced
+        )
+        let fadingTiming = RevealTiming(
+            pendingTaskCount: 6,
+            typewriterConfiguration: fadingConfiguration,
+            performanceProfile: .balanced
+        )
 
         #expect(baselineTiming == fadingTiming)
     }
 
-    @Test("Manual fixed timing remains deterministic")
-    func fixedTimingRemainsDeterministic() {
-        let sequencer = RevealSequencer()
-        sequencer.applyConfiguration(typewriter: .balanced, performanceProfile: .balanced)
-        sequencer.setFixedTiming(
-            .init(
-                charsPerStep: 11,
-                baseDuration: 0.004,
-                elementGapDuration: 0.001,
-                commaPause: 0.015,
-                sentencePause: 0.045,
-                jitterMax: 0.005
-            )
+    @Test("Explicit timing remains deterministic")
+    func explicitTimingRemainsDeterministic() {
+        let resolvedTiming = RevealTiming(
+            charsPerStep: 11,
+            baseDuration: 0.004,
+            elementGapDuration: 0.001,
+            commaPause: 0.015,
+            sentencePause: 0.045,
+            jitterMax: 0.005
         )
-
-        let resolvedTiming = sequencer.resolvedTiming(forPendingTaskCount: 30)
 
         #expect(resolvedTiming.charsPerStep == 11)
         #expect(approximatelyEqual(resolvedTiming.baseDuration, 0.004))
@@ -76,38 +83,21 @@ struct RevealSequencerProfileTests {
         #expect(approximatelyEqual(resolvedTiming.sentencePause, 0.045))
     }
 
-    @Test("Fixed timing override ignores queue depth")
-    func fixedTimingIgnoresQueueDepth() {
-        let sequencer = RevealSequencer()
-        sequencer.applyConfiguration(typewriter: .balanced, performanceProfile: .balanced)
-        sequencer.setFixedTiming(
-            .init(
-                charsPerStep: 6,
-                baseDuration: 0.012,
-                elementGapDuration: 0.04,
-                commaPause: 0.03,
-                sentencePause: 0.08,
-                jitterMax: 0.005
-            )
-        )
+    @Test("Buffered timing preset matches expected values")
+    func bufferedTimingPresetMatchesExpectedValues() {
+        let bufferedTiming = RevealTiming.buffered
 
-        let lowQueueTiming = sequencer.resolvedTiming(forPendingTaskCount: 1)
-        let highQueueTiming = sequencer.resolvedTiming(forPendingTaskCount: 24)
-
-        #expect(lowQueueTiming == highQueueTiming)
-        #expect(approximatelyEqual(lowQueueTiming.commaPause, 0.03))
-        #expect(approximatelyEqual(lowQueueTiming.sentencePause, 0.08))
-        #expect(approximatelyEqual(lowQueueTiming.jitterMax, 0.005))
-        #expect(approximatelyEqual(lowQueueTiming.baseDuration, 0.012))
-        #expect(approximatelyEqual(lowQueueTiming.elementGapDuration, 0.04))
+        #expect(bufferedTiming.charsPerStep == 4)
+        #expect(approximatelyEqual(bufferedTiming.baseDuration, 0.014))
+        #expect(approximatelyEqual(bufferedTiming.elementGapDuration, 0.04))
+        #expect(approximatelyEqual(bufferedTiming.commaPause, 0.03))
+        #expect(approximatelyEqual(bufferedTiming.sentencePause, 0.08))
+        #expect(approximatelyEqual(bufferedTiming.jitterMax, 0.005))
     }
 
     @Test("Minimum text animation window slows down short reveals deterministically")
     func minimumTextAnimationWindowSlowsShortReveals() {
-        let sequencer = RevealSequencer()
-        sequencer.setMinimumTextAnimationWindow(0.24)
-
-        let baseTiming = RevealSequencer.ResolvedTiming(
+        let baseTiming = RevealTiming(
             charsPerStep: 6,
             baseDuration: 0.012,
             elementGapDuration: 0.04,
@@ -116,9 +106,9 @@ struct RevealSequencerProfileTests {
             jitterMax: 0.005
         )
 
-        let regularTextTiming = sequencer.resolveTextTiming(baseTiming, totalCharacters: 120)
-        let shortTextTiming = sequencer.resolveTextTiming(baseTiming, totalCharacters: 20)
-        let tinyTextTiming = sequencer.resolveTextTiming(baseTiming, totalCharacters: 6)
+        let regularTextTiming = baseTiming.next(totalCharacters: 120, minimumTextAnimationWindow: 0.24)
+        let shortTextTiming = baseTiming.next(totalCharacters: 20, minimumTextAnimationWindow: 0.24)
+        let tinyTextTiming = baseTiming.next(totalCharacters: 6, minimumTextAnimationWindow: 0.24)
 
         #expect(regularTextTiming.charsPerStep == 6)
         #expect(shortTextTiming.charsPerStep == 1)
@@ -131,15 +121,21 @@ struct RevealSequencerProfileTests {
 
     @Test("Performance profile scales base timings")
     func performanceProfileScalesBaseTimings() {
-        let sequencer = RevealSequencer()
-        sequencer.applyConfiguration(typewriter: .balanced, performanceProfile: .balanced)
-        let balancedTiming = sequencer.resolvedTiming(forPendingTaskCount: 1)
-
-        sequencer.applyConfiguration(typewriter: .balanced, performanceProfile: .snappy)
-        let snappyTiming = sequencer.resolvedTiming(forPendingTaskCount: 1)
-
-        sequencer.applyConfiguration(typewriter: .balanced, performanceProfile: .longForm)
-        let longFormTiming = sequencer.resolvedTiming(forPendingTaskCount: 1)
+        let balancedTiming = RevealTiming(
+            pendingTaskCount: 1,
+            typewriterConfiguration: .balanced,
+            performanceProfile: .balanced
+        )
+        let snappyTiming = RevealTiming(
+            pendingTaskCount: 1,
+            typewriterConfiguration: .balanced,
+            performanceProfile: .snappy
+        )
+        let longFormTiming = RevealTiming(
+            pendingTaskCount: 1,
+            typewriterConfiguration: .balanced,
+            performanceProfile: .longForm
+        )
 
         #expect(snappyTiming.baseDuration < balancedTiming.baseDuration)
         #expect(longFormTiming.baseDuration > balancedTiming.baseDuration)

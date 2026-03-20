@@ -10,7 +10,7 @@ struct QuillViewLifecycleTests {
 
     @Test("append accumulates currentMarkdown")
     func appendAccumulatesMarkdown() async {
-        let view = makeHybridTailQuillView()
+        let view = makeStableBlocksQuillView()
 
         view.append("Hello ")
         #expect(view.currentMarkdown == "Hello ")
@@ -21,7 +21,7 @@ struct QuillViewLifecycleTests {
 
     @Test("cancelStreaming is idempotent")
     func cancelStreamingRemainsIdempotent() {
-        let view = makeHybridTailQuillView()
+        let view = makeStableBlocksQuillView()
 
         view.cancelStreaming()
         view.cancelStreaming()
@@ -35,7 +35,7 @@ struct QuillViewLifecycleTests {
 
     @Test("cancelStreaming then append auto-restarts stream")
     func appendAfterCancelRestartsStream() async {
-        let view = makeHybridTailQuillView()
+        let view = makeStableBlocksQuillView()
 
         view.append("First chunk")
         view.cancelStreaming()
@@ -53,18 +53,16 @@ struct QuillViewLifecycleTests {
     func customPresetClampsSpeedMultiplier() {
         let tooFastPreset = QuillStreamingPreset.custom(
             speedMultiplier: 3.0,
-            tailAggressiveness: .balanced,
             bufferingDelay: 1.0
         )
         let tooSlowPreset = QuillStreamingPreset.custom(
             speedMultiplier: 0.1,
-            tailAggressiveness: .balanced,
             bufferingDelay: 1.0
         )
 
-        let fastConfiguration = QuillConfigurationMapper.resolve(tooFastPreset)
-        let slowConfiguration = QuillConfigurationMapper.resolve(tooSlowPreset)
-        let balancedConfiguration = QuillConfigurationMapper.resolve(.balanced)
+        let fastConfiguration = RenderConfiguration(preset: tooFastPreset)
+        let slowConfiguration = RenderConfiguration(preset: tooSlowPreset)
+        let balancedConfiguration = RenderConfiguration(preset: .balanced)
 
         #expect(fastConfiguration.typewriter.lowQueue.baseDuration < balancedConfiguration.typewriter.lowQueue.baseDuration)
         #expect(slowConfiguration.typewriter.lowQueue.baseDuration > balancedConfiguration.typewriter.lowQueue.baseDuration)
@@ -77,7 +75,7 @@ struct QuillViewLifecycleTests {
 
     @Test("finish then append auto-restarts stream")
     func appendAfterFinishRestartsStream() async {
-        let view = makeHybridTailQuillView()
+        let view = makeStableBlocksQuillView()
 
         view.append("First paragraph\n\n")
         view.finish()
@@ -93,7 +91,7 @@ struct QuillViewLifecycleTests {
 
     @Test("finish is idempotent")
     func finishRemainsIdempotent() async {
-        let view = makeHybridTailQuillView()
+        let view = makeStableBlocksQuillView()
 
         view.append("Content\n\n")
         view.finish()
@@ -105,7 +103,7 @@ struct QuillViewLifecycleTests {
 
     @Test("preset change applies without crash")
     func presetSwitchPreservesUsableState() {
-        let view = QuillView(frame: CGRect(x: 0, y: 0, width: 320, height: 0), streamingPreset: .balanced)
+        let view = QuillView(frame: CGRect(x: 0, y: 0, width: 320, height: 0))
         view.streamingPreset = .snappy
         view.streamingPreset = .longForm
         view.streamingPreset = .balanced
@@ -115,7 +113,7 @@ struct QuillViewLifecycleTests {
 
     @Test("reset clears currentMarkdown and rendered content")
     func resetClearsContent() async {
-        let view = makeHybridTailQuillView()
+        let view = makeStableBlocksQuillView()
 
         view.append("Some content\n\nMore content\n\n")
 
@@ -126,7 +124,7 @@ struct QuillViewLifecycleTests {
 
     @Test("static markdown assignment syncs currentMarkdown")
     func markdownAssignmentSyncsCurrentMarkdown() {
-        let view = makeHybridTailQuillView()
+        let view = makeStableBlocksQuillView()
 
         view.markdown = "# Title"
         #expect(view.currentMarkdown == "# Title")
@@ -136,5 +134,33 @@ struct QuillViewLifecycleTests {
 
         view.markdown = nil
         #expect(view.currentMarkdown == nil)
+    }
+
+    @Test("static markdown assignment resets active reveal sequencing")
+    func markdownAssignmentResetsActiveRevealSequencing() async throws {
+        let view = makeStableBlocksQuillView()
+
+        view.append("First paragraph with a [link](https://example.com) and enough extra text to keep reveal active for a moment.\n\n")
+
+        let streamingRendered = await eventually {
+            guard let container = containerView(for: view) else { return false }
+            guard let flow = container.blockViews.first(where: { $0 is TextFlowView }) as? TextFlowView else { return false }
+            return flow.totalCharacterCount > 0 && flow.originalAttributedString != nil
+        }
+        #expect(streamingRendered)
+
+        view.markdown = "# Static Title\n\nStatic body."
+
+        let staticRendered = await eventually {
+            guard let container = containerView(for: view) else { return false }
+            guard container.blockViews.count == 1 else { return false }
+            guard let flow = container.blockViews.first as? TextFlowView else { return false }
+            return flow.totalCharacterCount == 0 && flow.originalAttributedString == nil
+        }
+        #expect(staticRendered)
+
+        let textFlowView = try #require(containerView(for: view)?.blockViews.first as? TextFlowView)
+        #expect(textFlowView.totalCharacterCount == 0)
+        #expect(textFlowView.originalAttributedString == nil)
     }
 }
