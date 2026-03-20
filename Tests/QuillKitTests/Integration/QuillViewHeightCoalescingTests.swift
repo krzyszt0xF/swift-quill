@@ -14,8 +14,7 @@ struct QuillViewHeightCoalescingTests {
             streamingMode: .stableBlocks,
             performanceProfile: .balanced,
             typewriter: .balanced,
-            layout: .init(heightMeasurementCoalescingInterval: 0.05),
-            tail: .default
+            layout: .init(heightMeasurementCoalescingInterval: 0.05)
         )
 
         let view = QuillView(

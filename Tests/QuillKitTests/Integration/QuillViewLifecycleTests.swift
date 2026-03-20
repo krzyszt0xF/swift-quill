@@ -10,7 +10,7 @@ struct QuillViewLifecycleTests {
 
     @Test("append accumulates currentMarkdown")
     func appendAccumulatesMarkdown() async {
-        let view = makeHybridTailQuillView()
+        let view = makeStableBlocksQuillView()
 
         view.append("Hello ")
         #expect(view.currentMarkdown == "Hello ")
@@ -21,7 +21,7 @@ struct QuillViewLifecycleTests {
 
     @Test("cancelStreaming is idempotent")
     func cancelStreamingRemainsIdempotent() {
-        let view = makeHybridTailQuillView()
+        let view = makeStableBlocksQuillView()
 
         view.cancelStreaming()
         view.cancelStreaming()
@@ -35,7 +35,7 @@ struct QuillViewLifecycleTests {
 
     @Test("cancelStreaming then append auto-restarts stream")
     func appendAfterCancelRestartsStream() async {
-        let view = makeHybridTailQuillView()
+        let view = makeStableBlocksQuillView()
 
         view.append("First chunk")
         view.cancelStreaming()
@@ -53,12 +53,10 @@ struct QuillViewLifecycleTests {
     func customPresetClampsSpeedMultiplier() {
         let tooFastPreset = QuillStreamingPreset.custom(
             speedMultiplier: 3.0,
-            tailAggressiveness: .balanced,
             bufferingDelay: 1.0
         )
         let tooSlowPreset = QuillStreamingPreset.custom(
             speedMultiplier: 0.1,
-            tailAggressiveness: .balanced,
             bufferingDelay: 1.0
         )
 
@@ -77,7 +75,7 @@ struct QuillViewLifecycleTests {
 
     @Test("finish then append auto-restarts stream")
     func appendAfterFinishRestartsStream() async {
-        let view = makeHybridTailQuillView()
+        let view = makeStableBlocksQuillView()
 
         view.append("First paragraph\n\n")
         view.finish()
@@ -93,7 +91,7 @@ struct QuillViewLifecycleTests {
 
     @Test("finish is idempotent")
     func finishRemainsIdempotent() async {
-        let view = makeHybridTailQuillView()
+        let view = makeStableBlocksQuillView()
 
         view.append("Content\n\n")
         view.finish()
@@ -115,7 +113,7 @@ struct QuillViewLifecycleTests {
 
     @Test("reset clears currentMarkdown and rendered content")
     func resetClearsContent() async {
-        let view = makeHybridTailQuillView()
+        let view = makeStableBlocksQuillView()
 
         view.append("Some content\n\nMore content\n\n")
 
@@ -126,7 +124,7 @@ struct QuillViewLifecycleTests {
 
     @Test("static markdown assignment syncs currentMarkdown")
     func markdownAssignmentSyncsCurrentMarkdown() {
-        let view = makeHybridTailQuillView()
+        let view = makeStableBlocksQuillView()
 
         view.markdown = "# Title"
         #expect(view.currentMarkdown == "# Title")

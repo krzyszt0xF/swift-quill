@@ -109,21 +109,6 @@ struct StreamingRendererTests {
         #expect(renderer.renderedBlockViews[1] is CodeBlockView)
     }
 
-    @Test("Compatible flow tail block can be promoted without exact equality")
-    func compatibleTailPromotionKeepsView() throws {
-        let renderer = makeStreamingBlockRenderer()
-        let previewBlock: Block = .paragraph(content: [.text("mutable frontier preview text")])
-        let frozenBlock: Block = .paragraph(content: [.text("mutable frontier preview text with closing context")])
-
-        renderer.updateTail(block: previewBlock)
-        let previewView = try #require(renderer.renderedBlockViews.last)
-
-        let promotedView = renderer.promoteTailIfMatching(frozenBlock)
-        #expect(promotedView === previewView)
-        #expect(renderer.renderedBlockViews.count == 1)
-        #expect(renderer.renderedBlockViews[0] === previewView)
-    }
-
     @Test("Reset allows fresh start")
     func resetAllowsFreshStart() {
         let renderer = makeStreamingBlockRenderer()
@@ -166,44 +151,8 @@ struct StreamingRendererTests {
         #expect(renderer.renderedBlockViews[0] is TextFlowView)
     }
 
-    @Test("Matching tail block is promoted without replacing the view")
-    func exactTailPromotionKeepsView() throws {
-        let renderer = makeStreamingBlockRenderer()
-        let tailBlock: Block = .paragraph(content: [.text("mutable frontier")])
-
-        renderer.updateTail(block: tailBlock)
-        let previewView = try #require(renderer.renderedBlockViews.last)
-
-        let promotedView = renderer.promoteTailIfMatching(tailBlock)
-        #expect(promotedView === previewView)
-        #expect(renderer.renderedBlockViews.count == 1)
-        #expect(renderer.renderedBlockViews[0] === previewView)
-
-        _ = renderer.append(blocks: [.codeBlock(language: nil, code: "let x = 1\n")])
-
-        #expect(renderer.renderedBlockViews.count == 2)
-        #expect(renderer.renderedBlockViews[0] === previewView)
-        #expect(renderer.renderedBlockViews[1] is CodeBlockView)
-    }
-
-    @Test("Table tail updates reuse the same placeholder view")
-    func tableTailUpdatesReuseView() throws {
-        let renderer = makeStreamingBlockRenderer()
-
-        let initialTableBlock = makeTableBlock(rowValues: [["alpha", "1"]])
-        let expandedTableBlock = makeTableBlock(rowValues: [["alpha", "1"], ["beta", "2"]])
-
-        renderer.updateTail(block: initialTableBlock)
-        let initialTailView = try #require(renderer.renderedBlockViews.last)
-
-        renderer.updateTail(block: expandedTableBlock)
-        let updatedTailView = try #require(renderer.renderedBlockViews.last)
-
-        #expect(initialTailView === updatedTailView)
-    }
-
-    @Test("Tail views are rebuilt not reused")
-    func tailUpdatesRebuildViews() {
+    @Test("Trailing unfrozen views are rebuilt not reused across snapshot updates")
+    func trailingUnfrozenViewsRebuildAcrossSnapshotUpdates() {
         let renderer = makeStreamingBlockRenderer()
 
         let initialBlocks: [Block] = [
@@ -213,7 +162,7 @@ struct StreamingRendererTests {
         ]
         renderer.update(blocks: initialBlocks, frozenCount: 2)
 
-        let initialTailView = renderer.renderedBlockViews[2]
+        let initialTrailingView = renderer.renderedBlockViews[2]
 
         let updatedBlocks: [Block] = [
             .paragraph(content: [.text("A")]),
@@ -222,8 +171,8 @@ struct StreamingRendererTests {
         ]
         renderer.update(blocks: updatedBlocks, frozenCount: 2)
 
-        let updatedTailView = renderer.renderedBlockViews[2]
-        #expect(initialTailView !== updatedTailView)
+        let updatedTrailingView = renderer.renderedBlockViews[2]
+        #expect(initialTrailingView !== updatedTrailingView)
     }
 
     @Test("Frozen prefix with three structural nodes preserved across updates")
@@ -255,8 +204,8 @@ struct StreamingRendererTests {
         #expect(renderer.renderedBlockViews[2] === trailingFlowView)
     }
 
-    @Test("Frozen views survive when tail is added")
-    func frozenViewsRemainStableWhenTailIsAdded() {
+    @Test("Frozen views survive when a trailing unfrozen view is added")
+    func frozenViewsRemainStableWhenTrailingViewIsAdded() {
         let renderer = makeStreamingBlockRenderer()
 
         let initialBlocks: [Block] = [
@@ -279,22 +228,5 @@ struct StreamingRendererTests {
         #expect(renderer.renderedBlockViews[0] === frozenFlowView)
         #expect(renderer.renderedBlockViews[1] === frozenCodeView)
         #expect(renderer.renderedBlockViews[2] is TextFlowView)
-    }
-}
-
-private extension StreamingRendererTests {
-    func makeTableBlock(rowValues: [[String]]) -> Block {
-        let header = Block.TableRow(cells: [
-            .init(content: [.text("name")]),
-            .init(content: [.text("value")]),
-        ])
-
-        let rows = rowValues.map { rowValues in
-            Block.TableRow(cells: rowValues.map { cellValue in
-                .init(content: [.text(cellValue)])
-            })
-        }
-
-        return .table(columnAlignments: [nil, nil], header: header, rows: rows)
     }
 }

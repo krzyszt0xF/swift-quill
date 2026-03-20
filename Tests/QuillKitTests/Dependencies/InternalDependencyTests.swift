@@ -51,8 +51,7 @@ struct InternalDependencyTests {
             streamingMode: .stableBlocks,
             performanceProfile: .balanced,
             typewriter: .balanced,
-            layout: .default,
-            tail: .default
+            layout: .default
         )
 
         coordinator.append(
@@ -95,8 +94,7 @@ struct InternalDependencyTests {
             streamingMode: .stableBlocks,
             performanceProfile: .balanced,
             typewriter: .balanced,
-            layout: .default,
-            tail: .default
+            layout: .default
         )
         let dependencies = QuillView.Dependencies(
             heightCoordinator: HeightCoordinator(),

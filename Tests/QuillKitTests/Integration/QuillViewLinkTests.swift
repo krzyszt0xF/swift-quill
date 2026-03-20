@@ -28,43 +28,6 @@ struct QuillViewLinkTests {
         #expect(tappedURL == URL(string: "https://example.com"))
     }
 
-    @Test("streaming tail link is tappable before promotion and after promotion")
-    func streamingTailLinkStaysTappableAcrossPromotion() async throws {
-        let view = makeHybridTailQuillView()
-        var tappedURLs: [URL] = []
-
-        view.onLinkTap = { url in
-            tappedURLs.append(url)
-        }
-
-        view.append("[click](https://example.com)\n")
-
-        let tailRendered = await eventually {
-            guard let container = containerView(for: view) else { return false }
-            guard let flow = container.blockViews.first(where: { $0 is TextFlowView }) as? TextFlowView else { return false }
-            return checkFlowViewIsLaidOut(flow, in: view)
-        }
-        #expect(tailRendered)
-
-        let initialFlowView = try #require(containerView(for: view)?.blockViews.first as? TextFlowView)
-        initialFlowView.handleTap(at: makeTapPoint(in: initialFlowView, rootView: view))
-
-        view.append("\n\nNext paragraph\n")
-
-        let promoted = await eventually {
-            guard let container = containerView(for: view) else { return false }
-            return container.blockViews.contains(where: { $0 === initialFlowView }) && container.blockViews.count >= 2
-        }
-        #expect(promoted)
-
-        initialFlowView.handleTap(at: makeTapPoint(in: initialFlowView, rootView: view))
-
-        #expect(tappedURLs == [
-            URL(string: "https://example.com"),
-            URL(string: "https://example.com"),
-        ].compactMap { $0 })
-    }
-
     @Test("replacement flow views inherit current handler")
     func replacementFlowViewsInheritCurrentHandler() async throws {
         let view = makeStableBlocksQuillView()

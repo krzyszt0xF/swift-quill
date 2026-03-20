@@ -85,7 +85,7 @@ public final class QuillView: UIView {
     }
 
     public func cancelStreaming() {
-        streamCoordinator.cancelStreaming(configuration: configuration)
+        streamCoordinator.cancelStreaming()
     }
 
     public func finish() {

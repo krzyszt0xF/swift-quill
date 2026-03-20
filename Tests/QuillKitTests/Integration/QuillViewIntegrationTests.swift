@@ -50,8 +50,8 @@ struct QuillViewIntegrationTests {
         #expect(streamedSignatures.contains("table"))
     }
 
-    @Test("finish flushes buffered tail content")
-    func finishFlushesBufferedTail() async {
+    @Test("finish flushes buffered incomplete content")
+    func finishFlushesBufferedIncompleteContent() async {
         let view = makeStableBlocksQuillView()
         let incompleteMarkdown = "# Title\n\n```swift\nlet x = 1"
         let markdownChunks = incompleteMarkdown.chunked(sizes: [5, 8, 6])

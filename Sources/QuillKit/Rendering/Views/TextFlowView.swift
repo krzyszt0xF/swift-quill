@@ -253,6 +253,12 @@ final class TextFlowView: UIView {
 }
 
 private extension TextFlowView {
+    enum StreamingRevealStep {
+        case done
+        case reveal(index: Int, delay: TimeInterval)
+        case sleep(TimeInterval)
+    }
+
     @objc func handleTapGesture(_ recognizer: UITapGestureRecognizer) {
         guard recognizer.state == .ended else { return }
         handleTap(at: recognizer.location(in: self))
@@ -280,38 +286,50 @@ private extension TextFlowView {
         let stepDelay = revealController.fadeStepDelay()
         let taskID = UUID()
 
-        let task = Task { @MainActor [weak self] in
-            defer { self?.revealFadeTasks[taskID] = nil }
-
-            if stepDelay > 0 {
-                try? await Task.sleep(for: .seconds(stepDelay))
-            }
-
-            guard let self,
-                  !Task.isCancelled,
-                  self.revealController.revealFadeGeneration == generation else {
-                return
-            }
-
-            self.revealController.applyAttributes(in: revealRange, alphaMultiplier: midpointAlpha)
-            if let workingAttributedString = self.revealController.workingAttributedString {
-                self.textContentStorage.attributedString = workingAttributedString
-                self.setNeedsDisplay()
+        let task = Task { [weak self] in
+            defer {
+                Task { @MainActor [weak self] in
+                    self?.revealFadeTasks[taskID] = nil
+                }
             }
 
             if stepDelay > 0 {
                 try? await Task.sleep(for: .seconds(stepDelay))
             }
 
-            guard !Task.isCancelled,
-                  self.revealController.revealFadeGeneration == generation else {
-                return
+            let appliedMidpoint = await MainActor.run { [weak self] in
+                guard let self,
+                      !Task.isCancelled,
+                      self.revealController.revealFadeGeneration == generation else {
+                    return false
+                }
+
+                self.revealController.applyAttributes(in: revealRange, alphaMultiplier: midpointAlpha)
+                if let workingAttributedString = self.revealController.workingAttributedString {
+                    self.textContentStorage.attributedString = workingAttributedString
+                    self.setNeedsDisplay()
+                }
+
+                return true
+            }
+            guard appliedMidpoint else { return }
+
+            if stepDelay > 0 {
+                try? await Task.sleep(for: .seconds(stepDelay))
             }
 
-            self.revealController.applyAttributes(in: revealRange, alphaMultiplier: nil)
-            if let workingAttributedString = self.revealController.workingAttributedString {
-                self.textContentStorage.attributedString = workingAttributedString
-                self.setNeedsDisplay()
+            await MainActor.run { [weak self] in
+                guard let self,
+                      !Task.isCancelled,
+                      self.revealController.revealFadeGeneration == generation else {
+                    return
+                }
+
+                self.revealController.applyAttributes(in: revealRange, alphaMultiplier: nil)
+                if let workingAttributedString = self.revealController.workingAttributedString {
+                    self.textContentStorage.attributedString = workingAttributedString
+                    self.setNeedsDisplay()
+                }
             }
         }
 
@@ -354,13 +372,16 @@ private extension TextFlowView {
         let remaining = max(0.001, maxStartDelay - elapsed)
 
         deferredStreamingStartTask?.cancel()
-        deferredStreamingStartTask = Task { @MainActor [weak self] in
+        deferredStreamingStartTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(remaining))
-            guard let self, !Task.isCancelled else { return }
 
-            self.revealController.pendingStreamingStartTime = nil
-            self.deferredStreamingStartTask = nil
-            self.startStreamingRevealIfNeeded()
+            await MainActor.run { [weak self] in
+                guard let self, !Task.isCancelled else { return }
+
+                self.revealController.pendingStreamingStartTime = nil
+                self.deferredStreamingStartTask = nil
+                self.startStreamingRevealIfNeeded()
+            }
         }
     }
 
@@ -371,51 +392,66 @@ private extension TextFlowView {
             return
         }
 
-        streamingRevealTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-
-            while !Task.isCancelled {
-                guard let profile = self.revealController.streamingProfile,
-                      let originalAttributedString = self.revealController.originalAttributedString
-                else {
-                    break
+        streamingRevealTask = Task { [weak self] in
+            streamingLoop: while !Task.isCancelled {
+                let step = await MainActor.run { [weak self] in
+                    self?.makeStreamingRevealStep() ?? .done
                 }
 
-                let totalCharacters = originalAttributedString.length
-                if self.revealController.lastRevealedIndex >= totalCharacters {
-                    let now = Date.timeIntervalSinceReferenceDate
-                    let idleSinceLastUpdate = now - (self.revealController.lastStreamingUpdateTime ?? now)
-                    if idleSinceLastUpdate >= self.revealController.streamingIdleTimeout {
-                        self.revealController.setOriginalAttributedString(nil)
-                        self.revealController.workingAttributedString = nil
-                        self.revealController.streamingProfile = nil
-                        self.streamingRevealTask = nil
-                        return
+                switch step {
+                case .done:
+                    break streamingLoop
+                case let .reveal(index, delay):
+                    try? await Task.sleep(for: .seconds(delay))
+                    guard !Task.isCancelled else { break streamingLoop }
+
+                    await MainActor.run { [weak self] in
+                        self?.revealCharacters(upTo: index)
                     }
-
-                    let revealPollInterval = TimeInterval(0.016)
-                    try? await Task.sleep(for: .seconds(revealPollInterval))
-                    continue
+                case let .sleep(delay):
+                    try? await Task.sleep(for: .seconds(delay))
                 }
-
-                let nextIndex = min(self.revealController.lastRevealedIndex + profile.charsPerStep, totalCharacters)
-                let delayDuration = self.revealController.streamingDelay(
-                    in: originalAttributedString.string as NSString,
-                    from: self.revealController.lastRevealedIndex,
-                    to: nextIndex,
-                    baseDuration: profile.baseDuration,
-                    commaPause: profile.commaPause,
-                    jitterMax: profile.jitterMax,
-                    sentencePause: profile.sentencePause
-                )
-
-                try? await Task.sleep(for: .seconds(delayDuration))
-                guard !Task.isCancelled else { return }
-                self.revealCharacters(upTo: nextIndex)
             }
 
-            self.streamingRevealTask = nil
+            await MainActor.run { [weak self] in
+                self?.streamingRevealTask = nil
+            }
         }
+    }
+
+    func makeStreamingRevealStep() -> StreamingRevealStep {
+        guard let profile = revealController.streamingProfile,
+              let originalAttributedString = revealController.originalAttributedString
+        else {
+            return .done
+        }
+
+        let totalCharacters = originalAttributedString.length
+        if revealController.lastRevealedIndex >= totalCharacters {
+            let now = Date.timeIntervalSinceReferenceDate
+            let idleSinceLastUpdate = now - (revealController.lastStreamingUpdateTime ?? now)
+            if idleSinceLastUpdate >= revealController.streamingIdleTimeout {
+                revealController.setOriginalAttributedString(nil)
+                revealController.workingAttributedString = nil
+                revealController.streamingProfile = nil
+                return .done
+            }
+
+            return .sleep(0.016)
+        }
+
+        let nextIndex = min(revealController.lastRevealedIndex + profile.charsPerStep, totalCharacters)
+        let delayDuration = revealController.streamingDelay(
+            in: originalAttributedString.string as NSString,
+            from: revealController.lastRevealedIndex,
+            to: nextIndex,
+            baseDuration: profile.baseDuration,
+            commaPause: profile.commaPause,
+            jitterMax: profile.jitterMax,
+            sentencePause: profile.sentencePause
+        )
+
+        return .reveal(index: nextIndex, delay: delayDuration)
     }
 
     func setupTextContainer() {

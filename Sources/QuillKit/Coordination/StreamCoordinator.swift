@@ -24,13 +24,11 @@ final class StreamCoordinator {
     private let makeStreamController: () -> MarkdownStreamController
     private var moduleStreamGate: ModuleStreamGate
     private let now: () -> TimeInterval
-    private var pendingTailBlock: Block?
     private let renderer: StreamingBlockRenderer
     private let sequencer: RevealSequencer
     private let sleep: (Duration) async -> Void
     private var streamGeneration = 0
     private var streamTask: Task<Void, Never>?
-    private var tailUpdateTask: Task<Void, Never>?
     
     init(
         renderer: StreamingBlockRenderer,
@@ -53,7 +51,6 @@ final class StreamCoordinator {
         bufferingFlushTask?.cancel()
         finishTask?.cancel()
         streamTask?.cancel()
-        tailUpdateTask?.cancel()
     }
 }
 
@@ -92,7 +89,6 @@ extension StreamCoordinator {
     }
 
     func applyConfiguration(_ configuration: RenderConfiguration) {
-        renderer.tailConfiguration = configuration.tail
         moduleStreamGate.updateConfiguration(
             ModuleStreamGateConfiguration(
                 minModuleLength: configuration.bufferedStream.minModuleLength,
@@ -107,29 +103,10 @@ extension StreamCoordinator {
             cancelBufferedFlush()
             moduleStreamGate.reset()
         }
-
-        if configuration.streamingMode == .stableBlocks
-            || configuration.streamingMode == .bufferedModules {
-            cancelTailUpdate()
-            renderer.clearTail()
-            onHeightInvalidated?()
-        }
     }
 
-    func cancelStreaming(configuration: RenderConfiguration) {
-        streamTask?.cancel()
-        streamTask = nil
-        finishTask?.cancel()
-        finishTask = nil
-        appendTask?.cancel()
-        appendTask = nil
-        cancelBufferedFlush()
-        moduleStreamGate.reset()
-        cancelTailUpdate()
-        controller = nil
-        streamGeneration += 1
-        sequencer.reset()
-        renderer.clearTail()
+    func cancelStreaming() {
+        cancelAllTasks()
         onHeightInvalidated?()
     }
 
@@ -159,8 +136,6 @@ extension StreamCoordinator {
             await streamController.finish()
             await task?.value
             guard self.streamGeneration == generation else { return }
-            
-            self.renderer.clearTail()
             self.onHeightInvalidated?()
         }
     }
@@ -171,10 +146,16 @@ extension StreamCoordinator {
     }
 
     func reset() {
-        resetStreamRendering()
+        cancelAllTasks()
+        renderer.reset()
+        renderedFrozenCount = 0
     }
+}
 
-    func resetStreamRendering() {
+// MARK: - Task Management
+
+private extension StreamCoordinator {
+    func cancelAllTasks() {
         streamTask?.cancel()
         streamTask = nil
         finishTask?.cancel()
@@ -183,19 +164,11 @@ extension StreamCoordinator {
         appendTask = nil
         cancelBufferedFlush()
         moduleStreamGate.reset()
-        cancelTailUpdate()
         controller = nil
         streamGeneration += 1
         sequencer.reset()
-
-        renderer.reset()
-        renderedFrozenCount = 0
     }
-}
 
-// MARK: - Stream Task
-
-private extension StreamCoordinator {
     func bindLayoutCallbacks() {
         sequencer.onLayoutChange = { [weak self] view in
             if let self, let view {
@@ -209,7 +182,7 @@ private extension StreamCoordinator {
     }
 
     func startStream(bootstrap: String? = nil, configuration: RenderConfiguration) {
-        cancelStreaming(configuration: configuration)
+        cancelStreaming()
 
         let streamController = makeStreamController()
         controller = streamController
@@ -230,15 +203,7 @@ private extension StreamCoordinator {
                 let newFrozen = state.frozenCount
 
                 if newFrozen > self.renderedFrozenCount {
-                    var newBlocks = Array(state.blocks[self.renderedFrozenCount..<newFrozen])
-                    let firstFrozenBlock = newBlocks.first
-                    let promotedTail = self.promoteTailIfPossible(
-                        firstFrozenBlock: firstFrozenBlock,
-                        configuration: configuration
-                    )
-                    if promotedTail {
-                        newBlocks.removeFirst()
-                    }
+                    let newBlocks = Array(state.blocks[self.renderedFrozenCount..<newFrozen])
 
                     self.renderedFrozenCount = newFrozen
 
@@ -246,15 +211,8 @@ private extension StreamCoordinator {
                     for view in views {
                         self.sequencer.enqueue(view: view)
                     }
-
-                    if !promotedTail,
-                       configuration.streamingMode == .hybridTail,
-                       firstFrozenBlock != nil {
-                        self.renderer.clearTail()
-                    }
+                    self.onHeightInvalidated?()
                 }
-
-                self.updateTailPreview(for: state, configuration: configuration)
             }
         }
     }
@@ -357,102 +315,6 @@ private extension StreamCoordinator {
     ) {
         for chunk in chunks where chunk.isEmpty == false {
             enqueueAppendChunk(chunk, to: streamController)
-        }
-    }
-}
-
-// MARK: - Tail Rendering
-
-private extension StreamCoordinator {
-    func cancelTailUpdate() {
-        tailUpdateTask?.cancel()
-        tailUpdateTask = nil
-        pendingTailBlock = nil
-    }
-
-    func promoteTailIfPossible(
-        firstFrozenBlock: Block?,
-        configuration: RenderConfiguration
-    ) -> Bool {
-        guard configuration.streamingMode == .hybridTail,
-              let firstFrozenBlock,
-              renderer.promoteTailIfMatching(firstFrozenBlock) != nil
-        else {
-            return false
-        }
-
-        sequencer.enqueue(view: renderer.hostView)
-        return true
-    }
-
-    func updateTailPreview(
-        for state: BlockReducer.ReducerState,
-        configuration: RenderConfiguration
-    ) {
-        guard configuration.streamingMode == .hybridTail else {
-            cancelTailUpdate()
-            renderer.clearTail()
-            return
-        }
-
-        if state.blocks.count > state.frozenCount,
-           let tailBlock = BlockReducer.makeTailPreview(from: state) {
-            if shouldApplyTailImmediately(tailBlock, configuration: configuration) {
-                cancelTailUpdate()
-                renderer.updateTail(block: tailBlock)
-                onHeightInvalidated?()
-            } else {
-                scheduleTailUpdate(block: tailBlock, configuration: configuration)
-            }
-        } else {
-            cancelTailUpdate()
-            renderer.clearTail()
-            onHeightInvalidated?()
-        }
-    }
-
-    func scheduleTailUpdate(
-        block: Block,
-        configuration: RenderConfiguration
-    ) {
-        pendingTailBlock = block
-        guard tailUpdateTask == nil else { return }
-
-        let generation = streamGeneration
-        let coalescingInterval = max(0, configuration.tail.flowTailUpdateCoalescingInterval)
-        
-        tailUpdateTask = Task { [weak self] in
-            guard let self else { return }
-            defer { self.tailUpdateTask = nil }
-
-            if coalescingInterval > 0 {
-                await self.sleep(.seconds(coalescingInterval))
-            }
-
-            guard !Task.isCancelled, self.streamGeneration == generation else { return }
-            
-            let latestTailBlock = self.pendingTailBlock
-            self.pendingTailBlock = nil
-            guard let latestTailBlock else { return }
-            
-            self.renderer.updateTail(block: latestTailBlock)
-            self.onHeightInvalidated?()
-        }
-    }
-
-    func shouldApplyTailImmediately(
-        _ block: Block,
-        configuration: RenderConfiguration
-    ) -> Bool {
-        guard configuration.tail.flowTailUpdateCoalescingInterval > 0 else {
-            return true
-        }
-
-        switch block {
-        case .codeBlock, .table:
-            return true
-        case .blockquote, .heading, .htmlBlock, .orderedList, .paragraph, .thematicBreak, .unorderedList:
-            return false
         }
     }
 }

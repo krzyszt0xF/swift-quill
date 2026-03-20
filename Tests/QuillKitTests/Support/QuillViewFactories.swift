@@ -19,11 +19,6 @@ func makeBufferedModulesQuillView(
 }
 
 @MainActor
-func makeHybridTailQuillView() -> QuillView {
-    makeQuillView(mode: .hybridTail)
-}
-
-@MainActor
 func makeQuillView(
     mode: StreamingMode = .stableBlocks,
     bufferedStreamConfiguration: BufferedStreamConfiguration? = nil
@@ -33,7 +28,7 @@ func makeQuillView(
         performanceProfile: .balanced,
         typewriter: .balanced,
         layout: .init(heightMeasurementCoalescingInterval: 0.005),
-        tail: .default
+        bufferedStream: .default
     )
 
     if mode == .bufferedModules {

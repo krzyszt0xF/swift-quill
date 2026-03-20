@@ -55,8 +55,8 @@ struct BlockStateDiffTests {
         #expect(newStateIDs[1] != oldStateIDs[1])
     }
 
-    @Test("Frozen prefix immutability: no operations target frozen indices on tail update")
-    func frozenPrefixRemainsImmutableDuringTailUpdate() {
+    @Test("Frozen prefix remains immutable when a trailing block appears in a later snapshot")
+    func frozenPrefixRemainsImmutableWhenSnapshotGrows() {
         let renderer = makeStreamingBlockRenderer()
 
         let initialBlocks: [Block] = [

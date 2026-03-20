@@ -66,16 +66,6 @@ package enum BlockReducer {
         case .thematicBreak:
             emitBlock(.thematicBreak, state: &state)
         }
-
-        if let tail = TailPreviewBuilder.buildTailPreview(state: state) {
-            state.blocks.append(tail)
-        }
-    }
-}
-
-package extension BlockReducer {
-    static func makeTailPreview(from state: ReducerState) -> Block? {
-        TailPreviewBuilder.buildTailPreview(state: state)
     }
 }
 
