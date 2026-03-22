@@ -2,10 +2,10 @@ import QuillCore
 import UIKit
 
 enum AttributedStringBuilder {
-    static func build(from segment: RenderNode.FlowSegment) -> NSAttributedString {
+    static func build(from blocks: [Block]) -> NSAttributedString {
         let result = NSMutableAttributedString()
 
-        for (index, block) in segment.blocks.enumerated() {
+        for (index, block) in blocks.enumerated() {
             if index > 0 {
                 result.append(NSAttributedString(string: "\n"))
             }
@@ -14,9 +14,84 @@ enum AttributedStringBuilder {
 
         return result
     }
+
+    static func buildDocumentFragments(
+        from nodes: [BlockNode],
+        frozenCount: Int
+    ) -> [DocumentFragment] {
+        var fragments: [DocumentFragment] = []
+
+        for (index, node) in nodes.enumerated() {
+            let block = node.block
+            let blockID = node.id
+            let isFrozen = index < frozenCount
+
+            switch block {
+            case let .codeBlock(language, code):
+                if isFrozen {
+                    let attachment = CodeBlockAttachment(blockID: blockID, language: language, code: code)
+                    let attachmentString = NSMutableAttributedString(attachment: attachment)
+                    let style = NSMutableParagraphStyle()
+                    style.paragraphSpacingBefore = 8
+                    attachmentString.addAttribute(
+                        .paragraphStyle,
+                        value: style,
+                        range: NSRange(location: 0, length: attachmentString.length)
+                    )
+                    fragments.append(DocumentFragment(
+                        attributedString: attachmentString,
+                        blockID: blockID
+                    ))
+                } else {
+                    fragments.append(DocumentFragment(
+                        attributedString: openCodeFenceAttributedString(code: code),
+                        blockID: blockID
+                    ))
+                }
+            case let .table(_, header, rows):
+                fragments.append(DocumentFragment(
+                    attributedString: tableFallbackAttributedString(header: header, rows: rows),
+                    blockID: blockID
+                ))
+            default:
+                let attrString = attributedString(for: block, nestingContext: .root)
+                guard attrString.length > 0 else { continue }
+                fragments.append(DocumentFragment(
+                    attributedString: attrString,
+                    blockID: blockID
+                ))
+            }
+        }
+
+        return fragments
+    }
+
+    static func buildDocument(from fragments: [DocumentFragment]) -> NSAttributedString {
+        let result = NSMutableAttributedString()
+
+        for (index, fragment) in fragments.enumerated() {
+            if index > 0 {
+                result.append(NSAttributedString(string: "\n"))
+            }
+            let fragmentString = NSMutableAttributedString(attributedString: fragment.attributedString)
+            let fullRange = NSRange(location: 0, length: fragmentString.length)
+            fragmentString.addAttribute(.blockID, value: fragment.blockID, range: fullRange)
+            result.append(fragmentString)
+        }
+
+        return result
+    }
+}
+
+extension AttributedStringBuilder {
+    struct DocumentFragment {
+        let attributedString: NSAttributedString
+        let blockID: BlockIdentity
+    }
 }
 
 extension NSAttributedString.Key {
+    static let blockID = NSAttributedString.Key("quill.blockID")
     static let blockquoteDepth = NSAttributedString.Key("quill.blockquoteDepth")
     static let structuralMarker = NSAttributedString.Key("quill.structuralMarker")
 }
@@ -38,8 +113,8 @@ private extension AttributedStringBuilder {
             return orderedListAttributedString(startIndex: startIndex, items: items, nestingContext: nestingContext)
         case let .paragraph(content):
             return paragraphAttributedString(content: content, nestingContext: nestingContext)
-        case .table:
-            return NSAttributedString()
+        case let .table(_, header, rows):
+            return tableFallbackAttributedString(header: header, rows: rows)
         case .thematicBreak:
             return thematicBreakAttributedString()
         case let .unorderedList(items):
@@ -47,7 +122,7 @@ private extension AttributedStringBuilder {
         }
     }
 
-    static func blockquoteAttributedString(children: [Block], nestingContext: NestingContext) -> NSAttributedString {
+    static func blockquoteAttributedString(children: [BlockNode], nestingContext: NestingContext) -> NSAttributedString {
         let nestedContext = NestingContext(
             blockquoteDepth: nestingContext.blockquoteDepth + 1,
             listLevel: 0
@@ -57,7 +132,7 @@ private extension AttributedStringBuilder {
             if index > 0 {
                 result.append(NSAttributedString(string: "\n"))
             }
-            result.append(attributedString(for: child, nestingContext: nestedContext))
+            result.append(attributedString(for: child.block, nestingContext: nestedContext))
         }
 
         let fullRange = NSRange(location: 0, length: result.length)
@@ -100,6 +175,21 @@ private extension AttributedStringBuilder {
         return result
     }
 
+    static func openCodeFenceAttributedString(code: String) -> NSAttributedString {
+        let monoFont = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+        let displayCode = code.hasSuffix("\n") ? String(code.dropLast()) : code
+        let result = NSMutableAttributedString(string: displayCode, attributes: [
+            .font: monoFont,
+            .foregroundColor: UIColor.label,
+        ])
+
+        let style = NSMutableParagraphStyle()
+        style.paragraphSpacingBefore = 8
+        result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
+
+        return result
+    }
+
     static func orderedListAttributedString(startIndex: UInt, items: [Block.ListItem], nestingContext: NestingContext) -> NSAttributedString {
         let bodyFont = UIFont.systemFont(ofSize: 16)
         let result = NSMutableAttributedString()
@@ -128,14 +218,14 @@ private extension AttributedStringBuilder {
                 listLevel: nestingContext.listLevel + 1
             )
             for (childIndex, child) in item.children.enumerated() {
-                if childIndex == 0, case let .paragraph(content) = child {
+                if childIndex == 0, case let .paragraph(content) = child.block {
                     for inline in content {
                         itemResult.append(attributedString(for: inline, baseFont: bodyFont))
                     }
                     itemResult.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: itemResult.length))
                 } else {
                     itemResult.append(NSAttributedString(string: "\n"))
-                    itemResult.append(attributedString(for: child, nestingContext: childContext))
+                    itemResult.append(attributedString(for: child.block, nestingContext: childContext))
                 }
             }
 
@@ -155,6 +245,34 @@ private extension AttributedStringBuilder {
         let style = NSMutableParagraphStyle()
         style.paragraphSpacingBefore = 8
         applyBlockquoteIndent(to: style, nestingContext: nestingContext)
+        result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
+
+        return result
+    }
+
+    static func tableFallbackAttributedString(header: Block.TableRow, rows: [Block.TableRow]) -> NSAttributedString {
+        let monoFont = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+        var lines: [String] = []
+
+        let headerCells = header.cells.map { plainText(from: $0.content) }
+        lines.append("| " + headerCells.joined(separator: " | ") + " |")
+
+        let separator = "| " + headerCells.map { String(repeating: "-", count: max($0.count, 3)) }.joined(separator: " | ") + " |"
+        lines.append(separator)
+
+        for row in rows {
+            let cells = row.cells.map { plainText(from: $0.content) }
+            lines.append("| " + cells.joined(separator: " | ") + " |")
+        }
+
+        let tableText = lines.joined(separator: "\n")
+        let result = NSMutableAttributedString(string: tableText, attributes: [
+            .font: monoFont,
+            .foregroundColor: UIColor.label,
+        ])
+
+        let style = NSMutableParagraphStyle()
+        style.paragraphSpacingBefore = 8
         result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
 
         return result
@@ -217,14 +335,14 @@ private extension AttributedStringBuilder {
                 listLevel: nestingContext.listLevel + 1
             )
             for (childIndex, child) in item.children.enumerated() {
-                if childIndex == 0, case let .paragraph(content) = child {
+                if childIndex == 0, case let .paragraph(content) = child.block {
                     for inline in content {
                         itemResult.append(attributedString(for: inline, baseFont: bodyFont))
                     }
                     itemResult.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: itemResult.length))
                 } else {
                     itemResult.append(NSAttributedString(string: "\n"))
-                    itemResult.append(attributedString(for: child, nestingContext: childContext))
+                    itemResult.append(attributedString(for: child.block, nestingContext: childContext))
                 }
             }
 
@@ -398,9 +516,7 @@ private extension AttributedStringBuilder {
     }
 
     static func applyBlockquoteIndent(to style: NSMutableParagraphStyle, nestingContext: NestingContext) {
-        guard nestingContext.blockquoteDepth > 0 else {
-            return
-        }
+        guard nestingContext.blockquoteDepth > 0 else { return }
 
         let indent = CGFloat(nestingContext.blockquoteDepth) * 16
         style.headIndent += indent

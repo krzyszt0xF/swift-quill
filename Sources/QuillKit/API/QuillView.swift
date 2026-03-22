@@ -4,13 +4,17 @@ import UIKit
 @MainActor
 public final class QuillView: UIView {
     public private(set) var currentMarkdown: String?
-    
+
     public var onHeightChange: ((_ old: CGFloat, _ new: CGFloat) -> Void)? {
         didSet { heightCoordinator.onHeightChange = onHeightChange }
     }
 
-    public var onLinkTap: ((URL) -> Void)? {
-        didSet { streamCoordinator.onLinkTap = onLinkTap }
+    public var onLinkSelection: ((URL) -> Void)? {
+        didSet { streamCoordinator.onLinkSelection = onLinkSelection }
+    }
+
+    public var syntaxHighlighter: (any SyntaxHighlighter)? {
+        didSet { streamCoordinator.syntaxHighlighter = syntaxHighlighter }
     }
 
     public var markdown: String? {
@@ -32,7 +36,7 @@ public final class QuillView: UIView {
     private let heightCoordinator: HeightCoordinator
     private let markdownParser: MarkdownParser
     private let streamCoordinator: StreamCoordinator
-    
+
     public convenience init(frame: CGRect = .zero, preset: QuillStreamingPreset) {
         self.init(frame: frame)
         self.streamingPreset = preset
@@ -56,7 +60,7 @@ public final class QuillView: UIView {
         super.init(coder: coder)
         setup()
     }
-    
+
     package init(
         frame: CGRect = .zero,
         configuration: RenderConfiguration,
@@ -130,24 +134,24 @@ private extension QuillView {
     func scheduleHeightUpdate() {
         heightCoordinator.scheduleHeightUpdate(
             hostView: self,
-            containerView: streamCoordinator.hostView,
+            documentTextView: streamCoordinator.hostView,
             configuration: configuration.layout
         )
     }
-    
-    func setup() {
-        let host = streamCoordinator.hostView
-        host.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(host)
 
-        let bottom = host.bottomAnchor.constraint(equalTo: bottomAnchor)
+    func setup() {
+        let documentView = streamCoordinator.hostView
+        documentView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(documentView)
+
+        let bottom = documentView.bottomAnchor.constraint(equalTo: bottomAnchor)
         bottom.priority = .defaultLow
 
         NSLayoutConstraint.activate([
             bottom,
-            host.leadingAnchor.constraint(equalTo: leadingAnchor),
-            host.topAnchor.constraint(equalTo: topAnchor),
-            host.trailingAnchor.constraint(equalTo: trailingAnchor),
+            documentView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            documentView.topAnchor.constraint(equalTo: topAnchor),
+            documentView.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])
 
         streamCoordinator.applyConfiguration(configuration)

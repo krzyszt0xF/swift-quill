@@ -1,9 +1,9 @@
 import Markdown
 
 package struct MarkdownParser: Sendable {
-    package var parse: @Sendable (String) -> [Block]
+    package var parse: @Sendable (String) -> [BlockNode]
 
-    package init(parse: @escaping @Sendable (String) -> [Block]) {
+    package init(parse: @escaping @Sendable (String) -> [BlockNode]) {
         self.parse = parse
     }
 }

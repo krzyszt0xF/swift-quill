@@ -4,51 +4,38 @@ import UIKit
 
 @MainActor
 final class StreamCoordinator {
-    var onHeightInvalidated: (() -> Void)?
-
     var hasActiveController: Bool { controller != nil }
-    var hostView: UIView { renderer.hostView }
-    var onLinkTap: ((URL) -> Void)? {
-        didSet {
-            renderer.onLinkTap = onLinkTap
-            renderer.rebindLinkTapHandlers()
-        }
+    var hostView: DocumentTextView { renderer.textView }
+    
+    var onHeightInvalidated: (() -> Void)?
+    var onLinkSelection: ((URL) -> Void)? {
+        didSet { renderer.textView.onLinkSelection = onLinkSelection }
+    }
+    var syntaxHighlighter: (any SyntaxHighlighter)? {
+        didSet { renderer.set(highlighter: syntaxHighlighter) }
     }
 
-    private(set) var renderedFrozenCount = 0
-
     private var appendTask: Task<Void, Never>?
-    private var bufferingFlushTask: Task<Void, Never>?
+    private let bufferedStreamCommitScheduler: BufferedStreamCommitScheduler
     private var controller: MarkdownStreamController?
     private var finishTask: Task<Void, Never>?
     private let makeStreamController: () -> MarkdownStreamController
-    private var moduleStreamGate: ModuleStreamGate
-    private let now: () -> TimeInterval
-    private let renderer: StreamingBlockRenderer
-    private let sequencer: RevealSequencer
-    private let sleep: (Duration) async -> Void
+    private let renderer: DocumentRenderer
     private var streamGeneration = 0
     private var streamTask: Task<Void, Never>?
-    
+
     init(
-        renderer: StreamingBlockRenderer,
-        sequencer: RevealSequencer,
-        moduleStreamGate: ModuleStreamGate,
-        now: @escaping () -> TimeInterval,
-        sleep: @escaping (Duration) async -> Void,
-        streamController: @escaping () -> MarkdownStreamController) {
-            makeStreamController = streamController
-            self.moduleStreamGate = moduleStreamGate
-            self.now = now
-            self.renderer = renderer
-            self.sequencer = sequencer
-            self.sleep = sleep
-            bindLayoutCallbacks()
-        }
-    
+        renderer: DocumentRenderer,
+        bufferedStreamCommitScheduler: BufferedStreamCommitScheduler,
+        streamController: @escaping () -> MarkdownStreamController
+    ) {
+        makeStreamController = streamController
+        self.bufferedStreamCommitScheduler = bufferedStreamCommitScheduler
+        self.renderer = renderer
+    }
+
     deinit {
         appendTask?.cancel()
-        bufferingFlushTask?.cancel()
         finishTask?.cancel()
         streamTask?.cancel()
     }
@@ -58,14 +45,8 @@ extension StreamCoordinator {
     static var live: StreamCoordinator {
         StreamCoordinator(
             renderer: .live,
-            sequencer: .live,
-            moduleStreamGate: .init(),
-            now: { Date.timeIntervalSinceReferenceDate },
-            sleep: { duration in
-                try? await Task.sleep(for: duration)
-            },
-            streamController: MarkdownStreamController.init
-        )
+            bufferedStreamCommitScheduler: .live,
+            streamController: MarkdownStreamController.init)
     }
 }
 
@@ -82,27 +63,14 @@ extension StreamCoordinator {
         guard let streamController = controller else { return }
 
         if configuration.streamingMode == .bufferedModules {
-            appendBufferedChunk(chunk, to: streamController, configuration: configuration)
+            appendBufferedChunk(chunk, to: streamController)
         } else {
             enqueueAppendChunk(chunk, to: streamController)
         }
     }
 
     func applyConfiguration(_ configuration: RenderConfiguration) {
-        moduleStreamGate.updateConfiguration(
-            ModuleStreamGateConfiguration(
-                minModuleLength: configuration.bufferedStream.minModuleLength,
-                maxBufferingDelay: configuration.bufferedStream.maxBufferingDelay
-            )
-        )
-        sequencer.applyConfiguration(typewriter: configuration.typewriter, performanceProfile: configuration.performanceProfile)
-        sequencer.setFixedTiming(configuration.streamingMode == .bufferedModules ? .buffered : nil)
-        sequencer.setMinimumTextAnimationWindow( configuration.streamingMode == .bufferedModules ? 0.4 : 0)
-
-        if configuration.streamingMode != .bufferedModules {
-            cancelBufferedFlush()
-            moduleStreamGate.reset()
-        }
+        bufferedStreamCommitScheduler.applyConfiguration(configuration)
     }
 
     func cancelStreaming() {
@@ -112,7 +80,7 @@ extension StreamCoordinator {
 
     func finish(configuration: RenderConfiguration) {
         guard let streamController = controller else { return }
-        
+
         controller = nil
         let task = streamTask
         let generation = streamGeneration
@@ -126,8 +94,7 @@ extension StreamCoordinator {
             await pendingAppendTask?.value
 
             if configuration.streamingMode == .bufferedModules {
-                self.cancelBufferedFlush()
-                let remaining = self.moduleStreamGate.flushRemaining()
+                let remaining = self.bufferedStreamCommitScheduler.flushRemaining()
                 if !remaining.isEmpty {
                     await streamController.append(remaining)
                 }
@@ -140,15 +107,14 @@ extension StreamCoordinator {
         }
     }
 
-    func renderStatic(blocks: [Block]) {
+    func renderStatic(blocks: [BlockNode]) {
         reset()
-        renderer.update(blocks: blocks, frozenCount: blocks.count)
+        renderer.render(blocks: blocks, frozenCount: blocks.count)
     }
 
     func reset() {
         cancelAllTasks()
         renderer.reset()
-        renderedFrozenCount = 0
     }
 }
 
@@ -162,23 +128,9 @@ private extension StreamCoordinator {
         finishTask = nil
         appendTask?.cancel()
         appendTask = nil
-        cancelBufferedFlush()
-        moduleStreamGate.reset()
+        bufferedStreamCommitScheduler.reset()
         controller = nil
         streamGeneration += 1
-        sequencer.reset()
-    }
-
-    func bindLayoutCallbacks() {
-        sequencer.onLayoutChange = { [weak self] view in
-            if let self, let view {
-                self.renderer.containerView.invalidateBlockLayout(for: view)
-            }
-            self?.onHeightInvalidated?()
-        }
-        sequencer.onComplete = { [weak self] in
-            self?.onHeightInvalidated?()
-        }
     }
 
     func startStream(bootstrap: String? = nil, configuration: RenderConfiguration) {
@@ -200,19 +152,8 @@ private extension StreamCoordinator {
                 guard !Task.isCancelled, let self, self.streamGeneration == generation else { break }
 
                 BlockReducer.apply(event, to: &state)
-                let newFrozen = state.frozenCount
-
-                if newFrozen > self.renderedFrozenCount {
-                    let newBlocks = Array(state.blocks[self.renderedFrozenCount..<newFrozen])
-
-                    self.renderedFrozenCount = newFrozen
-
-                    let views = self.renderer.append(blocks: newBlocks)
-                    for view in views {
-                        self.sequencer.enqueue(view: view)
-                    }
-                    self.onHeightInvalidated?()
-                }
+                self.renderer.render(blocks: state.blocks, frozenCount: state.frozenCount)
+                self.onHeightInvalidated?()
             }
         }
     }
@@ -223,71 +164,35 @@ private extension StreamCoordinator {
 private extension StreamCoordinator {
     func appendBufferedChunk(
         _ chunk: String,
-        to streamController: MarkdownStreamController,
-        configuration: RenderConfiguration
+        to streamController: MarkdownStreamController
     ) {
-        let currentTime = now()
-        let result = moduleStreamGate.append(
+        bufferedStreamCommitScheduler.append(
             chunk,
-            now: currentTime
+            generation: streamGeneration,
+            commitChunks: { [weak self] chunks in
+                self?.enqueueCommittedChunks(chunks, to: streamController)
+            },
+            onFlushDue: { [weak self] generation in
+                self?.flushBufferedChunks(generation: generation, to: streamController)
+            }
         )
-
-        enqueueCommittedChunks(result.committedChunks, to: streamController)
-
-        if result.hasPendingText {
-            scheduleBufferedFlushIfNeeded(
-                streamController: streamController,
-                now: currentTime,
-                configuration: configuration
-            )
-        } else {
-            cancelBufferedFlush()
-        }
     }
 
-    func cancelBufferedFlush() {
-        bufferingFlushTask?.cancel()
-        bufferingFlushTask = nil
-    }
-
-    func flushBufferedInputIfNeeded(
-        streamController: MarkdownStreamController,
-        configuration: RenderConfiguration
+    func flushBufferedChunks(
+        generation: Int,
+        to streamController: MarkdownStreamController
     ) {
-        let currentTime = now()
-        let chunks = moduleStreamGate.commitIfOverdue(now: currentTime)
-        enqueueCommittedChunks(chunks, to: streamController)
+        guard streamGeneration == generation else { return }
 
-        if moduleStreamGate.hasPendingText {
-            scheduleBufferedFlushIfNeeded(
-                streamController: streamController,
-                now: currentTime,
-                configuration: configuration
-            )
-        } else {
-            cancelBufferedFlush()
-        }
-    }
-
-    func scheduleBufferedFlushIfNeeded(
-        streamController: MarkdownStreamController,
-        now: TimeInterval,
-        configuration: RenderConfiguration
-    ) {
-        cancelBufferedFlush()
-        let generation = streamGeneration
-        let delay = moduleStreamGate.timeUntilForcedCommit(now: now) ?? 0.12
-        let effectiveDelay = max(0.05, delay)
-
-        bufferingFlushTask = Task { [weak self] in
-            guard let self else { return }
-            await self.sleep(.seconds(effectiveDelay))
-            guard !Task.isCancelled, self.streamGeneration == generation else { return }
-            self.flushBufferedInputIfNeeded(
-                streamController: streamController,
-                configuration: configuration
-            )
-        }
+        bufferedStreamCommitScheduler.flushIfNeeded(
+            generation: generation,
+            commitChunks: { [weak self] chunks in
+                self?.enqueueCommittedChunks(chunks, to: streamController)
+            },
+            onFlushDue: { [weak self] nextGeneration in
+                self?.flushBufferedChunks(generation: nextGeneration, to: streamController)
+            }
+        )
     }
 }
 
@@ -304,7 +209,7 @@ private extension StreamCoordinator {
         appendTask = Task {
             await priorTask?.value
             guard !Task.isCancelled else { return }
-            
+
             await streamController.append(chunk)
         }
     }

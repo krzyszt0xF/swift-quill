@@ -3,6 +3,8 @@ import SwiftUI
 
 /// Streaming markdown view backed by QuillView and driven by an AsyncSequence.
 public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable where S.Element == String {
+    @Environment(\.quillSyntaxHighlighter) private var syntaxHighlighter
+
     let chunks: S
     let linkTapHandler: ((URL) -> Void)?
     let mode: StreamingMode
@@ -57,8 +59,7 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
     }
 
     public func updateUIView(_ uiView: QuillView, context: Context) {
-        let coordinator = context.coordinator
-        applyConfiguration(to: coordinator.quillView)
+        applyConfiguration(to: context.coordinator.quillView)
     }
 
     public static func dismantleUIView(_ uiView: QuillView, coordinator: Coordinator) {
@@ -80,12 +81,13 @@ public extension QuillStreamView {
 
 extension QuillStreamView {
     func applyConfiguration(to view: QuillView) {
-        view.onLinkTap = linkTapHandler
-        
+        view.onLinkSelection = linkTapHandler
+        view.syntaxHighlighter = syntaxHighlighter
+
         if view.streamingPreset != preset {
             view.streamingPreset = preset
         }
-        
+
         if view.streamingMode != mode {
             view.streamingMode = mode
         }
