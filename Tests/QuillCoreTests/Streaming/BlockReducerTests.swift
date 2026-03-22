@@ -69,9 +69,9 @@ struct BlockReducerTests {
             .startListItem, .startParagraph, .text("item"), .endParagraph, .endListItem,
             .endList,
         ])
-        #expect(blocks == [.unorderedList(items: [
-            Block.ListItem(children: [.paragraph(content: [.text("item")])]),
-        ])])
+        #expect(canonicalBlocks(blocks) == canonicalBlocks([.unorderedList(items: [
+            makeItem(.paragraph(content: [.text("item")])),
+        ])]))
     }
 
     @Test("Ordered list")
@@ -82,10 +82,10 @@ struct BlockReducerTests {
             .startListItem, .startParagraph, .text("second"), .endParagraph, .endListItem,
             .endList,
         ])
-        #expect(blocks == [.orderedList(startIndex: 1, items: [
-            Block.ListItem(children: [.paragraph(content: [.text("first")])]),
-            Block.ListItem(children: [.paragraph(content: [.text("second")])]),
-        ])])
+        #expect(canonicalBlocks(blocks) == canonicalBlocks([.orderedList(startIndex: 1, items: [
+            makeItem(.paragraph(content: [.text("first")])),
+            makeItem(.paragraph(content: [.text("second")])),
+        ])]))
     }
 
     @Test("Task list keeps checkbox state")
@@ -96,10 +96,10 @@ struct BlockReducerTests {
             .startTaskListItem(checkbox: .unchecked), .startParagraph, .text("pending"), .endParagraph, .endListItem,
             .endList,
         ])
-        #expect(blocks == [.unorderedList(items: [
-            Block.ListItem(checkbox: .checked, children: [.paragraph(content: [.text("done")])]),
-            Block.ListItem(checkbox: .unchecked, children: [.paragraph(content: [.text("pending")])]),
-        ])])
+        #expect(canonicalBlocks(blocks) == canonicalBlocks([.unorderedList(items: [
+            makeItem(checkbox: .checked, .paragraph(content: [.text("done")])),
+            makeItem(checkbox: .unchecked, .paragraph(content: [.text("pending")])),
+        ])]))
     }
 
     // MARK: - Blockquotes
@@ -111,7 +111,7 @@ struct BlockReducerTests {
             .startParagraph, .text("quoted"), .endParagraph,
             .endBlockQuote,
         ])
-        #expect(blocks == [.blockquote(children: [.paragraph(content: [.text("quoted")])])])
+        #expect(canonicalBlocks(blocks) == canonicalBlocks([makeBlockquote(.paragraph(content: [.text("quoted")]))]))
     }
 
     // MARK: - Thematic Break
@@ -246,12 +246,12 @@ struct BlockReducerTests {
             .endListItem,
             .endList,
         ])
-        #expect(blocks == [.unorderedList(items: [
-            Block.ListItem(children: [
+        #expect(canonicalBlocks(blocks) == canonicalBlocks([.unorderedList(items: [
+            makeItem(
                 .paragraph(content: [.text("text")]),
                 .codeBlock(language: nil, code: "code\n"),
-            ]),
-        ])])
+            ),
+        ])]))
     }
 
     @Test("Nested list inside list item")
@@ -266,14 +266,14 @@ struct BlockReducerTests {
             .endListItem,
             .endList,
         ])
-        #expect(blocks == [.orderedList(startIndex: 1, items: [
-            Block.ListItem(children: [
+        #expect(canonicalBlocks(blocks) == canonicalBlocks([.orderedList(startIndex: 1, items: [
+            makeItem(
                 .paragraph(content: [.text("outer")]),
                 .unorderedList(items: [
-                    Block.ListItem(children: [.paragraph(content: [.text("inner")])]),
+                    makeItem(.paragraph(content: [.text("inner")]))
                 ]),
-            ]),
-        ])])
+            ),
+        ])]))
     }
 
     @Test("Blockquote with multiple children")
@@ -284,9 +284,9 @@ struct BlockReducerTests {
             .startParagraph, .text("second"), .endParagraph,
             .endBlockQuote,
         ])
-        #expect(blocks == [.blockquote(children: [
+        #expect(canonicalBlocks(blocks) == canonicalBlocks([makeBlockquote(
             .paragraph(content: [.text("first")]),
-            .paragraph(content: [.text("second")]),
-        ])])
+            .paragraph(content: [.text("second")])
+        )]))
     }
 }

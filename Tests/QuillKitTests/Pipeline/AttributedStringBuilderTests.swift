@@ -1,4 +1,5 @@
 import QuillCore
+import QuillCoreTestSupport
 @testable import QuillKit
 import Testing
 import UIKit
@@ -179,7 +180,7 @@ struct AttributedStringBuilderTests {
     @Test("List item link keeps link styling")
     func listItemLinkFormatting() {
         let items = [
-            Block.ListItem(children: [.paragraph(content: [.link(destination: "https://example.com", children: [.text("item")])])]),
+            makeItem(.paragraph(content: [.link(destination: "https://example.com", children: [.text("item")])])),
         ]
         let result = AttributedStringBuilder.build(from: segment(.unorderedList(items: items)))
         let linkIndex = (result.string as NSString).range(of: "item").location
@@ -195,9 +196,9 @@ struct AttributedStringBuilderTests {
 
     @Test("Blockquote link keeps link styling and blockquote depth")
     func blockquoteLinkFormatting() {
-        let blockquote = Block.blockquote(children: [
+        let blockquote = makeBlockquote(
             .paragraph(content: [.link(destination: "https://example.com", children: [.text("quoted")])])
-        ])
+        )
         let result = AttributedStringBuilder.build(from: segment(blockquote))
         let linkIndex = (result.string as NSString).range(of: "quoted").location
 
@@ -230,8 +231,8 @@ struct AttributedStringBuilderTests {
     @Test("Unordered list has bullet markers")
     func unorderedListMarkers() {
         let items = [
-            Block.ListItem(children: [.paragraph(content: [.text("alpha")])]),
-            Block.ListItem(children: [.paragraph(content: [.text("beta")])]),
+            makeItem(.paragraph(content: [.text("alpha")])),
+            makeItem(.paragraph(content: [.text("beta")])),
         ]
         let result = AttributedStringBuilder.build(from: segment(.unorderedList(items: items)))
         #expect(result.string.contains("+"))
@@ -242,8 +243,8 @@ struct AttributedStringBuilderTests {
     @Test("Ordered list has numbered markers")
     func orderedListMarkers() {
         let items = [
-            Block.ListItem(children: [.paragraph(content: [.text("first")])]),
-            Block.ListItem(children: [.paragraph(content: [.text("second")])]),
+            makeItem(.paragraph(content: [.text("first")])),
+            makeItem(.paragraph(content: [.text("second")])),
         ]
         let result = AttributedStringBuilder.build(from: segment(.orderedList(startIndex: 1, items: items)))
         #expect(result.string.contains("1."))
@@ -253,10 +254,10 @@ struct AttributedStringBuilderTests {
     @Test("Nested list has greater indentation than parent")
     func nestedListIndentation() {
         let innerList = Block.unorderedList(items: [
-            Block.ListItem(children: [.paragraph(content: [.text("nested")])])
+            makeItem(.paragraph(content: [.text("nested")]))
         ])
         let outerList = Block.unorderedList(items: [
-            Block.ListItem(children: [.paragraph(content: [.text("top")]), innerList])
+            makeItem(.paragraph(content: [.text("top")]), innerList)
         ])
         let result = AttributedStringBuilder.build(from: segment(outerList))
 
@@ -273,8 +274,8 @@ struct AttributedStringBuilderTests {
     @Test("Ordered list respects startIndex")
     func orderedListStartIndex() {
         let items = [
-            Block.ListItem(children: [.paragraph(content: [.text("a")])]),
-            Block.ListItem(children: [.paragraph(content: [.text("b")])]),
+            makeItem(.paragraph(content: [.text("a")])),
+            makeItem(.paragraph(content: [.text("b")])),
         ]
         let result = AttributedStringBuilder.build(from: segment(.orderedList(startIndex: 3, items: items)))
         #expect(result.string.contains("3."))
@@ -284,8 +285,8 @@ struct AttributedStringBuilderTests {
     @Test("Task list renders checkbox marker")
     func taskListMarker() {
         let items = [
-            Block.ListItem(checkbox: .checked, children: [.paragraph(content: [.text("done")])]),
-            Block.ListItem(checkbox: .unchecked, children: [.paragraph(content: [.text("pending")])]),
+            makeItem(checkbox: .checked, .paragraph(content: [.text("done")])),
+            makeItem(checkbox: .unchecked, .paragraph(content: [.text("pending")])),
         ]
         let result = AttributedStringBuilder.build(from: segment(.unorderedList(items: items)))
 
@@ -297,7 +298,7 @@ struct AttributedStringBuilderTests {
 
     @Test("Blockquote has greater indentation than plain text")
     func blockquoteIndentation() {
-        let blockquote = Block.blockquote(children: [.paragraph(content: [.text("quoted")])])
+        let blockquote = makeBlockquote(.paragraph(content: [.text("quoted")]))
         let plainParagraph = Block.paragraph(content: [.text("plain")])
         let result = AttributedStringBuilder.build(from: segment(blockquote, plainParagraph))
 
@@ -317,8 +318,8 @@ struct AttributedStringBuilderTests {
 
     @Test("Nested blockquote has greater indent than single")
     func nestedBlockquoteIndentation() {
-        let nestedBlockquote = Block.blockquote(children: [.paragraph(content: [.text("deep")])])
-        let outerBlockquote = Block.blockquote(children: [.paragraph(content: [.text("shallow")]), nestedBlockquote])
+        let nestedBlockquote = makeBlockquote(.paragraph(content: [.text("deep")]))
+        let outerBlockquote = makeBlockquote(.paragraph(content: [.text("shallow")]), nestedBlockquote)
         let result = AttributedStringBuilder.build(from: segment(outerBlockquote))
 
         let shallowRange = (result.string as NSString).range(of: "shallow")
@@ -332,7 +333,7 @@ struct AttributedStringBuilderTests {
 
     @Test("Blockquote carries blockquoteDepth custom attribute")
     func blockquoteDepthAttribute() {
-        let blockquote = Block.blockquote(children: [.paragraph(content: [.text("quoted")])])
+        let blockquote = makeBlockquote(.paragraph(content: [.text("quoted")]))
         let result = AttributedStringBuilder.build(from: segment(blockquote))
 
         let quotedRange = (result.string as NSString).range(of: "quoted")
@@ -345,7 +346,7 @@ struct AttributedStringBuilderTests {
     @Test("Unordered list has structuralMarker on bullet+tab characters")
     func unorderedListStructuralMarker() {
         let items = [
-            Block.ListItem(children: [.paragraph(content: [.text("alpha")])]),
+            makeItem(.paragraph(content: [.text("alpha")])),
         ]
         let result = AttributedStringBuilder.build(from: segment(.unorderedList(items: items)))
 
@@ -366,7 +367,7 @@ struct AttributedStringBuilderTests {
     @Test("Ordered list has structuralMarker on number+dot+tab characters")
     func orderedListStructuralMarker() {
         let items = [
-            Block.ListItem(children: [.paragraph(content: [.text("first")])]),
+            makeItem(.paragraph(content: [.text("first")])),
         ]
         let result = AttributedStringBuilder.build(from: segment(.orderedList(startIndex: 1, items: items)))
 
@@ -386,7 +387,7 @@ struct AttributedStringBuilderTests {
     @Test("Task list has structuralMarker on checkbox marker characters")
     func taskListStructuralMarker() {
         let items = [
-            Block.ListItem(checkbox: .checked, children: [.paragraph(content: [.text("first")])]),
+            makeItem(checkbox: .checked, .paragraph(content: [.text("first")])),
         ]
         let result = AttributedStringBuilder.build(from: segment(.unorderedList(items: items)))
 
@@ -416,7 +417,7 @@ struct AttributedStringBuilderTests {
 
     @Test("Blockquote does NOT have structuralMarker")
     func blockquoteNoStructuralMarker() {
-        let blockquote = Block.blockquote(children: [.paragraph(content: [.text("quoted")])])
+        let blockquote = makeBlockquote(.paragraph(content: [.text("quoted")]))
         let result = AttributedStringBuilder.build(from: segment(blockquote))
 
         var hasStructuralMarker = false
@@ -439,6 +440,190 @@ struct AttributedStringBuilderTests {
         }
         #expect(hasAttachment)
     }
+
+    // MARK: - Document Building Tests
+
+    @Test("Paragraph-only document produces one fragment per block")
+    func documentParagraphOnly() {
+        let blocks: [Block] = [
+            .paragraph(content: [.text("Hello")]),
+            .paragraph(content: [.text("World")]),
+        ]
+        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+
+        #expect(fragments.count == 2)
+        #expect(fragments[0].attributedString.string.contains("Hello"))
+        #expect(fragments[1].attributedString.string.contains("World"))
+    }
+
+    @Test("Closed code block produces CodeBlockAttachment fragment")
+    func documentClosedCodeBlock() {
+        let blocks: [Block] = [
+            .paragraph(content: [.text("Before")]),
+            .codeBlock(language: "swift", code: "let x = 1\n"),
+            .paragraph(content: [.text("After")]),
+        ]
+        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+
+        #expect(fragments.count == 3)
+
+        var foundCodeBlockAttachment = false
+        fragments[1].attributedString.enumerateAttribute(
+            .attachment,
+            in: NSRange(location: 0, length: fragments[1].attributedString.length)
+        ) { value, _, _ in
+            if value is CodeBlockAttachment { foundCodeBlockAttachment = true }
+        }
+        #expect(foundCodeBlockAttachment)
+    }
+
+    @Test("Open code fence renders as plain monospace text")
+    func documentOpenCodeFence() {
+        let blocks: [Block] = [
+            .paragraph(content: [.text("Before")]),
+            .codeBlock(language: "swift", code: "let x = 1\n"),
+        ]
+        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: 1)
+
+        #expect(fragments.count == 2)
+        #expect(fragments[1].attributedString.string.contains("let x = 1"))
+
+        var foundCodeBlockAttachment = false
+        fragments[1].attributedString.enumerateAttribute(
+            .attachment,
+            in: NSRange(location: 0, length: fragments[1].attributedString.length)
+        ) { value, _, _ in
+            if value is CodeBlockAttachment { foundCodeBlockAttachment = true }
+        }
+        #expect(foundCodeBlockAttachment == false)
+
+        let resultFont = font(in: fragments[1].attributedString)
+        #expect(resultFont?.fontDescriptor.symbolicTraits.contains(.traitMonoSpace) == true)
+    }
+
+    @Test("Table fallback renders visible plain text with pipe separators")
+    func documentTableFallback() {
+        let header = Block.TableRow(cells: [
+            Block.TableCell(content: [.text("Name")]),
+            Block.TableCell(content: [.text("Age")]),
+        ])
+        let rows = [
+            Block.TableRow(cells: [
+                Block.TableCell(content: [.text("Alice")]),
+                Block.TableCell(content: [.text("30")]),
+            ]),
+        ]
+        let blocks: [Block] = [
+            .table(columnAlignments: [nil, nil], header: header, rows: rows),
+        ]
+        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+
+        #expect(fragments.count == 1)
+
+        let text = fragments[0].attributedString.string
+        #expect(text.contains("Name"))
+        #expect(text.contains("Age"))
+        #expect(text.contains("Alice"))
+        #expect(text.contains("30"))
+        #expect(text.contains("|"))
+    }
+
+    @Test("Blockquote depth propagates in document fragments")
+    func documentBlockquoteDepth() {
+        let blocks: [Block] = [
+            makeBlockquote(makeBlockquote(.paragraph(content: [.text("deep")]))),
+        ]
+        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+
+        #expect(fragments.count == 1)
+
+        let deepRange = (fragments[0].attributedString.string as NSString).range(of: "deep")
+        let depth = fragments[0].attributedString.attribute(.blockquoteDepth, at: deepRange.location, effectiveRange: nil) as? Int
+        #expect(depth == 2)
+    }
+
+    @Test("Empty input produces no fragments")
+    func documentEmptyInput() {
+        let fragments = AttributedStringBuilder.buildDocumentFragments(from: [], frozenCount: 0)
+        #expect(fragments.isEmpty)
+    }
+
+    @Test("buildDocument concatenates fragments with newline separators")
+    func buildDocumentConcatenation() {
+        let blocks: [Block] = [
+            .paragraph(content: [.text("one")]),
+            .paragraph(content: [.text("two")]),
+        ]
+        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let document = AttributedStringBuilder.buildDocument(from: fragments)
+
+        #expect(document.string.contains("one"))
+        #expect(document.string.contains("two"))
+        #expect(document.string.contains("\n"))
+    }
+
+    @Test("buildDocument stamps blockID attribute on each fragment range")
+    func buildDocumentBlockIDAttribute() {
+        let id1 = BlockIdentity(rawValue: 10)
+        let id2 = BlockIdentity(rawValue: 11)
+        let nodes = [
+            BlockNode(block: .paragraph(content: [.text("alpha")]), id: id1),
+            BlockNode(block: .paragraph(content: [.text("beta")]), id: id2),
+        ]
+        let fragments = AttributedStringBuilder.buildDocumentFragments(from: nodes, frozenCount: nodes.count)
+        let document = AttributedStringBuilder.buildDocument(from: fragments)
+
+        let alphaRange = (document.string as NSString).range(of: "alpha")
+        let betaRange = (document.string as NSString).range(of: "beta")
+
+        let alphaBlockID = document.attribute(.blockID, at: alphaRange.location, effectiveRange: nil) as? BlockIdentity
+        let betaBlockID = document.attribute(.blockID, at: betaRange.location, effectiveRange: nil) as? BlockIdentity
+
+        #expect(alphaBlockID == id1)
+        #expect(betaBlockID == id2)
+    }
+
+    @Test("Each fragment has a unique blockID")
+    func documentFragmentUniqueBlockIDs() {
+        let blocks: [Block] = [
+            .paragraph(content: [.text("a")]),
+            .paragraph(content: [.text("b")]),
+            .codeBlock(language: nil, code: "c"),
+        ]
+        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let ids = fragments.map(\.blockID)
+        #expect(Set(ids).count == ids.count)
+    }
+
+    @Test("Mixed document preserves paragraph-style spacing")
+    func documentParagraphStyleSpacing() {
+        let blocks: [Block] = [
+            .heading(level: 1, content: [.text("Title")]),
+            .paragraph(content: [.text("Body")]),
+        ]
+        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let document = AttributedStringBuilder.buildDocument(from: fragments)
+
+        let titleRange = (document.string as NSString).range(of: "Title")
+        let bodyRange = (document.string as NSString).range(of: "Body")
+
+        let titleStyle = document.attribute(.paragraphStyle, at: titleRange.location, effectiveRange: nil) as? NSParagraphStyle
+        let bodyStyle = document.attribute(.paragraphStyle, at: bodyRange.location, effectiveRange: nil) as? NSParagraphStyle
+
+        #expect(titleStyle?.paragraphSpacingBefore ?? 0 > 0)
+        #expect(bodyStyle?.paragraphSpacingBefore ?? 0 > 0)
+    }
+
+    @Test("Table fallback renders in flow segment build too")
+    func tableFallbackInFlowBuild() {
+        let header = Block.TableRow(cells: [
+            Block.TableCell(content: [.text("Col")]),
+        ])
+        let table = Block.table(columnAlignments: [nil], header: header, rows: [])
+        let result = AttributedStringBuilder.build(from: segment(table))
+        #expect(result.string.contains("Col"))
+        #expect(result.string.contains("|"))
+    }
 }
 
 private extension AttributedStringBuilderTests {
@@ -446,7 +631,7 @@ private extension AttributedStringBuilderTests {
         string.attribute(.font, at: location, effectiveRange: nil) as? UIFont
     }
 
-    func segment(_ blocks: Block...) -> RenderNode.FlowSegment {
-        RenderNode.FlowSegment(blocks: Array(blocks))
+    func segment(_ blocks: Block...) -> [Block] {
+        Array(blocks)
     }
 }

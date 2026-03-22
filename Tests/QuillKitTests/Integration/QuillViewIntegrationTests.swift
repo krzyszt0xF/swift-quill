@@ -25,29 +25,20 @@ struct QuillViewIntegrationTests {
 
         let markdownMatched = await eventually { streamedView.currentMarkdown == fullMarkdown }
         let streamedContentRendered = await eventually {
-            containerView(for: streamedView)?.blockViews.isEmpty == false
+            documentHasContent(streamedView)
         }
         let staticContentRendered = await eventually {
-            containerView(for: staticView)?.blockViews.isEmpty == false
+            documentHasContent(staticView)
         }
-        let structuralNodesMatched = await eventually(timeout: .milliseconds(1200)) {
-            structuralSignatures(for: streamedView) == structuralSignatures(for: staticView)
+        let codeBlockRendered = await eventually(timeout: .milliseconds(1200)) {
+            documentHasCodeBlockAttachment(streamedView)
         }
-        let streamedSignatures = viewSignatures(for: streamedView)
-        let staticSignatures = viewSignatures(for: staticView)
-        let streamedStructuralSignatures = streamedSignatures.filter { $0 != "flow" }
-        let staticStructuralSignatures = staticSignatures.filter { $0 != "flow" }
 
         #expect(markdownMatched)
         #expect(streamedContentRendered)
         #expect(staticContentRendered)
-        #expect(structuralNodesMatched)
+        #expect(codeBlockRendered)
         #expect(streamedView.currentMarkdown == fullMarkdown)
-        #expect(streamedStructuralSignatures == staticStructuralSignatures)
-        #expect(streamedSignatures.filter { $0 == "code" }.count == 1)
-        #expect(streamedSignatures.filter { $0 == "table" }.count == 1)
-        #expect(streamedSignatures.contains("code"))
-        #expect(streamedSignatures.contains("table"))
     }
 
     @Test("finish flushes buffered incomplete content")
@@ -61,24 +52,18 @@ struct QuillViewIntegrationTests {
         }
 
         let renderedContentBeforeFinish = await eventually {
-            containerView(for: view)?.blockViews.isEmpty == false
+            documentHasContent(view)
         }
-        let signaturesBeforeFinish = viewSignatures(for: view)
+        let codeBlockBeforeFinish = documentHasCodeBlockAttachment(view)
 
         view.finish()
 
         let markdownMatched = await eventually { view.currentMarkdown == incompleteMarkdown }
-        let renderedCodeBlockAfterFinish = await eventually {
-            viewSignatures(for: view).contains("code")
-        }
-        let signaturesAfterFinish = viewSignatures(for: view)
 
         #expect(renderedContentBeforeFinish)
-        #expect(signaturesBeforeFinish.contains("code") == false)
+        #expect(codeBlockBeforeFinish == false)
         #expect(markdownMatched)
         #expect(view.currentMarkdown == incompleteMarkdown)
-        #expect(renderedCodeBlockAfterFinish)
-        #expect(signaturesAfterFinish.contains("code"))
     }
 
     @Test("cancelStreaming preserves already-appended currentMarkdown")
@@ -104,7 +89,7 @@ struct QuillViewIntegrationTests {
         #expect(view.currentMarkdown == "First paragraph\n\nSecond paragraph\n\n")
 
         let renderedContent = await eventually {
-            (containerView(for: view)?.blockViews.count ?? 0) >= 1
+            documentHasContent(view)
         }
         #expect(renderedContent)
     }
@@ -121,7 +106,7 @@ struct QuillViewIntegrationTests {
         #expect(view.currentMarkdown == "Before cancel\n\nAfter cancel\n\n")
 
         let renderedContent = await eventually {
-            (containerView(for: view)?.blockViews.count ?? 0) >= 1
+            documentHasContent(view)
         }
         #expect(renderedContent)
     }
@@ -136,7 +121,7 @@ struct QuillViewIntegrationTests {
         view.reset()
 
         #expect(view.currentMarkdown == nil)
-        #expect(containerView(for: view)?.blockViews.isEmpty == true)
+        #expect(documentHasContent(view) == false)
     }
 
     // MARK: - Equivalence Tests

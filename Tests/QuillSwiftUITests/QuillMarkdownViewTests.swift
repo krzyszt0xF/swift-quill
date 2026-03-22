@@ -85,7 +85,7 @@ struct QuillMarkdownViewTests {
         let view = QuillView()
 
         markdownView.applyConfiguration(to: view)
-        view.onLinkTap?(URL(string: "https://example.com")!)
+        view.onLinkSelection?(URL(string: "https://example.com")!)
 
         #expect(markdownView.linkTapHandler != nil)
         #expect(tappedURL == URL(string: "https://example.com"))

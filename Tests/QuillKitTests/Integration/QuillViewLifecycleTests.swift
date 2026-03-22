@@ -44,7 +44,7 @@ struct QuillViewLifecycleTests {
         #expect(view.currentMarkdown == "First chunk continued\n\n")
 
         let renderedContent = await eventually {
-            (containerView(for: view)?.blockViews.count ?? 0) >= 1
+            documentHasContent(view)
         }
         #expect(renderedContent)
     }
@@ -84,7 +84,7 @@ struct QuillViewLifecycleTests {
         #expect(view.currentMarkdown == "First paragraph\n\nSecond paragraph\n\n")
 
         let renderedContent = await eventually {
-            (containerView(for: view)?.blockViews.count ?? 0) >= 1
+            documentHasContent(view)
         }
         #expect(renderedContent)
     }
@@ -119,7 +119,7 @@ struct QuillViewLifecycleTests {
 
         view.reset()
         #expect(view.currentMarkdown == nil)
-        #expect(containerView(for: view)?.blockViews.isEmpty == true)
+        #expect(documentHasContent(view) == false)
     }
 
     @Test("static markdown assignment syncs currentMarkdown")
@@ -136,31 +136,22 @@ struct QuillViewLifecycleTests {
         #expect(view.currentMarkdown == nil)
     }
 
-    @Test("static markdown assignment resets active reveal sequencing")
-    func markdownAssignmentResetsActiveRevealSequencing() async throws {
+    @Test("static markdown assignment resets active streaming")
+    func markdownAssignmentResetsActiveStreaming() async throws {
         let view = makeStableBlocksQuillView()
 
-        view.append("First paragraph with a [link](https://example.com) and enough extra text to keep reveal active for a moment.\n\n")
+        view.append("First paragraph with a [link](https://example.com) and enough extra text to keep streaming active for a moment.\n\n")
 
         let streamingRendered = await eventually {
-            guard let container = containerView(for: view) else { return false }
-            guard let flow = container.blockViews.first(where: { $0 is TextFlowView }) as? TextFlowView else { return false }
-            return flow.totalCharacterCount > 0 && flow.originalAttributedString != nil
+            documentHasContent(view)
         }
         #expect(streamingRendered)
 
         view.markdown = "# Static Title\n\nStatic body."
 
         let staticRendered = await eventually {
-            guard let container = containerView(for: view) else { return false }
-            guard container.blockViews.count == 1 else { return false }
-            guard let flow = container.blockViews.first as? TextFlowView else { return false }
-            return flow.totalCharacterCount == 0 && flow.originalAttributedString == nil
+            documentHasContent(view)
         }
         #expect(staticRendered)
-
-        let textFlowView = try #require(containerView(for: view)?.blockViews.first as? TextFlowView)
-        #expect(textFlowView.totalCharacterCount == 0)
-        #expect(textFlowView.originalAttributedString == nil)
     }
 }

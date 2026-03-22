@@ -1,4 +1,5 @@
 import QuillCore
+import QuillCoreTestSupport
 import Testing
 
 @Suite("Edge Case Tests")
@@ -17,7 +18,7 @@ struct EdgeCaseTests {
         let blocks = MarkdownParser.live.parse(markdown)
         #expect(!blocks.isEmpty)
 
-        guard case let .unorderedList(items) = blocks.first else {
+        guard case let .unorderedList(items) = blocks.first?.block else {
             Issue.record("Expected unorderedList, got \(String(describing: blocks.first))")
             return
         }
@@ -27,8 +28,8 @@ struct EdgeCaseTests {
         var currentItems = items
         while true {
             guard currentItems.count == 1,
-                  let nestedItems = currentItems[0].children.compactMap({ block -> [Block.ListItem]? in
-                      if case let .unorderedList(items) = block { return items }
+                  let nestedItems = currentItems[0].children.compactMap({ node -> [Block.ListItem]? in
+                      if case let .unorderedList(items) = node.block { return items }
                       return nil
                   }).first
             else { break }
@@ -74,7 +75,7 @@ struct EdgeCaseTests {
         Final paragraph.
         """
 
-        let blocks = MarkdownParser.live.parse(markdown)
+        let blocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         #expect(blocks.count == 9)
 
         guard case let .heading(h1Level, _) = blocks[0] else {
@@ -130,7 +131,7 @@ struct EdgeCaseTests {
     @Test("Long, long input")
     func veryLongInputProducesParagraphOutput() {
         let markdown = String(repeating: "word ", count: 10_000)
-        let blocks = MarkdownParser.live.parse(markdown)
+        let blocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         #expect(!blocks.isEmpty)
 
         guard case .paragraph = blocks.first else {
@@ -142,7 +143,7 @@ struct EdgeCaseTests {
     @Test("Mixed unclosed elements")
     func mixedUnclosedElements() {
         let markdown = "# Heading\n**unclosed bold\n```\nunclosed fence"
-        let blocks = MarkdownParser.live.parse(markdown)
+        let blocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         #expect(!blocks.isEmpty)
 
         guard case .heading = blocks.first else {
@@ -153,13 +154,13 @@ struct EdgeCaseTests {
 
     @Test("Multiple thematic breaks")
     func multipleThematicBreaks() {
-        let blocks = MarkdownParser.live.parse("---\n\n---\n\n---")
+        let blocks = normalizedBlocks(MarkdownParser.live.parse("---\n\n---\n\n---"))
         #expect(blocks == [.thematicBreak, .thematicBreak, .thematicBreak])
     }
 
     @Test("Unclosed code fence")
     func unclosedCodeFence() {
-        let blocks = MarkdownParser.live.parse("```\nsome code without closing fence\n")
+        let blocks = normalizedBlocks(MarkdownParser.live.parse("```\nsome code without closing fence\n"))
         #expect(!blocks.isEmpty)
 
         guard case .codeBlock = blocks.first else {
@@ -171,7 +172,7 @@ struct EdgeCaseTests {
     @Test("Unicode and emoji content")
     func unicodeAndEmoji() {
         let markdown = "# Emoji heading \u{1F389}\n\nParagraph with CJK: \u{4F60}\u{597D}\u{4E16}\u{754C}"
-        let blocks = MarkdownParser.live.parse(markdown)
+        let blocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         #expect(blocks.count == 2)
 
         guard case let .heading(level, content) = blocks[0] else {
@@ -199,7 +200,7 @@ struct EdgeCaseTests {
 
     @Test("Whitespace-only input")
     func whitespaceOnlyProducesNoMeaningfulBlocks() {
-        let blocks = MarkdownParser.live.parse("   \n\n  \t  ")
+        let blocks = normalizedBlocks(MarkdownParser.live.parse("   \n\n  \t  "))
         let producedOnlyParagraphs = blocks.allSatisfy {
             if case .paragraph = $0 { return true }
             return false
