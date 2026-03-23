@@ -2,8 +2,6 @@ import UIKit
 
 @MainActor
 final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
-    private var codeBlockView: CodeBlockView?
-
     override init(
         textAttachment: NSTextAttachment,
         parentView: UIView?,
@@ -26,7 +24,6 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
         let view = CodeBlockView()
         view.configure(language: attachment.language, code: attachment.code)
         self.view = view
-        codeBlockView = view
     }
 
     override func attachmentBounds(

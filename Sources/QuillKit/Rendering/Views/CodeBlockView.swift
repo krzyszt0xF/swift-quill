@@ -49,17 +49,27 @@ final class CodeBlockView: UIView {
         )
     }
 
-    static func measuredHeight(language: String?, code: String) -> CGFloat {
+    nonisolated static func measuredHeight(language: String?, code: String) -> CGFloat {
         let displayCode = code.withoutTrailingNewline
         let lineCount = max(1, displayCode.components(separatedBy: "\n").count)
-        let lineHeight = UIFont.code.lineHeight
-        let codeHeight = CGFloat(lineCount) * lineHeight + CGFloat(max(0, lineCount - 1)) * NSParagraphStyle.code.lineSpacing
+        let codeLineHeight = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular).lineHeight
+        let codeLineSpacing: CGFloat = 2
+        let codeHeight = CGFloat(lineCount) * codeLineHeight
+            + CGFloat(max(0, lineCount - 1)) * codeLineSpacing
+        let copyButtonSize: CGFloat = 20
+        let headerToCodeSpacing: CGFloat = 12
+        let verticalInset: CGFloat = 12
+        let minimumVisibleCodeHeight: CGFloat = 18
+        let languageLabelHeight = language == nil
+            ? CGFloat.zero
+            : UIFont.systemFont(ofSize: 12, weight: .semibold).lineHeight
+        let headerHeight = max(copyButtonSize, ceil(languageLabelHeight))
 
-        return Layout.Inset.vertical
-            + Layout.headerHeight(language: language)
-            + Layout.headerToCodeSpacing
-            + max(Layout.minimumVisibleCodeHeight, ceil(codeHeight))
-            + Layout.Inset.vertical
+        return verticalInset
+            + headerHeight
+            + headerToCodeSpacing
+            + max(minimumVisibleCodeHeight, ceil(codeHeight))
+            + verticalInset
     }
 
     func applyHighlightedCode(_ attributedString: NSAttributedString) {
