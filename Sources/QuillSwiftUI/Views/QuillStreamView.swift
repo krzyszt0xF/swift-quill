@@ -13,7 +13,7 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
 
     public init(
         chunks: S,
-        mode: StreamingMode = .bufferedModules,
+        mode: StreamingMode = .smoothedTail,
         onError: (@Sendable (Error) -> Void)? = nil,
         preset: QuillStreamingPreset = .balanced) {
             self.init(
@@ -102,9 +102,9 @@ public extension QuillStreamView {
         private var subscriptionTask: Task<Void, Never>?
 
         init(preset: QuillStreamingPreset, mode: StreamingMode) {
-            self.quillView = QuillView(preset: preset)
-            self.quillView.streamingMode = mode
-            self.quillView.onHeightChange = { [weak quillView] _, _ in
+            quillView = QuillView(preset: preset)
+            quillView.streamingMode = mode
+            quillView.onHeightChange = { [weak quillView] _, _ in
                 quillView?.invalidateIntrinsicContentSize()
             }
         }

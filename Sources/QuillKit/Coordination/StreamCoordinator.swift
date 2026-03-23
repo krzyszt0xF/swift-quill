@@ -6,7 +6,7 @@ import UIKit
 final class StreamCoordinator {
     var hasActiveController: Bool { controller != nil }
     var hostView: DocumentTextView { renderer.textView }
-    
+
     var onHeightInvalidated: (() -> Void)?
     var onLinkSelection: ((URL) -> Void)? {
         didSet { renderer.textView.onLinkSelection = onLinkSelection }
@@ -15,29 +15,32 @@ final class StreamCoordinator {
         didSet { renderer.set(highlighter: syntaxHighlighter) }
     }
 
-    private var appendTask: Task<Void, Never>?
     private let bufferedStreamCommitScheduler: BufferedStreamCommitScheduler
+    private let bufferedVisualFeeder: BufferedVisualFeeder
     private var controller: MarkdownStreamController?
     private var finishTask: Task<Void, Never>?
+    private var lastTailRevealHeightInvalidation = 0.0
     private let makeStreamController: () -> MarkdownStreamController
+    private var renderConfiguration: RenderConfiguration
     private let renderer: DocumentRenderer
     private var streamGeneration = 0
     private var streamTask: Task<Void, Never>?
 
     init(
         renderer: DocumentRenderer,
+        renderConfiguration: RenderConfiguration,
         bufferedStreamCommitScheduler: BufferedStreamCommitScheduler,
+        bufferedVisualFeeder: BufferedVisualFeeder,
         streamController: @escaping () -> MarkdownStreamController
     ) {
         makeStreamController = streamController
         self.bufferedStreamCommitScheduler = bufferedStreamCommitScheduler
+        self.bufferedVisualFeeder = bufferedVisualFeeder
         self.renderer = renderer
-    }
-
-    deinit {
-        appendTask?.cancel()
-        finishTask?.cancel()
-        streamTask?.cancel()
+        self.renderConfiguration = renderConfiguration
+        self.renderer.onTailRevealProgress = { [weak self] in
+            self?.invalidateHeight(for: .tailRevealProgress)
+        }
     }
 }
 
@@ -45,55 +48,51 @@ extension StreamCoordinator {
     static var live: StreamCoordinator {
         StreamCoordinator(
             renderer: .live,
+            renderConfiguration: .init(preset: .balanced),
             bufferedStreamCommitScheduler: .live,
+            bufferedVisualFeeder: .init(),
             streamController: MarkdownStreamController.init)
     }
 }
 
 extension StreamCoordinator {
+    func applyConfiguration(_ configuration: RenderConfiguration) {
+        syncConfiguration(configuration)
+    }
+
     func append(
         _ chunk: String,
         currentMarkdown: String?,
         configuration: RenderConfiguration,
-        needsRestart: Bool) {
-        if needsRestart {
-            startStream(bootstrap: currentMarkdown, configuration: configuration)
-        }
+        needsRestart: Bool
+    ) {
+        syncConfiguration(configuration)
+        startStreamIfNeeded(currentMarkdown: currentMarkdown, needsRestart: needsRestart)
 
         guard let streamController = controller else { return }
-
-        if configuration.streamingMode == .bufferedModules {
-            appendBufferedChunk(chunk, to: streamController)
-        } else {
-            enqueueAppendChunk(chunk, to: streamController)
-        }
-    }
-
-    func applyConfiguration(_ configuration: RenderConfiguration) {
-        bufferedStreamCommitScheduler.applyConfiguration(configuration)
+        routeIncomingChunk(chunk, to: streamController)
     }
 
     func cancelStreaming() {
         cancelAllTasks()
-        onHeightInvalidated?()
+        invalidateHeight(for: .streamReset)
     }
 
     func finish(configuration: RenderConfiguration) {
         guard let streamController = controller else { return }
+        syncConfiguration(configuration)
 
         controller = nil
         let task = streamTask
         let generation = streamGeneration
-        let pendingAppendTask = appendTask
-        appendTask = nil
 
         finishTask?.cancel()
         finishTask = Task { [weak self] in
             guard let self else { return }
 
-            await pendingAppendTask?.value
+            await self.bufferedVisualFeeder.waitUntilDrained()
 
-            if configuration.streamingMode == .bufferedModules {
+            if renderConfiguration.streamingMode == .bufferedModules {
                 let remaining = self.bufferedStreamCommitScheduler.flushRemaining()
                 if !remaining.isEmpty {
                     await streamController.append(remaining)
@@ -103,7 +102,7 @@ extension StreamCoordinator {
             await streamController.finish()
             await task?.value
             guard self.streamGeneration == generation else { return }
-            self.onHeightInvalidated?()
+            self.invalidateHeight(for: .streamFinished)
         }
     }
 
@@ -121,19 +120,73 @@ extension StreamCoordinator {
 // MARK: - Task Management
 
 private extension StreamCoordinator {
+    enum HeightInvalidationReason {
+        case rendererSnapshotApplied
+        case streamFinished
+        case streamReset
+        case tailRevealProgress
+    }
+
+    struct StreamingSnapshot {
+        let blocks: [BlockNode]
+        let frozenCount: Int
+    }
+
+    func applyStreamingSnapshot(_ snapshot: StreamingSnapshot) {
+        let outcome = renderer.render(
+            blocks: snapshot.blocks,
+            frozenCount: snapshot.frozenCount
+        )
+
+        guard outcome.invalidatedHeight else { return }
+        invalidateHeight(for: .rendererSnapshotApplied)
+    }
+
     func cancelAllTasks() {
+        lastTailRevealHeightInvalidation = 0
+        renderer.cancelStreaming()
+        bufferedVisualFeeder.cancel()
         streamTask?.cancel()
         streamTask = nil
         finishTask?.cancel()
         finishTask = nil
-        appendTask?.cancel()
-        appendTask = nil
         bufferedStreamCommitScheduler.reset()
         controller = nil
         streamGeneration += 1
     }
 
-    func startStream(bootstrap: String? = nil, configuration: RenderConfiguration) {
+    func handleParserEvent(
+        _ event: ParserEvent,
+        state: inout BlockReducer.ReducerState
+    ) {
+        BlockReducer.apply(event, to: &state)
+
+        let snapshot = StreamingSnapshot(
+            blocks: state.blocks,
+            frozenCount: state.frozenCount
+        )
+        applyStreamingSnapshot(snapshot)
+    }
+
+    func invalidateHeight(for reason: HeightInvalidationReason) {
+        switch reason {
+        case .rendererSnapshotApplied, .streamFinished, .streamReset:
+            lastTailRevealHeightInvalidation = Date.timeIntervalSinceReferenceDate
+            onHeightInvalidated?()
+        case .tailRevealProgress:
+            let now = Date.timeIntervalSinceReferenceDate
+            let minimumInterval = max(
+                0.04,
+                renderConfiguration.layout.heightMeasurementCoalescingInterval * 2
+            )
+            guard now - lastTailRevealHeightInvalidation >= minimumInterval else { return }
+
+            lastTailRevealHeightInvalidation = now
+            onHeightInvalidated?()
+        }
+    }
+
+    func startStream(bootstrap: String? = nil) {
         cancelStreaming()
 
         let streamController = makeStreamController()
@@ -151,11 +204,20 @@ private extension StreamCoordinator {
             for await event in events {
                 guard !Task.isCancelled, let self, self.streamGeneration == generation else { break }
 
-                BlockReducer.apply(event, to: &state)
-                self.renderer.render(blocks: state.blocks, frozenCount: state.frozenCount)
-                self.onHeightInvalidated?()
+                self.handleParserEvent(event, state: &state)
             }
         }
+    }
+
+    func startStreamIfNeeded(currentMarkdown: String?, needsRestart: Bool) {
+        guard needsRestart else { return }
+        startStream(bootstrap: currentMarkdown)
+    }
+
+    func syncConfiguration(_ configuration: RenderConfiguration) {
+        renderConfiguration = configuration
+        bufferedStreamCommitScheduler.applyConfiguration(configuration)
+        renderer.applyTailRevealPolicy(configuration.tailReveal)
     }
 }
 
@@ -170,7 +232,12 @@ private extension StreamCoordinator {
             chunk,
             generation: streamGeneration,
             commitChunks: { [weak self] chunks in
-                self?.enqueueCommittedChunks(chunks, to: streamController)
+                guard let self else { return }
+                self.bufferedVisualFeeder.enqueueBufferedModules(
+                    chunks,
+                    policy: self.renderConfiguration.tailReveal,
+                    to: streamController
+                )
             },
             onFlushDue: { [weak self] generation in
                 self?.flushBufferedChunks(generation: generation, to: streamController)
@@ -187,12 +254,29 @@ private extension StreamCoordinator {
         bufferedStreamCommitScheduler.flushIfNeeded(
             generation: generation,
             commitChunks: { [weak self] chunks in
-                self?.enqueueCommittedChunks(chunks, to: streamController)
+                guard let self else { return }
+                self.bufferedVisualFeeder.enqueueBufferedModules(
+                    chunks,
+                    policy: self.renderConfiguration.tailReveal,
+                    to: streamController
+                )
             },
             onFlushDue: { [weak self] nextGeneration in
                 self?.flushBufferedChunks(generation: nextGeneration, to: streamController)
             }
         )
+    }
+
+    func routeIncomingChunk(
+        _ chunk: String,
+        to streamController: MarkdownStreamController
+    ) {
+        if renderConfiguration.streamingMode == .bufferedModules {
+            appendBufferedChunk(chunk, to: streamController)
+            return
+        }
+
+        enqueueAppendChunk(chunk, to: streamController)
     }
 }
 
@@ -203,23 +287,6 @@ private extension StreamCoordinator {
         _ chunk: String,
         to streamController: MarkdownStreamController
     ) {
-        guard chunk.isEmpty == false else { return }
-
-        let priorTask = appendTask
-        appendTask = Task {
-            await priorTask?.value
-            guard !Task.isCancelled else { return }
-
-            await streamController.append(chunk)
-        }
-    }
-
-    func enqueueCommittedChunks(
-        _ chunks: [String],
-        to streamController: MarkdownStreamController
-    ) {
-        for chunk in chunks where chunk.isEmpty == false {
-            enqueueAppendChunk(chunk, to: streamController)
-        }
+        bufferedVisualFeeder.enqueueImmediateChunk(chunk, to: streamController)
     }
 }

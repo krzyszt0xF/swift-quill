@@ -83,6 +83,8 @@ package enum BlockReducer {
         case .thematicBreak:
             emitBlock(makeBlockNode(.thematicBreak, state: &state), state: &state)
         }
+
+        refreshOpenTopLevelBlock(state: &state)
     }
 }
 
@@ -162,6 +164,99 @@ private extension BlockReducer {
         default:
             break
         }
+    }
+
+    static func materializedInlines(state: ReducerState) -> [Inline] {
+        var inlines = state.currentInlines
+
+        for frame in state.inlineStack.reversed() {
+            inlines = frame.savedInlines + [wrapInline(frame.kind, children: inlines)]
+        }
+
+        return InlineRenderNormalizer.makeRenderedInlines(from: inlines)
+    }
+
+    static func materializedPreview(from state: ReducerState) -> PreviewValue? {
+        let renderedInlines = materializedInlines(state: state)
+        return materializedPreview(
+            currentContext: state.currentContext,
+            renderedInlines: renderedInlines
+        )
+    }
+
+    static func materializedPreview(
+        currentContext: OpenContext,
+        renderedInlines: [Inline]
+    ) -> PreviewValue? {
+        switch currentContext {
+        case let .blockquote(children, id):
+            return .block(BlockNode(block: .blockquote(children: children), id: id))
+        case let .codeBlock(language, code, id):
+            return .block(BlockNode(block: .codeBlock(language: language, code: code), id: id))
+        case let .heading(level, id):
+            return .block(BlockNode(block: .heading(level: level, content: renderedInlines), id: id))
+        case let .list(id, ordered, items):
+            return .block(BlockNode(
+                block: ordered
+                ? .orderedList(startIndex: 1, items: items)
+                : .unorderedList(items: items),
+                id: id))
+        case let .listItem(blocks, checkbox):
+            return .listItem(children: blocks, checkbox: checkbox)
+        case let .paragraph(id):
+            return .block(BlockNode(block: .paragraph(content: renderedInlines), id: id))
+        case let .table(id, rows):
+            guard let headerCells = rows.first else { return nil }
+
+            let header = Block.TableRow(cells: headerCells.map { Block.TableCell(content: [.text($0)]) })
+            let dataRows = rows.dropFirst().map { row in
+                Block.TableRow(cells: row.map { Block.TableCell(content: [.text($0)]) })
+            }
+            return .block(BlockNode(
+                block: .table(columnAlignments: [], header: header, rows: dataRows),
+                id: id
+            ))
+        case .topLevel:
+            return nil
+        }
+    }
+
+    static func promote(
+        _ preview: PreviewValue,
+        into context: OpenContext
+    ) -> PreviewValue? {
+        switch context {
+        case let .blockquote(children, id):
+            guard case let .block(node) = preview else { return nil }
+            return .block(BlockNode(block: .blockquote(children: children + [node]), id: id))
+        case .codeBlock, .heading, .paragraph, .table:
+            return nil
+        case let .list(id, ordered, items):
+            guard case let .listItem(children, checkbox) = preview else { return nil }
+
+            let nextItems = items + [Block.ListItem(checkbox: checkbox, children: children)]
+            if ordered {
+                return .block(BlockNode(block: .orderedList(startIndex: 1, items: nextItems), id: id))
+            }
+            return .block(BlockNode(block: .unorderedList(items: nextItems), id: id))
+        case let .listItem(blocks, checkbox):
+            guard case let .block(node) = preview else { return nil }
+            return .listItem(children: blocks + [node], checkbox: checkbox)
+        case .topLevel:
+            return preview
+        }
+    }
+
+    static func refreshOpenTopLevelBlock(state: inout ReducerState) {
+        guard var preview = materializedPreview(from: state) else { return }
+
+        for context in state.contextStack.reversed() {
+            guard let promoted = promote(preview, into: context) else { return }
+            preview = promoted
+        }
+
+        guard case let .block(node) = preview else { return }
+        state.blocks.append(node)
     }
 
     static func handleEndBlockQuote(state: inout ReducerState) {
@@ -298,5 +393,12 @@ private extension BlockReducer {
     static func pushInlineFrame(_ kind: InlineKind, state: inout ReducerState) {
         state.inlineStack.append(InlineFrame(kind: kind, savedInlines: state.currentInlines))
         state.currentInlines = []
+    }
+}
+
+private extension BlockReducer {
+    enum PreviewValue {
+        case block(BlockNode)
+        case listItem(children: [BlockNode], checkbox: Block.Checkbox?)
     }
 }

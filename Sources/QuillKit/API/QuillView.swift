@@ -21,7 +21,7 @@ public final class QuillView: UIView {
         didSet { renderStatic() }
     }
 
-    public var streamingMode: StreamingMode = .bufferedModules {
+    public var streamingMode: StreamingMode = .smoothedTail {
         didSet {
             configuration.streamingMode = streamingMode
             streamCoordinator.applyConfiguration(configuration)

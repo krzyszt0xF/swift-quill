@@ -1,24 +1,24 @@
 import Foundation
 
 package struct RenderConfiguration: Equatable, Sendable {
-    var streamingMode: StreamingMode
-    var performanceProfile: PerformanceProfile
-    var typewriter: TypewriterConfiguration
-    var layout: LayoutConfiguration
     var bufferedStream: BufferedStreamConfiguration
-    
+    var layout: LayoutConfiguration
+    var performanceProfile: PerformanceProfile
+    var streamingMode: StreamingMode
+    var tailReveal: TailRevealPolicy
+
     init(
-        streamingMode: StreamingMode = .bufferedModules,
-        performanceProfile: PerformanceProfile = .balanced,
-        typewriter: TypewriterConfiguration = .balanced,
-        layout: LayoutConfiguration = .default,
-        bufferedStream: BufferedStreamConfiguration = .default
+        streamingMode: StreamingMode,
+        performanceProfile: PerformanceProfile,
+        tailReveal: TailRevealPolicy,
+        layout: LayoutConfiguration,
+        bufferedStream: BufferedStreamConfiguration
     ) {
-        self.streamingMode = streamingMode
-        self.performanceProfile = performanceProfile
-        self.typewriter = typewriter
-        self.layout = layout
         self.bufferedStream = bufferedStream
+        self.layout = layout
+        self.performanceProfile = performanceProfile
+        self.streamingMode = streamingMode
+        self.tailReveal = tailReveal
     }
 }
 
@@ -27,38 +27,45 @@ extension RenderConfiguration {
         switch preset {
         case .balanced:
             self = RenderConfiguration(
-                streamingMode: .bufferedModules,
+                streamingMode: .smoothedTail,
                 performanceProfile: .balanced,
-                typewriter: .balanced,
+                tailReveal: .balanced,
                 layout: .default,
                 bufferedStream: .default
             )
         case let .custom(speedMultiplier, bufferingDelay):
             let clampedSpeed = min(max(0.75, speedMultiplier), 1.5)
             self = RenderConfiguration(
-                streamingMode: .bufferedModules,
+                streamingMode: .smoothedTail,
                 performanceProfile: .balanced,
-                typewriter: .balanced.scaled(by: clampedSpeed),
+                tailReveal: .balanced.scaled(by: clampedSpeed),
                 layout: .default,
                 bufferedStream: .init(
                     minModuleLength: 50,
                     maxBufferingDelay: max(0.1, bufferingDelay)))
         case .longForm:
             self = RenderConfiguration(
-                streamingMode: .bufferedModules,
+                streamingMode: .smoothedTail,
                 performanceProfile: .longForm,
-                typewriter: .longForm,
+                tailReveal: .longForm,
                 layout: .longForm,
                 bufferedStream: .default
             )
         case .snappy:
             self = RenderConfiguration(
-                streamingMode: .bufferedModules,
+                streamingMode: .smoothedTail,
                 performanceProfile: .snappy,
-                typewriter: .snappy,
+                tailReveal: .snappy,
                 layout: .snappy,
                 bufferedStream: .default
             )
         }
     }
+
+    static let `default` = Self(
+        streamingMode: .smoothedTail,
+        performanceProfile: .balanced,
+        tailReveal: .balanced,
+        layout: .default,
+        bufferedStream: .default)
 }

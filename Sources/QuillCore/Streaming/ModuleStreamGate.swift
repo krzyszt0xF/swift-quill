@@ -65,9 +65,16 @@ package struct ModuleStreamGate: Sendable {
     }
 
     package mutating func commitIfOverdue(now: TimeInterval) -> [String] {
+        let hasExceededDelay: Bool
+        if let pendingSince {
+            hasExceededDelay = now - pendingSince >= configuration.maxBufferingDelay
+        } else {
+            hasExceededDelay = false
+        }
+        let pendingStructure = detectPendingStructure(in: accumulatedText)
         guard
-            let pendingSince, now - pendingSince >= configuration.maxBufferingDelay,
-            detectPendingStructure(in: accumulatedText) == nil,
+            hasExceededDelay,
+            pendingStructure == nil,
             let boundary = timeoutBoundary(from: lastSafePosition)
         else {
             return []
