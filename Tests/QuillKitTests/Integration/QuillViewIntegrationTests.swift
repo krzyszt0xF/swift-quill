@@ -12,8 +12,8 @@ struct QuillViewIntegrationTests {
 
     @Test("append + finish produces identical currentMarkdown to chunk concatenation")
     func streamedAndStaticMarkdownMatch() async {
-        let streamedView = makeStableBlocksQuillView()
-        let staticView = makeStableBlocksQuillView()
+        let streamedView = makeSmoothedTailQuillView()
+        let staticView = makeSmoothedTailQuillView()
         let fullMarkdown = mixedMarkdownFixture
         let markdownChunks = fullMarkdown.chunked(sizes: [3, 7, 5, 9, 4])
 
@@ -43,7 +43,7 @@ struct QuillViewIntegrationTests {
 
     @Test("finish flushes buffered incomplete content")
     func finishFlushesBufferedIncompleteContent() async {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
         let incompleteMarkdown = "# Title\n\n```swift\nlet x = 1"
         let markdownChunks = incompleteMarkdown.chunked(sizes: [5, 8, 6])
 
@@ -68,7 +68,7 @@ struct QuillViewIntegrationTests {
 
     @Test("cancelStreaming preserves already-appended currentMarkdown")
     func cancelPreservesRenderedContent() {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
 
         view.append("First chunk. ")
         view.append("Second chunk.\n\n")
@@ -79,7 +79,7 @@ struct QuillViewIntegrationTests {
 
     @Test("append after finish auto-restarts a new stream session")
     func appendAfterFinishRestartsStream() async {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
 
         view.append("First paragraph\n\n")
         view.finish()
@@ -96,7 +96,7 @@ struct QuillViewIntegrationTests {
 
     @Test("append after cancel auto-restarts a new stream session")
     func appendAfterCancelRestartsStream() async {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
 
         view.append("Before cancel\n\n")
         view.cancelStreaming()
@@ -113,7 +113,7 @@ struct QuillViewIntegrationTests {
 
     @Test("reset clears currentMarkdown to nil")
     func resetClearsMarkdown() {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
 
         view.append("Some content\n\nMore content\n\n")
         #expect(view.currentMarkdown != nil)
@@ -165,7 +165,7 @@ struct QuillViewIntegrationTests {
 
     @Test("chunk boundary inside markdown syntax produces correct result")
     func chunkBoundariesInsideSyntaxPreserveOutput() async {
-        let codeFenceView = makeStableBlocksQuillView()
+        let codeFenceView = makeSmoothedTailQuillView()
         let codeFenceMarkdown = "```swift\nlet x = 1\n```\n\n"
         let codeFenceChunks = codeFenceMarkdown.chunked(sizes: [2, 3, 4])
 
@@ -178,7 +178,7 @@ struct QuillViewIntegrationTests {
         #expect(codeFenceMatched)
         #expect(codeFenceView.currentMarkdown == codeFenceMarkdown)
 
-        let boldTextView = makeStableBlocksQuillView()
+        let boldTextView = makeSmoothedTailQuillView()
         let boldMarkdown = "**bold text**\n\n"
         let boldChunks = boldMarkdown.chunked(sizes: [1])
 
@@ -194,7 +194,7 @@ struct QuillViewIntegrationTests {
 
     @Test("empty chunks do not corrupt currentMarkdown")
     func emptyChunksPreserveMarkdownOutput() async {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
         let appendedParts = ["# Title", "", "\n\n", "", "Body text.\n\n", ""]
 
         for part in appendedParts {
@@ -210,7 +210,7 @@ struct QuillViewIntegrationTests {
 
     @Test("large single chunk produces correct currentMarkdown")
     func largeSingleChunkPreservesMarkdown() async {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
         let largeMarkdown = makeLargeMarkdown()
 
         view.append(largeMarkdown)
@@ -223,7 +223,7 @@ struct QuillViewIntegrationTests {
 
     @Test("rapid successive appends produce correct cumulative result")
     func rapidSuccessiveAppendsAccumulateMarkdown() async {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
         let fullMarkdown = mixedMarkdownFixture
         let markdownChunks = fullMarkdown.chunked(sizes: [2, 3])
 

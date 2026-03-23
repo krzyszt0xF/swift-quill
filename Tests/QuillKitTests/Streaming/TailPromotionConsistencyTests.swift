@@ -32,7 +32,7 @@ struct StreamingModeConsistencyTests {
             minModuleLength: 1,
             maxBufferingDelay: 0.1
         )
-        let stableView = makeStableBlocksQuillView()
+        let stableView = makeSmoothedTailQuillView()
 
         for chunk in markdownChunks {
             bufferedView.append(chunk)

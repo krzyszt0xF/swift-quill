@@ -220,6 +220,48 @@ struct BlockReducerTests {
         #expect(state.blocks.count == 2)
     }
 
+    @Test("Open paragraph materializes as mutable tail before close")
+    func openParagraphMaterializesMutableTail() {
+        var state = BlockReducer.ReducerState()
+
+        BlockReducer.apply(.startParagraph, to: &state)
+        BlockReducer.apply(.text("Hello"), to: &state)
+
+        #expect(state.frozenCount == 0)
+        #expect(state.blocks.count == 1)
+        #expect(state.blocks.first?.block == .paragraph(content: [.text("Hello")]))
+    }
+
+    @Test("Open code block materializes as mutable tail before close")
+    func openCodeBlockMaterializesMutableTail() {
+        var state = BlockReducer.ReducerState()
+
+        BlockReducer.apply(.startCodeBlock(language: "swift"), to: &state)
+        BlockReducer.apply(.codeBlockText("let x = 1\n"), to: &state)
+
+        #expect(state.frozenCount == 0)
+        #expect(state.blocks.count == 1)
+        #expect(state.blocks.first?.block == .codeBlock(language: "swift", code: "let x = 1\n"))
+    }
+
+    @Test("Open list item materializes inside mutable list tail")
+    func openListMaterializesMutableTail() {
+        var state = BlockReducer.ReducerState()
+
+        BlockReducer.apply(.startList(ordered: false), to: &state)
+        BlockReducer.apply(.startListItem, to: &state)
+        BlockReducer.apply(.startParagraph, to: &state)
+        BlockReducer.apply(.text("item"), to: &state)
+
+        #expect(state.frozenCount == 0)
+        #expect(state.blocks.count == 1)
+        #expect(canonicalBlocks(state.blocks.map(\.block)) == canonicalBlocks([
+            .unorderedList(items: [
+                makeItem(.paragraph(content: [.text("item")]))
+            ])
+        ]))
+    }
+
     // MARK: - Determinism
 
     @Test("Deterministic: same events produce same blocks")

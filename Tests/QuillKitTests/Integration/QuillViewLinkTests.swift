@@ -8,7 +8,7 @@ import UIKit
 struct QuillViewLinkTests {
     @Test("onLinkSelection callback receives URL from static render")
     func onLinkSelectionReceivesURLFromStaticRender() async throws {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
         var tappedURL: URL?
 
         view.onLinkSelection = { url in
@@ -33,7 +33,7 @@ struct QuillViewLinkTests {
 
     @Test("onLinkSelection callback is re-assigned without crash")
     func onLinkSelectionCallbackReassignment() {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
 
         var firstURL: URL?
         view.onLinkSelection = { url in firstURL = url }

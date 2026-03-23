@@ -10,7 +10,7 @@ import UIKit
 struct DocumentRendererTests {
     @Test("First render of static document installs content")
     func staticDocumentRender() {
-        let renderer = DocumentRenderer()
+        let renderer = DocumentRenderer.live
         let blocks: [Block] = [
             .paragraph(content: [.text("Hello")]),
             .paragraph(content: [.text("World")]),
@@ -26,7 +26,7 @@ struct DocumentRendererTests {
 
     @Test("Repeated render with growing frozen prefix appends content")
     func growingFrozenPrefix() {
-        let renderer = DocumentRenderer()
+        let renderer = DocumentRenderer.live
         let blocks: [Block] = [
             .paragraph(content: [.text("First")]),
             .paragraph(content: [.text("Second")]),
@@ -47,7 +47,7 @@ struct DocumentRendererTests {
 
     @Test("Tail-only replacement when frozenCount unchanged")
     func tailOnlyReplacement() {
-        let renderer = DocumentRenderer()
+        let renderer = DocumentRenderer.live
 
         renderer.render(
             blocks: makeNodes([
@@ -77,7 +77,7 @@ struct DocumentRendererTests {
 
     @Test("Closed code fence produces attachment")
     func closedCodeFenceAttachment() {
-        let renderer = DocumentRenderer()
+        let renderer = DocumentRenderer.live
         let blocks: [Block] = [
             .codeBlock(language: "swift", code: "let x = 1\n"),
         ]
@@ -91,7 +91,7 @@ struct DocumentRendererTests {
 
     @Test("Open code fence remains plain text before close")
     func openCodeFencePlainText() {
-        let renderer = DocumentRenderer()
+        let renderer = DocumentRenderer.live
         let blocks: [Block] = [
             .codeBlock(language: "swift", code: "let x = 1\n"),
         ]
@@ -106,7 +106,7 @@ struct DocumentRendererTests {
 
     @Test("Stable prefix ranges after tail mutations")
     func stablePrefixRanges() {
-        let renderer = DocumentRenderer()
+        let renderer = DocumentRenderer.live
 
         renderer.render(
             blocks: makeNodes([
@@ -143,9 +143,102 @@ struct DocumentRendererTests {
         #expect(prefixText1.contains("Stable"))
     }
 
+    @Test("Buffered modules still reveal the mutable tail progressively")
+    func bufferedModulesUseSmoothedTailReveal() {
+        let renderer = DocumentRenderer.live
+        renderer.applyTailRevealPolicy(.balanced)
+
+        renderer.render(
+            blocks: makeNodes([
+                .paragraph(content: [.text("Frozen")]),
+                .paragraph(content: [.text("Tail content appears gradually")]),
+            ]),
+            frozenCount: 1
+        )
+
+        let text = renderer.textView.contentStorage?.attributedString?.string ?? ""
+
+        #expect(text.contains("Frozen"))
+        #expect(text != "Frozen\nTail content appears gradually")
+    }
+
+    @Test("Tail reveal prefers burst-sized batches for longer words")
+    func tailRevealBatchRangePrefersBurstOverFullWord() {
+        let range = DocumentRenderer.makeTailRevealBatchRange(
+            content: NSAttributedString(string: "animation smoothness"),
+            visibleLength: 0,
+            policy: .balanced
+        )
+
+        #expect(range?.location == 0)
+        #expect(range?.length == 4)
+    }
+
+    @Test("Tail reveal softly snaps to a nearby word boundary")
+    func tailRevealBatchRangeSnapsToNearbyWordBoundary() {
+        let range = DocumentRenderer.makeTailRevealBatchRange(
+            content: NSAttributedString(string: "flow more"),
+            visibleLength: 0,
+            policy: .balanced
+        )
+
+        #expect(range?.location == 0)
+        #expect(range?.length == 5)
+    }
+
+    @Test("Smoothed tail shows full content once the document becomes fully frozen")
+    func smoothedTailFinishesImmediatelyWhenTailDisappears() {
+        let renderer = DocumentRenderer.live
+        renderer.applyTailRevealPolicy(.balanced)
+
+        let blocks = makeNodes([
+            .paragraph(content: [.text("Frozen")]),
+            .paragraph(content: [.text("Tail content appears gradually")]),
+        ])
+
+        renderer.render(blocks: blocks, frozenCount: 1)
+        renderer.render(blocks: blocks, frozenCount: 2)
+
+        let text = renderer.textView.contentStorage?.attributedString?.string ?? ""
+
+        #expect(text.contains("Frozen"))
+        #expect(text.contains("Tail content appears gradually"))
+    }
+
+    @Test("Repeated identical static render is a no-op for height invalidation")
+    func repeatedIdenticalStaticRenderDoesNotInvalidateHeight() {
+        let renderer = DocumentRenderer.live
+        let blocks = makeNodes([
+            .paragraph(content: [.text("Hello")]),
+            .paragraph(content: [.text("World")]),
+        ])
+
+        let firstOutcome = renderer.render(blocks: blocks, frozenCount: 2)
+        let secondOutcome = renderer.render(blocks: blocks, frozenCount: 2)
+
+        #expect(firstOutcome.invalidatedHeight == true)
+        #expect(secondOutcome.invalidatedHeight == false)
+    }
+
+    @Test("Repeated identical smoothed-tail snapshot is a no-op for height invalidation")
+    func repeatedIdenticalSmoothedTailSnapshotDoesNotInvalidateHeight() {
+        let renderer = DocumentRenderer.live
+        renderer.applyTailRevealPolicy(.balanced)
+
+        let blocks = makeNodes([
+            .paragraph(content: [.text("Frozen")]),
+            .paragraph(content: [.text("Tail content appears gradually")]),
+        ])
+
+        _ = renderer.render(blocks: blocks, frozenCount: 1)
+        let secondOutcome = renderer.render(blocks: blocks, frozenCount: 1)
+
+        #expect(secondOutcome.invalidatedHeight == false)
+    }
+
     @Test("Reset clears content and state")
     func resetClearsEverything() {
-        let renderer = DocumentRenderer()
+        let renderer = DocumentRenderer.live
         renderer.render(
             blocks: makeNodes([.paragraph(content: [.text("Content")])]),
             frozenCount: 1

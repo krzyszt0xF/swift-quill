@@ -11,10 +11,11 @@ struct QuillViewHeightCoalescingTests {
     @Test("Rapid updates coalesce into one height notification per scheduler window")
     func rapidUpdatesCoalesceHeightCallbacks() async {
         let configuration = RenderConfiguration(
-            streamingMode: .stableBlocks,
+            streamingMode: .smoothedTail,
             performanceProfile: .balanced,
-            typewriter: .balanced,
-            layout: .init(heightMeasurementCoalescingInterval: 0.05)
+            tailReveal: .balanced,
+            layout: .init(heightMeasurementCoalescingInterval: 0.05),
+            bufferedStream: .default
         )
 
         let view = QuillView(

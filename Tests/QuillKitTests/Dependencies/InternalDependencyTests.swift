@@ -11,21 +11,24 @@ struct InternalDependencyTests {
         let streamControllerFactory = Counter()
         let coordinator = StreamCoordinator(
             renderer: makeDocumentRenderer(),
+            renderConfiguration: .default,
             bufferedStreamCommitScheduler: BufferedStreamCommitScheduler(
                 moduleStreamGate: .init(),
                 now: { 0 },
                 sleep: { _ in }
             ),
+            bufferedVisualFeeder: .live,
             streamController: {
                 streamControllerFactory.increment()
                 return MarkdownStreamController()
             }
         )
         let configuration = RenderConfiguration(
-            streamingMode: .stableBlocks,
+            streamingMode: .smoothedTail,
             performanceProfile: .balanced,
-            typewriter: .balanced,
-            layout: .default
+            tailReveal: .balanced,
+            layout: .default,
+            bufferedStream: .default
         )
 
         coordinator.append(
@@ -49,11 +52,13 @@ struct InternalDependencyTests {
             },
             streamCoordinator: StreamCoordinator(
                 renderer: makeDocumentRenderer(),
+                renderConfiguration: .default,
                 bufferedStreamCommitScheduler: BufferedStreamCommitScheduler(
                     moduleStreamGate: .init(),
                     now: { 0 },
                     sleep: { _ in }
                 ),
+                bufferedVisualFeeder: .live,
                 streamController: MarkdownStreamController.init
             )
         )
@@ -66,21 +71,24 @@ struct InternalDependencyTests {
     func quillViewDependenciesUseInjectedStreamCoordinator() {
         let streamControllerFactory = Counter()
         let configuration = RenderConfiguration(
-            streamingMode: .stableBlocks,
+            streamingMode: .smoothedTail,
             performanceProfile: .balanced,
-            typewriter: .balanced,
-            layout: .default
+            tailReveal: .balanced,
+            layout: .default,
+            bufferedStream: .default
         )
         let dependencies = QuillView.Dependencies(
             heightCoordinator: HeightCoordinator(),
             markdownParser: .live,
             streamCoordinator: StreamCoordinator(
                 renderer: makeDocumentRenderer(),
+                renderConfiguration: .default,
                 bufferedStreamCommitScheduler: BufferedStreamCommitScheduler(
                     moduleStreamGate: .init(),
                     now: { 0 },
                     sleep: { _ in }
                 ),
+                bufferedVisualFeeder: .live,
                 streamController: {
                     streamControllerFactory.increment()
                     return MarkdownStreamController()
@@ -105,4 +113,3 @@ private final class Counter: @unchecked Sendable {
         value += 1
     }
 }
-

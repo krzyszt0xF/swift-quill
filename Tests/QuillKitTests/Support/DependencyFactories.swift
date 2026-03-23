@@ -2,5 +2,5 @@
 
 @MainActor
 func makeDocumentRenderer() -> DocumentRenderer {
-    DocumentRenderer()
+    .live
 }

@@ -9,11 +9,10 @@ struct StreamBufferTests {
     func partialLineAccumulation() {
         var buffer = StreamBuffer()
         let events1 = buffer.append("hel")
-        #expect(events1.isEmpty)
+        #expect(events1 == [.startParagraph, .text("hel")])
 
         let events2 = buffer.append("lo\n")
-        #expect(events2.contains(.startParagraph))
-        #expect(events2.contains(.text("hello")))
+        #expect(events2 == [.text("lo")])
     }
 
     @Test("Empty chunk produces no events")
@@ -346,13 +345,35 @@ struct StreamBufferTests {
     func adversarialParagraphSplit() {
         var buffer = StreamBuffer()
         let events1 = buffer.append("He")
-        #expect(events1.isEmpty)
+        #expect(events1 == [.startParagraph, .text("He")])
 
         let events2 = buffer.append("llo\n\n")
-        #expect(events2 == [.startParagraph, .text("Hello"), .endParagraph])
+        #expect(events2 == [.text("llo"), .endParagraph])
 
         let events3 = buffer.append("World\n")
         #expect(events3 == [.startParagraph, .text("World")])
+    }
+
+    @Test("Partial list item waits for newline")
+    func partialListItemWaitsForNewline() {
+        var buffer = StreamBuffer()
+
+        let events1 = buffer.append("- ite")
+        #expect(events1.isEmpty)
+
+        let events2 = buffer.append("m")
+        #expect(events2.isEmpty)
+    }
+
+    @Test("Partial code line streams before newline inside fence")
+    func partialCodeLineStreamsBeforeNewline() {
+        var buffer = StreamBuffer()
+
+        let events1 = buffer.append("```\npri")
+        #expect(events1 == [.startCodeBlock(language: nil), .codeBlockText("pri")])
+
+        let events2 = buffer.append("nt\n")
+        #expect(events2 == [.codeBlockText("nt\n")])
     }
 
     @Test("Adversarial: heading split mid-prefix")
@@ -386,6 +407,33 @@ struct StreamBufferTests {
 
         let events2 = buffer.append("-\n")
         #expect(events2 == [.thematicBreak])
+    }
+
+    @Test("Adversarial: ordered list marker split across chunks")
+    func adversarialOrderedListSplit() {
+        var buffer = StreamBuffer()
+        let events1 = buffer.append("1.")
+        #expect(events1.isEmpty)
+
+        let events2 = buffer.append(" item\n\n")
+        #expect(events2 == [
+            .startList(ordered: true), .startListItem, .startParagraph, .text("item"),
+            .endParagraph, .endListItem, .endList,
+        ])
+    }
+
+    @Test("Adversarial: short fence prefix waits for disambiguation")
+    func adversarialShortFencePrefix() {
+        var buffer = StreamBuffer()
+        let events1 = buffer.append("``")
+        #expect(events1.isEmpty)
+
+        let events2 = buffer.append("`\ncode\n```\n")
+        #expect(events2 == [
+            .startCodeBlock(language: nil),
+            .codeBlockText("code\n"),
+            .endCodeBlock,
+        ])
     }
 
     // MARK: - Mixed Content

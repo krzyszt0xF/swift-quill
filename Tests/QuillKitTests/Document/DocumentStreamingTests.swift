@@ -10,7 +10,7 @@ import UIKit
 struct DocumentStreamingTests {
     @Test("Frozen prefix text is not mutated across updates")
     func frozenPrefixStability() {
-        let renderer = DocumentRenderer()
+        let renderer = DocumentRenderer.live
 
         renderer.render(
             blocks: makeNodes([
@@ -41,7 +41,7 @@ struct DocumentStreamingTests {
 
     @Test("Change region is bounded to tail range")
     func boundedChangeRegion() {
-        let renderer = DocumentRenderer()
+        let renderer = DocumentRenderer.live
 
         renderer.render(
             blocks: makeNodes([
@@ -73,7 +73,7 @@ struct DocumentStreamingTests {
 
     @Test("Attachment appears after fence close")
     func attachmentAfterFenceClose() {
-        let renderer = DocumentRenderer()
+        let renderer = DocumentRenderer.live
 
         let blocks: [Block] = [
             .paragraph(content: [.text("Before code")]),
