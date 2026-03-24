@@ -2,6 +2,8 @@ import Foundation
 
 @MainActor
 final class TailRevealEngine {
+    var advancePresentation: ((CFTimeInterval) -> Bool)?
+    var hasPresentationWork: (() -> Bool)?
     var onProgress: (() -> Void)?
 
     private let appendBatch: (NSAttributedString) -> Bool
@@ -9,8 +11,14 @@ final class TailRevealEngine {
         canRevealMore: { [weak self] in
             self?.state?.hasPendingContent ?? false
         },
+        hasPresentationWork: { [weak self] in
+            self?.hasPresentationWork?() ?? false
+        },
         intervalProvider: { [weak self] in
             self?.state?.nextInterval ?? Layout.defaultInterval
+        },
+        updatePresentation: { [weak self] timestamp in
+            _ = self?.advancePresentation?(timestamp)
         },
         revealNextBatch: { [weak self] in
             self?.appendNextBatch() ?? false
@@ -39,6 +47,8 @@ final class TailRevealEngine {
         }
 
         if state?.hasPendingContent == true {
+            driver.resume(immediate: false)
+        } else if hasPresentationWork?() == true {
             driver.resume(immediate: false)
         } else {
             driver.stop()

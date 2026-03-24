@@ -11,6 +11,7 @@ final class DocumentRenderer {
     private var blockIndexer = DocumentBlockIndexer()
     private var highlightCoordinator: HighlightCoordinator
     private var renderState = RenderState()
+    private let tailAnimator = TailAnimator()
     private var tailRevealPolicy: TailRevealPolicy?
     private lazy var tailRevealEngine = TailRevealEngine { [weak self] batch in
         self?.appendTailRevealBatch(batch) ?? false
@@ -22,6 +23,12 @@ final class DocumentRenderer {
     ) {
         self.textView = textView
         self.highlightCoordinator = highlightCoordinator
+        tailRevealEngine.advancePresentation = { [weak self] timestamp in
+            self?.advanceTailFade(timestamp: timestamp) ?? false
+        }
+        tailRevealEngine.hasPresentationWork = { [weak self] in
+            self?.tailAnimator.hasActiveSegments ?? false
+        }
     }
 
     func applyTailRevealPolicy(_ policy: TailRevealPolicy) {
@@ -30,6 +37,7 @@ final class DocumentRenderer {
 
     func cancelStreaming() {
         tailRevealEngine.cancel()
+        tailAnimator.cancel()
         renderState.resetSmoothedTailStart()
     }
 
@@ -151,13 +159,19 @@ private extension DocumentRenderer {
     }
 
     func appendTailRevealBatch(_ batch: NSAttributedString) -> Bool {
-        guard let contentStorage = textView.contentStorage else { return false }
+        guard let contentStorage = textView.contentStorage,
+              let tailRevealPolicy
+        else { return false }
 
         let insertLocation = contentStorage.attributedString?.length ?? 0
+        let presentedBatch = tailAnimator.prepareBatchForAppend(
+            batch,
+            policy: tailRevealPolicy
+        )
         contentStorage.performEditingTransaction {
             contentStorage.textStorage?.replaceCharacters(
                 in: NSRange(location: insertLocation, length: 0),
-                with: batch
+                with: presentedBatch
             )
         }
 
@@ -262,6 +276,7 @@ private extension DocumentRenderer {
         previousFrozenCount: Int
     ) -> RenderOutcome {
         tailRevealEngine.cancel()
+        tailAnimator.cancel()
         renderState.resetSmoothedTailStart()
 
         guard let contentStorage = textView.contentStorage,
@@ -328,10 +343,14 @@ private extension DocumentRenderer {
             to: desiredTail,
             policy: tailRevealPolicy
         )
+        let presentedTail = tailAnimator.rebaseVisibleContent(
+            to: displayedTail,
+            tailStart: currentTailStart
+        )
 
         let didMutateVisibleContent = replaceCharactersIfNeeded(
             in: NSRange(location: currentTailStart, length: currentDocumentLength - currentTailStart),
-            with: displayedTail,
+            with: presentedTail,
             contentStorage: contentStorage
         )
 
@@ -398,6 +417,18 @@ private extension DocumentRenderer {
         }
 
         return true
+    }
+
+    func advanceTailFade(timestamp: CFTimeInterval) -> Bool {
+        guard let contentStorage = textView.contentStorage else {
+            tailAnimator.cancel()
+            return false
+        }
+
+        return tailAnimator.advancePresentation(
+            in: contentStorage,
+            now: timestamp
+        )
     }
 }
 

@@ -2,6 +2,7 @@ import QuillCore
 import UIKit
 
 final class CodeBlockAttachment: NSTextAttachment {
+    private var hasAnimatedAppearance = false
     let blockID: BlockIdentity
     let code: String
     let language: String?
@@ -18,6 +19,16 @@ final class CodeBlockAttachment: NSTextAttachment {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    func consumePendingAppearanceAnimation(isReduceMotionEnabled: Bool) -> Bool {
+        guard
+            isReduceMotionEnabled == false,
+            hasAnimatedAppearance == false
+        else { return false }
+
+        hasAnimatedAppearance = true
+        return true
     }
 
     override func viewProvider(

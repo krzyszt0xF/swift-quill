@@ -4,17 +4,23 @@ import QuartzCore
 final class TailRevealDriver: NSObject {
     private var accumulatedTime: CFTimeInterval = 0
     private let canRevealMore: () -> Bool
+    private let hasPresentationWork: () -> Bool
     private let intervalProvider: () -> TimeInterval
+    private let updatePresentation: (CFTimeInterval) -> Void
     private let revealNextBatch: () -> Bool
     private var displayLink: CADisplayLink?
 
     init(
         canRevealMore: @escaping () -> Bool,
+        hasPresentationWork: @escaping () -> Bool,
         intervalProvider: @escaping () -> TimeInterval,
+        updatePresentation: @escaping (CFTimeInterval) -> Void,
         revealNextBatch: @escaping () -> Bool
     ) {
         self.canRevealMore = canRevealMore
+        self.hasPresentationWork = hasPresentationWork
         self.intervalProvider = intervalProvider
+        self.updatePresentation = updatePresentation
         self.revealNextBatch = revealNextBatch
         super.init()
     }
@@ -28,7 +34,7 @@ final class TailRevealDriver: NSObject {
             _ = revealNextBatch()
         }
 
-        guard canRevealMore() else {
+        guard canRevealMore() || hasPresentationWork() else {
             stop()
             return
         }
@@ -49,24 +55,22 @@ final class TailRevealDriver: NSObject {
 
 private extension TailRevealDriver {
     @objc func handleDisplayLink(_ displayLink: CADisplayLink) {
-        guard canRevealMore() else {
-            stop()
-            return
-        }
+        updatePresentation(displayLink.timestamp)
 
         accumulatedTime += displayLink.targetTimestamp - displayLink.timestamp
         let interval = max(0.016, intervalProvider())
-        guard accumulatedTime >= interval else { return }
 
-        while accumulatedTime >= interval, canRevealMore() {
-            accumulatedTime -= interval
-            guard revealNextBatch() else {
-                stop()
-                return
+        if accumulatedTime >= interval {
+            while accumulatedTime >= interval, canRevealMore() {
+                accumulatedTime -= interval
+                guard revealNextBatch() else {
+                    stop()
+                    return
+                }
             }
         }
 
-        if !canRevealMore() {
+        if canRevealMore() == false, hasPresentationWork() == false {
             stop()
         }
     }
