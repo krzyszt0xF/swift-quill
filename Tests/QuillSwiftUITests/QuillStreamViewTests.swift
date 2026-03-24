@@ -145,7 +145,7 @@ struct QuillStreamViewTests {
         let view = QuillView()
 
         streamView.applyConfiguration(to: view)
-        view.onLinkTap?(URL(string: "https://example.com")!)
+        view.onLinkSelection?(URL(string: "https://example.com")!)
 
         #expect(streamView.linkTapHandler != nil)
         #expect(tappedURL == URL(string: "https://example.com"))

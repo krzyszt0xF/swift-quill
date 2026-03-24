@@ -1,8 +1,51 @@
 struct StreamBuffer {
     private var partialLine = ""
-    private var pendingLines: [String] = []
     private var listStack: [ListContext] = []
+    private var partialPreview: PartialPreview?
     private var state: State = .idle
+
+    mutating func append(_ chunk: String) -> [ParserEvent] {
+        guard !chunk.isEmpty else { return [] }
+
+        var events: [ParserEvent] = []
+        let combined = partialLine + chunk
+        let segments = combined.split(separator: "\n", omittingEmptySubsequences: false)
+
+        for index in 0..<(segments.count - 1) {
+            let line = String(segments[index])
+            events.append(contentsOf: processCompletedLine(line))
+        }
+
+        partialLine = String(segments.last ?? "")
+        events.append(contentsOf: previewPartialLineIfNeeded())
+
+        return events
+    }
+
+    mutating func finalize() -> [ParserEvent] {
+        var events: [ParserEvent] = []
+
+        if !partialLine.isEmpty {
+            events.append(contentsOf: finalizePartialLine())
+            partialLine = ""
+        }
+
+        events.append(contentsOf: closeCurrentBlock())
+
+        return events
+    }
+}
+
+extension StreamBuffer {
+    struct ListContext: Equatable {
+        let indent: Int
+        let ordered: Bool
+    }
+
+    enum PartialPreview: Equatable {
+        case codeBlockText(emittedText: String)
+        case paragraph(emittedText: String, isContinuation: Bool)
+    }
 
     enum State: Equatable {
         case blockquote
@@ -14,46 +57,72 @@ struct StreamBuffer {
         case table
         case tableCandidate(headerLine: String)
     }
-
-    struct ListContext: Equatable {
-        let indent: Int
-        let ordered: Bool
-    }
-
-    mutating func append(_ chunk: String) -> [ParserEvent] {
-        guard !chunk.isEmpty else { return [] }
-
-        var events: [ParserEvent] = []
-        let combined = partialLine + chunk
-        let segments = combined.split(separator: "\n", omittingEmptySubsequences: false)
-
-        for i in 0..<(segments.count - 1) {
-            let line = String(segments[i])
-            events.append(contentsOf: processLine(line))
-        }
-
-        partialLine = String(segments.last ?? "")
-        
-        return events
-    }
-
-    mutating func finalize() -> [ParserEvent] {
-        var events: [ParserEvent] = []
-
-        if !partialLine.isEmpty {
-            events.append(contentsOf: processLine(partialLine))
-            partialLine = ""
-        }
-
-        events.append(contentsOf: closeCurrentBlock())
-        
-        return events
-    }
 }
 
 // MARK: - State Machine
 
 private extension StreamBuffer {
+    mutating func closeCurrentBlock() -> [ParserEvent] {
+        let previousState = state
+        partialPreview = nil
+        state = .idle
+
+        switch previousState {
+        case .blockquote:
+            return [.endParagraph, .endBlockQuote]
+        case .codeFence:
+            return [.endCodeBlock]
+        case .heading:
+            return [.endHeading]
+        case .idle:
+            return []
+        case .list:
+            return ListParsingHelpers.closeOpenLists(&listStack)
+        case .paragraph:
+            return [.endParagraph]
+        case .table:
+            return [.endTable]
+        case let .tableCandidate(headerLine):
+            return [.startParagraph, .text(headerLine), .endParagraph]
+        }
+    }
+
+    mutating func emitPreviewRemainder(for line: String) -> [ParserEvent]? {
+        guard let partialPreview else { return nil }
+
+        defer { self.partialPreview = nil }
+
+        return PartialLinePreviewer.makeRemainderEvents(for: line, preview: partialPreview)
+    }
+
+    mutating func finalizePartialLine() -> [ParserEvent] {
+        emitPreviewRemainder(for: partialLine) ?? processLine(partialLine)
+    }
+
+    mutating func previewPartialLineIfNeeded() -> [ParserEvent] {
+        guard partialLine.isEmpty == false else {
+            partialPreview = nil
+            return []
+        }
+
+        guard let preview = PartialLinePreviewer.makePreview(
+            for: partialLine,
+            previousPreview: partialPreview,
+            state: state
+        ) else {
+            partialPreview = nil
+            return []
+        }
+
+        partialPreview = preview.preview
+        state = preview.state
+        return preview.events
+    }
+
+    mutating func processCompletedLine(_ line: String) -> [ParserEvent] {
+        emitPreviewRemainder(for: line) ?? processLine(line)
+    }
+
     mutating func processLine(_ line: String) -> [ParserEvent] {
         switch state {
         case .blockquote:
@@ -116,7 +185,6 @@ private extension StreamBuffer {
         }
 
         state = .paragraph
-        
         return [.startParagraph, .text(trimmed)]
     }
 
@@ -244,31 +312,6 @@ private extension StreamBuffer {
         }
 
         let cells = StreamLineClassifier.parseTableCells(trimmed)
-        
         return [.tableRow(cells)]
-    }
-
-    mutating func closeCurrentBlock() -> [ParserEvent] {
-        let previousState = state
-        state = .idle
-
-        switch previousState {
-        case .blockquote:
-            return [.endParagraph, .endBlockQuote]
-        case .codeFence:
-            return [.endCodeBlock]
-        case .heading:
-            return [.endHeading]
-        case .idle:
-            return []
-        case .list:
-            return ListParsingHelpers.closeOpenLists(&listStack)
-        case .paragraph:
-            return [.endParagraph]
-        case .table:
-            return [.endTable]
-        case let .tableCandidate(headerLine):
-            return [.startParagraph, .text(headerLine), .endParagraph]
-        }
     }
 }

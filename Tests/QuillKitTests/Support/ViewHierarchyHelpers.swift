@@ -2,8 +2,34 @@
 import UIKit
 
 @MainActor
-func containerView(for view: QuillView) -> BlockContainerView? {
-    view.subviews.first { $0 is BlockContainerView } as? BlockContainerView
+func documentTextView(for view: QuillView) -> DocumentTextView? {
+    findSubview(of: DocumentTextView.self, in: view)
+}
+
+@MainActor
+func documentHasContent(_ view: QuillView) -> Bool {
+    guard let textView = documentTextView(for: view),
+          let storage = textView.contentStorage,
+          let attributedString = storage.attributedString
+    else { return false }
+    return attributedString.length > 0
+}
+
+@MainActor
+func documentHasCodeBlockAttachment(_ view: QuillView) -> Bool {
+    guard let textView = documentTextView(for: view),
+          let storage = textView.contentStorage,
+          let attributedString = storage.attributedString
+    else { return false }
+
+    var found = false
+    attributedString.enumerateAttribute(.attachment, in: NSRange(location: 0, length: attributedString.length)) { value, _, stop in
+        if value is CodeBlockAttachment {
+            found = true
+            stop.pointee = true
+        }
+    }
+    return found
 }
 
 @MainActor
@@ -23,22 +49,4 @@ func findSubview<T: UIView>(
     }
 
     return nil
-}
-
-func viewSignature(_ view: UIView) -> String {
-    if view is TextFlowView { return "flow" }
-    if view is CodeBlockView { return "code" }
-    if view is PlaceholderBlockView { return "table" }
-    return String(describing: type(of: view))
-}
-
-@MainActor
-func viewSignatures(for view: QuillView) -> [String] {
-    guard let container = containerView(for: view) else { return [] }
-    return container.blockViews.map(viewSignature)
-}
-
-@MainActor
-func structuralSignatures(for view: QuillView) -> [String] {
-    viewSignatures(for: view).filter { $0 != "flow" }
 }

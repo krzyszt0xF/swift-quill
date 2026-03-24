@@ -15,7 +15,7 @@ final class HeightCoordinator {
 
     func handleWidthChange(newWidth: CGFloat) -> Bool {
         guard newWidth != previousWidth else { return false }
-        
+
         previousWidth = newWidth
         return true
     }
@@ -26,20 +26,20 @@ final class HeightCoordinator {
 
     func scheduleHeightUpdate(
         hostView: UIView,
-        containerView: UIView,
+        documentTextView: DocumentTextView,
         configuration: LayoutConfiguration
     ) {
         guard !heightInvalidationScheduled else { return }
-        
+
         heightInvalidationScheduled = true
 
         let coalescingInterval = max(0, configuration.heightMeasurementCoalescingInterval)
         heightUpdateTask?.cancel()
-        heightUpdateTask = Task { [weak self, weak hostView, weak containerView] in
+        heightUpdateTask = Task { [weak self, weak hostView, weak documentTextView] in
             guard
                 let self,
                 let hostView,
-                let containerView
+                let documentTextView
             else { return }
 
             if coalescingInterval > 0 {
@@ -47,10 +47,10 @@ final class HeightCoordinator {
             }
 
             guard !Task.isCancelled else { return }
-            
+
             self.measureAndNotify(
                 hostView: hostView,
-                containerView: containerView,
+                documentTextView: documentTextView,
                 configuration: configuration
             )
         }
@@ -60,19 +60,16 @@ final class HeightCoordinator {
 private extension HeightCoordinator {
     func measureAndNotify(
         hostView: UIView,
-        containerView: UIView,
+        documentTextView: DocumentTextView,
         configuration: LayoutConfiguration
     ) {
         heightInvalidationScheduled = false
         heightUpdateTask = nil
         guard hostView.bounds.width > 0 else { return }
 
-        hostView.setNeedsLayout()
-        hostView.layoutIfNeeded()
-        containerView.setNeedsLayout()
-        containerView.layoutIfNeeded()
+        documentTextView.invalidateIntrinsicContentSize()
 
-        let newHeight = ceil(containerView.bounds.height)
+        let newHeight = ceil(documentTextView.intrinsicContentSize.height)
         let oldHeight = lastNotifiedHeight
         let minDelta = max(0.5, configuration.heightNotificationMinimumDelta)
         guard abs(newHeight - oldHeight) > minDelta else { return }

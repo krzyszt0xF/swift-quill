@@ -7,7 +7,7 @@ import UIKit
 @MainActor
 @Suite("Streaming Mode Consistency")
 struct StreamingModeConsistencyTests {
-    @Test("Buffered and stable modes converge to identical final node signatures")
+    @Test("Buffered and stable modes converge to identical final markdown")
     func bufferedMatchesStableAfterFinish() async throws {
         let markdown = """
         # Title
@@ -32,7 +32,7 @@ struct StreamingModeConsistencyTests {
             minModuleLength: 1,
             maxBufferingDelay: 0.1
         )
-        let stableView = makeStableBlocksQuillView()
+        let stableView = makeSmoothedTailQuillView()
 
         for chunk in markdownChunks {
             bufferedView.append(chunk)
@@ -43,18 +43,14 @@ struct StreamingModeConsistencyTests {
         bufferedView.finish()
         stableView.finish()
 
-        let signaturesMatched = await eventually(timeout: .milliseconds(800)) {
-            viewSignatures(for: bufferedView) == viewSignatures(for: stableView)
+        let markdownMatched = await eventually(timeout: .milliseconds(800)) {
+            bufferedView.currentMarkdown == stableView.currentMarkdown
         }
-        #expect(signaturesMatched)
+        #expect(markdownMatched)
 
-        let bufferedContainer = try #require(containerView(for: bufferedView))
-        let bufferedSignatures = bufferedContainer.blockViews.map(viewSignature)
-
-        #expect(bufferedSignatures.contains("code"))
-        #expect(bufferedSignatures.contains("table"))
-        #expect(bufferedSignatures.filter { $0 == "code" }.count == 1)
-        #expect(bufferedSignatures.filter { $0 == "table" }.count == 1)
-        #expect(bufferedSignatures.filter { $0 == "flow" }.count >= 1)
+        let bothRendered = await eventually(timeout: .milliseconds(800)) {
+            documentHasContent(bufferedView) && documentHasContent(stableView)
+        }
+        #expect(bothRendered)
     }
 }

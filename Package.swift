@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "swift-quill",
-    platforms: [.iOS(.v16)],
+    platforms: [.iOS(.v17)],
     products: [
         .library(name: "QuillCore", targets: ["QuillCore"]),
         .library(name: "QuillKit", targets: ["QuillKit"]),
@@ -45,7 +45,7 @@ let package = Package(
         ),
         .testTarget(
             name: "QuillKitTests",
-            dependencies: ["QuillKit", "QuillCore", "QuillSharedTestSupport"]
+            dependencies: ["QuillKit", "QuillCore", "QuillCoreTestSupport", "QuillSharedTestSupport"]
         ),
         .testTarget(
             name: "QuillSwiftUITests",

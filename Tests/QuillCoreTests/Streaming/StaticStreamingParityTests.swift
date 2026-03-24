@@ -8,30 +8,30 @@ struct StaticStreamingParityTests {
     func simpleDocumentParity() async {
         let markdown = "# Hello\n\nSome text.\n\n---\n\n"
 
-        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [3, 7, 5])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 
     @Test("Paragraph transitions match between paths")
     func paragraphTransitionsParity() async {
         let markdown = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.\n\n"
 
-        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [4, 9, 6, 11])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 
     @Test("Heading levels match between paths")
     func headingLevelsParity() async {
         let markdown = "# H1\n\n## H2\n\n### H3\n\nBody.\n\n"
 
-        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [5, 3, 8, 6])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 
     @Test("Flat ordered and unordered lists match between paths")
@@ -45,10 +45,10 @@ struct StaticStreamingParityTests {
 
         """
 
-        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [6, 4, 9, 7, 3])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 
     @Test("Task list matches between paths")
@@ -59,10 +59,10 @@ struct StaticStreamingParityTests {
 
         """
 
-        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [3, 5, 4, 2, 6])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 
     @Test("Nested unordered list matches between paths")
@@ -74,10 +74,10 @@ struct StaticStreamingParityTests {
 
         """
 
-        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [2, 4, 3, 5, 2])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 
     @Test("Nested ordered list matches between paths")
@@ -90,10 +90,10 @@ struct StaticStreamingParityTests {
 
         """
 
-        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [3, 4, 5, 2, 6])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 
     @Test("Nested task list matches between paths")
@@ -106,20 +106,20 @@ struct StaticStreamingParityTests {
 
         """
 
-        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [3, 4, 6, 2, 5])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 
     @Test("Code fence with language matches between paths")
     func codeFenceParity() async {
         let markdown = "```swift\nlet x = 1\nlet y = 2\n```\n\n"
 
-        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [8, 5, 12, 7])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 
     @Test("Table matches between paths")
@@ -132,10 +132,10 @@ struct StaticStreamingParityTests {
 
         """
 
-        let staticBlocks = streamingComparable(MarkdownParser.live.parse(markdown))
+        let staticBlocks = streamingComparable(normalizedBlocks(MarkdownParser.live.parse(markdown)))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [10, 8, 14, 6, 11])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 
     @Test("Mixed document with supported streaming block types matches between paths")
@@ -167,10 +167,10 @@ struct StaticStreamingParityTests {
 
         """
 
-        let staticBlocks = streamingComparable(MarkdownParser.live.parse(markdown))
+        let staticBlocks = streamingComparable(normalizedBlocks(MarkdownParser.live.parse(markdown)))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [3, 7, 5, 9, 4, 11, 6, 8])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
         #expect(staticBlocks.count == streamedBlocks.count)
     }
 
@@ -178,44 +178,48 @@ struct StaticStreamingParityTests {
     func singleCharacterChunkParity() async {
         let markdown = "# Hi\n\nWorld.\n\n"
 
-        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [1])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 
     @Test("Formatted paragraph matches between static and streaming paths")
     func formattedParagraphParity() async {
         let markdown = "**bold** and *italic* with `code`\n\n"
 
-        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [4, 5, 3, 7])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 
     @Test("Link paragraph matches between static and streaming paths")
     func linkParagraphParity() async {
         let markdown = "Hello [link](http://url) world\n\n"
 
-        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [3, 6, 4, 5])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 
     @Test("Nested formatting matches between static and streaming paths")
     func nestedFormattingParity() async {
         let markdown = "**bold *and italic***\n\n"
 
-        let staticBlocks = MarkdownParser.live.parse(markdown)
+        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [2, 4, 3, 5])
 
-        #expect(staticBlocks == streamedBlocks)
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 }
 
 private extension StaticStreamingParityTests {
+    func blocksMatch(_ lhs: [Block], _ rhs: [Block]) -> Bool {
+        canonicalBlocks(lhs) == canonicalBlocks(rhs)
+    }
+
     func streamingComparable(_ blocks: [Block]) -> [Block] {
         blocks.map(streamingComparable)
     }
@@ -223,14 +227,14 @@ private extension StaticStreamingParityTests {
     func streamingComparable(_ block: Block) -> Block {
         switch block {
         case let .blockquote(children):
-            return .blockquote(children: children.map(streamingComparable))
+            return makeBlockquote(children.map { streamingComparable($0.block) })
         case .codeBlock, .heading, .htmlBlock, .paragraph, .thematicBreak:
             return block
         case let .orderedList(startIndex, items):
             let normalizedItems = items.map { item in
-                Block.ListItem(
+                makeItem(
                     checkbox: item.checkbox,
-                    children: item.children.map(streamingComparable)
+                    item.children.map { streamingComparable($0.block) }
                 )
             }
             return .orderedList(startIndex: startIndex, items: normalizedItems)
@@ -238,9 +242,9 @@ private extension StaticStreamingParityTests {
             return .table(columnAlignments: [], header: header, rows: rows)
         case let .unorderedList(items):
             let normalizedItems = items.map { item in
-                Block.ListItem(
+                makeItem(
                     checkbox: item.checkbox,
-                    children: item.children.map(streamingComparable)
+                    item.children.map { streamingComparable($0.block) }
                 )
             }
             return .unorderedList(items: normalizedItems)

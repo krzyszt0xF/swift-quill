@@ -204,7 +204,7 @@ extension InlineTestCase: CustomTestStringConvertible {
 
 private func extractFirstParagraphContent(from markdown: String) -> [Inline]? {
     let blocks = MarkdownParser.live.parse(markdown)
-    guard case let .paragraph(content) = blocks.first else {
+    guard case let .paragraph(content) = blocks.first?.block else {
         return nil
     }
     

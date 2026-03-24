@@ -2,44 +2,46 @@ import Markdown
 
 /// Maps swift-markdown's `Markup` AST to QuillCore's `Block`/`Inline` types.
 struct BlockVisitor: MarkupVisitor {
-    typealias Result = [Block]
+    typealias Result = [BlockNode]
 
-    mutating func defaultVisit(_ markup: Markup) -> [Block] {
-        var blocks: [Block] = []
+    private var identityGenerator = BlockIdentityGenerator()
+
+    mutating func defaultVisit(_ markup: Markup) -> [BlockNode] {
+        var blocks: [BlockNode] = []
         for child in markup.children {
             blocks.append(contentsOf: visit(child))
         }
         return blocks
     }
 
-    mutating func visitDocument(_ document: Document) -> [Block] {
-        var blocks: [Block] = []
+    mutating func visitDocument(_ document: Document) -> [BlockNode] {
+        var blocks: [BlockNode] = []
         for child in document.children {
             blocks.append(contentsOf: visit(child))
         }
         return blocks
     }
     
-    mutating func visitBlockQuote(_ blockQuote: BlockQuote) -> [Block] {
-        var children: [Block] = []
+    mutating func visitBlockQuote(_ blockQuote: BlockQuote) -> [BlockNode] {
+        var children: [BlockNode] = []
         for child in blockQuote.children {
             children.append(contentsOf: visit(child))
         }
-        return [.blockquote(children: children)]
+        return [makeBlockNode(.blockquote(children: children))]
     }
     
-    mutating func visitCodeBlock(_ codeBlock: CodeBlock) -> [Block] {
-        [.codeBlock(language: codeBlock.language, code: codeBlock.code)]
+    mutating func visitCodeBlock(_ codeBlock: CodeBlock) -> [BlockNode] {
+        [makeBlockNode(.codeBlock(language: codeBlock.language, code: codeBlock.code))]
     }
 
-    mutating func visitHeading(_ heading: Heading) -> [Block] {
-        [.heading(level: heading.level, content: convertInlines(heading))]
+    mutating func visitHeading(_ heading: Heading) -> [BlockNode] {
+        [makeBlockNode(.heading(level: heading.level, content: convertInlines(heading)))]
     }
     
-    mutating func visitOrderedList(_ orderedList: OrderedList) -> [Block] {
+    mutating func visitOrderedList(_ orderedList: OrderedList) -> [BlockNode] {
         var items: [Block.ListItem] = []
         for item in orderedList.listItems {
-            var children: [Block] = []
+            var children: [BlockNode] = []
             for child in item.children {
                 children.append(contentsOf: visit(child))
             }
@@ -48,14 +50,14 @@ struct BlockVisitor: MarkupVisitor {
             items.append(Block.ListItem(checkbox: checkbox, children: children))
         }
         
-        return [.orderedList(startIndex: orderedList.startIndex, items: items)]
+        return [makeBlockNode(.orderedList(startIndex: orderedList.startIndex, items: items))]
     }
 
-    mutating func visitParagraph(_ paragraph: Paragraph) -> [Block] {
-        [.paragraph(content: convertInlines(paragraph))]
+    mutating func visitParagraph(_ paragraph: Paragraph) -> [BlockNode] {
+        [makeBlockNode(.paragraph(content: convertInlines(paragraph)))]
     }
     
-    mutating func visitTable(_ table: Table) -> [Block] {
+    mutating func visitTable(_ table: Table) -> [BlockNode] {
         let columnAlignments = table.columnAlignments.map { alignment -> Block.ColumnAlignment? in
             switch alignment {
             case .left: return .left
@@ -72,18 +74,18 @@ struct BlockVisitor: MarkupVisitor {
             bodyRows.append(convert(tableRow: row))
         }
 
-        return [.table(columnAlignments: columnAlignments, header: headerRow, rows: bodyRows)]
+        return [makeBlockNode(.table(columnAlignments: columnAlignments, header: headerRow, rows: bodyRows))]
     }
 
-    mutating func visitThematicBreak(_ thematicBreak: ThematicBreak) -> [Block] {
-        [.thematicBreak]
+    mutating func visitThematicBreak(_ thematicBreak: ThematicBreak) -> [BlockNode] {
+        [makeBlockNode(.thematicBreak)]
     }
     
-    mutating func visitUnorderedList(_ unorderedList: UnorderedList) -> [Block] {
+    mutating func visitUnorderedList(_ unorderedList: UnorderedList) -> [BlockNode] {
         var items: [Block.ListItem] = []
         
         for item in unorderedList.listItems {
-            var children: [Block] = []
+            var children: [BlockNode] = []
             for child in item.children {
                 children.append(contentsOf: visit(child))
             }
@@ -92,15 +94,19 @@ struct BlockVisitor: MarkupVisitor {
             items.append(Block.ListItem(checkbox: checkbox, children: children))
         }
         
-        return [.unorderedList(items: items)]
+        return [makeBlockNode(.unorderedList(items: items))]
     }
 
-    mutating func visitHTMLBlock(_ htmlBlock: HTMLBlock) -> [Block] {
-        [.htmlBlock(rawHTML: htmlBlock.rawHTML)]
+    mutating func visitHTMLBlock(_ htmlBlock: HTMLBlock) -> [BlockNode] {
+        [makeBlockNode(.htmlBlock(rawHTML: htmlBlock.rawHTML))]
     }
 }
 
 private extension BlockVisitor {
+    mutating func makeBlockNode(_ block: Block) -> BlockNode {
+        BlockNode(block: block, id: identityGenerator.makeIdentity())
+    }
+
     func convert(tableHead: Table.Head) -> Block.TableRow {
         var cells: [Block.TableCell] = []
         for cell in tableHead.cells {

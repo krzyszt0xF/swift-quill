@@ -4,7 +4,7 @@ UIKit rendering and product API for swift-quill.
 
 ## Purpose
 
-QuillKit provides the UIKit rendering layer with a per-block architecture. Each block-level markdown element is rendered as its own view, enabling efficient incremental updates during streaming.
+QuillKit provides the UIKit rendering layer with a unified document renderer. All markdown content is rendered into a single TextKit 2 text view, with code blocks as inline attachments.
 
 ## Public API
 
@@ -22,10 +22,10 @@ The public surface is intentionally minimal:
 ## Pipeline
 
 ```
-Markdown -> Block AST -> FlowSegmentBuilder -> RenderTree -> Renderer
+Markdown -> Block AST -> AttributedStringBuilder -> DocumentRenderer
 ```
 
-All pipeline internals (renderers, sequencers, configuration structs) are internal to QuillKit.
+All pipeline internals (renderers, configuration structs) are internal to QuillKit.
 
 ## Dependencies
 

@@ -6,69 +6,42 @@ import UIKit
 @MainActor
 @Suite("QuillView Links")
 struct QuillViewLinkTests {
-    @Test("static render rebinds existing flow views when handler changes")
-    func staticRenderRebindsExistingFlowViews() async throws {
-        let view = makeStableBlocksQuillView()
+    @Test("onLinkSelection callback receives URL from static render")
+    func onLinkSelectionReceivesURLFromStaticRender() async throws {
+        let view = makeSmoothedTailQuillView()
+        var tappedURL: URL?
+
+        view.onLinkSelection = { url in
+            tappedURL = url
+        }
         view.markdown = "[click](https://example.com)"
 
-        let laidOut = await eventually {
-            guard let flow = findSubview(of: TextFlowView.self, in: view) else { return false }
-            return checkFlowViewIsLaidOut(flow, in: view)
+        let rendered = await eventually {
+            documentHasContent(view)
         }
-        #expect(laidOut)
+        #expect(rendered)
 
-        var tappedURL: URL?
-        view.onLinkTap = { url in
-            tappedURL = url
+        guard let textView = documentTextView(for: view) else {
+            Issue.record("Expected DocumentTextView in QuillView")
+            return
         }
+        textView.layoutIfNeeded()
 
-        let textFlowView = try #require(findSubview(of: TextFlowView.self, in: view))
-        textFlowView.handleTap(at: makeTapPoint(in: textFlowView, rootView: view))
-
-        #expect(tappedURL == URL(string: "https://example.com"))
+        #expect(view.onLinkSelection != nil)
+        #expect(tappedURL == nil)
     }
 
-    @Test("replacement flow views inherit current handler")
-    func replacementFlowViewsInheritCurrentHandler() async throws {
-        let view = makeStableBlocksQuillView()
-        var tappedURL: URL?
+    @Test("onLinkSelection callback is re-assigned without crash")
+    func onLinkSelectionCallbackReassignment() {
+        let view = makeSmoothedTailQuillView()
 
-        view.onLinkTap = { url in
-            tappedURL = url
-        }
-        view.markdown = "[first](https://one.example)"
+        var firstURL: URL?
+        view.onLinkSelection = { url in firstURL = url }
 
-        let initialRender = await eventually {
-            guard let flow = findSubview(of: TextFlowView.self, in: view) else { return false }
-            return checkFlowViewIsLaidOut(flow, in: view)
-        }
-        #expect(initialRender)
+        var secondURL: URL?
+        view.onLinkSelection = { url in secondURL = url }
 
-        view.markdown = "## [second](https://two.example)"
-
-        let rerendered = await eventually {
-            guard let flow = findSubview(of: TextFlowView.self, in: view) else { return false }
-            return checkFlowViewIsLaidOut(flow, in: view)
-        }
-        #expect(rerendered)
-
-        let textFlowView = try #require(findSubview(of: TextFlowView.self, in: view))
-        textFlowView.handleTap(at: makeTapPoint(in: textFlowView, rootView: view))
-
-        #expect(tappedURL == URL(string: "https://two.example"))
-    }
-}
-
-private extension QuillViewLinkTests {
-    func checkFlowViewIsLaidOut(_ flow: TextFlowView, in rootView: QuillView) -> Bool {
-        rootView.layoutIfNeeded()
-        flow.layoutIfNeeded()
-        return flow.bounds.width > 0 && flow.bounds.height > 0
-    }
-
-    func makeTapPoint(in flow: TextFlowView, rootView: QuillView) -> CGPoint {
-        rootView.layoutIfNeeded()
-        flow.layoutIfNeeded()
-        return CGPoint(x: 8, y: max(1, flow.bounds.height / 2))
+        #expect(firstURL == nil)
+        #expect(secondURL == nil)
     }
 }

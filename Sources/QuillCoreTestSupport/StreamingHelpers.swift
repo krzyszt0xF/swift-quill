@@ -26,7 +26,7 @@ package func reduce(_ events: [ParserEvent]) -> [Block] {
     for event in events {
         BlockReducer.apply(event, to: &reducerState)
     }
-    return reducerState.blocks
+    return normalizedBlocks(reducerState.blocks)
 }
 
 package func streamAndReduce(_ markdown: String, chunkSizes: [Int]) async -> [Block] {
@@ -46,5 +46,5 @@ package func streamAndReduce(_ markdown: String, chunkSizes: [Int]) async -> [Bl
         BlockReducer.apply(event, to: &reducerState)
     }
 
-    return reducerState.blocks
+    return normalizedBlocks(reducerState.blocks)
 }

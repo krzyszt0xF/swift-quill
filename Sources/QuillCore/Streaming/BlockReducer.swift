@@ -27,22 +27,36 @@ package enum BlockReducer {
             appendInline(.image(source: source, title: title, alt: [.text(alt)]), state: &state)
         case .startBlockQuote:
             state.contextStack.append(state.currentContext)
-            state.currentContext = .blockquote(children: [])
+            state.currentContext = .blockquote(
+                children: [],
+                id: state.identityGenerator.makeIdentity()
+            )
         case let .startCodeBlock(language):
             state.contextStack.append(state.currentContext)
-            state.currentContext = .codeBlock(language: language, code: "")
+            state.currentContext = .codeBlock(
+                language: language,
+                code: "",
+                id: state.identityGenerator.makeIdentity()
+            )
         case .startEmphasis:
             pushInlineFrame(.emphasis, state: &state)
         case let .startHeading(level):
             state.contextStack.append(state.currentContext)
-            state.currentContext = .heading(level: level)
+            state.currentContext = .heading(
+                level: level,
+                id: state.identityGenerator.makeIdentity()
+            )
         case .startInlineCode:
             pushInlineFrame(.code, state: &state)
         case let .startLink(destination):
             pushInlineFrame(.link(destination: destination), state: &state)
         case let .startList(ordered):
             state.contextStack.append(state.currentContext)
-            state.currentContext = .list(ordered: ordered, items: [])
+            state.currentContext = .list(
+                id: state.identityGenerator.makeIdentity(),
+                ordered: ordered,
+                items: []
+            )
         case .startListItem:
             state.contextStack.append(state.currentContext)
             state.currentContext = .listItem(blocks: [], checkbox: nil)
@@ -51,31 +65,37 @@ package enum BlockReducer {
             state.currentContext = .listItem(blocks: [], checkbox: checkbox)
         case .startParagraph:
             state.contextStack.append(state.currentContext)
-            state.currentContext = .paragraph
+            state.currentContext = .paragraph(id: state.identityGenerator.makeIdentity())
         case .startStrikethrough:
             pushInlineFrame(.strikethrough, state: &state)
         case .startStrong:
             pushInlineFrame(.strong, state: &state)
         case .startTable:
             state.contextStack.append(state.currentContext)
-            state.currentContext = .table(rows: [])
+            state.currentContext = .table(
+                id: state.identityGenerator.makeIdentity(),
+                rows: []
+            )
         case let .tableRow(cells):
             handleTableRow(cells, state: &state)
         case let .text(string):
             appendInline(.text(string), state: &state)
         case .thematicBreak:
-            emitBlock(.thematicBreak, state: &state)
+            emitBlock(makeBlockNode(.thematicBreak, state: &state), state: &state)
         }
+
+        refreshOpenTopLevelBlock(state: &state)
     }
 }
 
 package extension BlockReducer {
     struct ReducerState: Sendable {
-        package var blocks: [Block] = []
+        package var blocks: [BlockNode] = []
         package var frozenCount: Int = 0
 
         var contextStack: [OpenContext] = []
         var currentContext: OpenContext = .topLevel
+        var identityGenerator = BlockIdentityGenerator()
         var inlineStack: [InlineFrame] = []
         var currentInlines: [Inline] = []
 
@@ -85,13 +105,13 @@ package extension BlockReducer {
 
 extension BlockReducer {
     enum OpenContext: Sendable {
-        case blockquote(children: [Block])
-        case codeBlock(language: String?, code: String)
-        case heading(level: Int)
-        case list(ordered: Bool, items: [Block.ListItem])
-        case listItem(blocks: [Block], checkbox: Block.Checkbox?)
-        case paragraph
-        case table(rows: [[String]])
+        case blockquote(children: [BlockNode], id: BlockIdentity)
+        case codeBlock(language: String?, code: String, id: BlockIdentity)
+        case heading(level: Int, id: BlockIdentity)
+        case list(id: BlockIdentity, ordered: Bool, items: [Block.ListItem])
+        case listItem(blocks: [BlockNode], checkbox: Block.Checkbox?)
+        case paragraph(id: BlockIdentity)
+        case table(id: BlockIdentity, rows: [[String]])
         case topLevel
     }
 
@@ -130,79 +150,194 @@ extension BlockReducer {
 // MARK: - Event Handlers
 
 private extension BlockReducer {
-    static func emitBlock(_ block: Block, state: inout ReducerState) {
+    static func emitBlock(_ node: BlockNode, state: inout ReducerState) {
         switch state.currentContext {
-        case var .blockquote(children):
-            children.append(block)
-            state.currentContext = .blockquote(children: children)
+        case .blockquote(var children, let id):
+            children.append(node)
+            state.currentContext = .blockquote(children: children, id: id)
         case .listItem(var blocks, let checkbox):
-            blocks.append(block)
+            blocks.append(node)
             state.currentContext = .listItem(blocks: blocks, checkbox: checkbox)
         case .topLevel:
-            state.blocks.append(block)
+            state.blocks.append(node)
             state.frozenCount += 1
         default:
             break
         }
     }
 
+    static func materializedInlines(state: ReducerState) -> [Inline] {
+        var inlines = state.currentInlines
+
+        for frame in state.inlineStack.reversed() {
+            inlines = frame.savedInlines + [wrapInline(frame.kind, children: inlines)]
+        }
+
+        return InlineRenderNormalizer.makeRenderedInlines(from: inlines)
+    }
+
+    static func materializedPreview(from state: ReducerState) -> PreviewValue? {
+        let renderedInlines = materializedInlines(state: state)
+        return materializedPreview(
+            currentContext: state.currentContext,
+            renderedInlines: renderedInlines
+        )
+    }
+
+    static func materializedPreview(
+        currentContext: OpenContext,
+        renderedInlines: [Inline]
+    ) -> PreviewValue? {
+        switch currentContext {
+        case let .blockquote(children, id):
+            return .block(BlockNode(block: .blockquote(children: children), id: id))
+        case let .codeBlock(language, code, id):
+            return .block(BlockNode(block: .codeBlock(language: language, code: code), id: id))
+        case let .heading(level, id):
+            return .block(BlockNode(block: .heading(level: level, content: renderedInlines), id: id))
+        case let .list(id, ordered, items):
+            return .block(BlockNode(
+                block: ordered
+                ? .orderedList(startIndex: 1, items: items)
+                : .unorderedList(items: items),
+                id: id))
+        case let .listItem(blocks, checkbox):
+            return .listItem(children: blocks, checkbox: checkbox)
+        case let .paragraph(id):
+            return .block(BlockNode(block: .paragraph(content: renderedInlines), id: id))
+        case let .table(id, rows):
+            guard let headerCells = rows.first else { return nil }
+
+            let header = Block.TableRow(cells: headerCells.map { Block.TableCell(content: [.text($0)]) })
+            let dataRows = rows.dropFirst().map { row in
+                Block.TableRow(cells: row.map { Block.TableCell(content: [.text($0)]) })
+            }
+            return .block(BlockNode(
+                block: .table(columnAlignments: [], header: header, rows: dataRows),
+                id: id
+            ))
+        case .topLevel:
+            return nil
+        }
+    }
+
+    static func promote(
+        _ preview: PreviewValue,
+        into context: OpenContext
+    ) -> PreviewValue? {
+        switch context {
+        case let .blockquote(children, id):
+            guard case let .block(node) = preview else { return nil }
+            return .block(BlockNode(block: .blockquote(children: children + [node]), id: id))
+        case .codeBlock, .heading, .paragraph, .table:
+            return nil
+        case let .list(id, ordered, items):
+            guard case let .listItem(children, checkbox) = preview else { return nil }
+
+            let nextItems = items + [Block.ListItem(checkbox: checkbox, children: children)]
+            if ordered {
+                return .block(BlockNode(block: .orderedList(startIndex: 1, items: nextItems), id: id))
+            }
+            return .block(BlockNode(block: .unorderedList(items: nextItems), id: id))
+        case let .listItem(blocks, checkbox):
+            guard case let .block(node) = preview else { return nil }
+            return .listItem(children: blocks + [node], checkbox: checkbox)
+        case .topLevel:
+            return preview
+        }
+    }
+
+    static func refreshOpenTopLevelBlock(state: inout ReducerState) {
+        guard var preview = materializedPreview(from: state) else { return }
+
+        for context in state.contextStack.reversed() {
+            guard let promoted = promote(preview, into: context) else { return }
+            preview = promoted
+        }
+
+        guard case let .block(node) = preview else { return }
+        state.blocks.append(node)
+    }
+
     static func handleEndBlockQuote(state: inout ReducerState) {
-        guard case let .blockquote(children) = state.currentContext else { return }
+        guard case let .blockquote(children, id) = state.currentContext else { return }
 
         state.currentContext = state.contextStack.removeLast()
-        emitBlock(.blockquote(children: children), state: &state)
+        emitBlock(BlockNode(block: .blockquote(children: children), id: id), state: &state)
     }
 
     static func handleEndCodeBlock(state: inout ReducerState) {
-        guard case let .codeBlock(language, code) = state.currentContext else { return }
+        guard case let .codeBlock(language, code, id) = state.currentContext else { return }
 
         state.currentContext = state.contextStack.removeLast()
-        emitBlock(.codeBlock(language: language, code: code), state: &state)
+        emitBlock(BlockNode(block: .codeBlock(language: language, code: code), id: id), state: &state)
     }
 
     static func handleEndHeading(state: inout ReducerState) {
-        guard case let .heading(level) = state.currentContext else { return }
+        guard case let .heading(level, id) = state.currentContext else { return }
 
         let inlines = state.currentInlines
         state.currentInlines = []
         state.currentContext = state.contextStack.removeLast()
-        emitBlock(.heading(level: level, content: InlineRenderNormalizer.makeRenderedInlines(from: inlines)), state: &state)
+        emitBlock(
+            BlockNode(
+                block: .heading(
+                    level: level,
+                    content: InlineRenderNormalizer.makeRenderedInlines(from: inlines)
+                ),
+                id: id
+            ),
+            state: &state
+        )
     }
 
     static func handleEndList(state: inout ReducerState) {
-        guard case let .list(ordered, items) = state.currentContext else { return }
+        guard case let .list(id, ordered, items) = state.currentContext else { return }
 
         state.currentContext = state.contextStack.removeLast()
         if ordered {
-            emitBlock(.orderedList(startIndex: 1, items: items), state: &state)
+            emitBlock(BlockNode(block: .orderedList(startIndex: 1, items: items), id: id), state: &state)
         } else {
-            emitBlock(.unorderedList(items: items), state: &state)
+            emitBlock(BlockNode(block: .unorderedList(items: items), id: id), state: &state)
         }
     }
 
     static func handleEndListItem(state: inout ReducerState) {
         guard case let .listItem(blocks, checkbox) = state.currentContext else { return }
+        
         state.currentContext = state.contextStack.removeLast()
-
-        guard case .list(let ordered, var items) = state.currentContext else { return }
+        guard case .list(let id, let ordered, var items) = state.currentContext else { return }
+        
         items.append(Block.ListItem(checkbox: checkbox, children: blocks))
-        state.currentContext = .list(ordered: ordered, items: items)
+        state.currentContext = .list(id: id, ordered: ordered, items: items)
     }
 
     static func handleEndParagraph(state: inout ReducerState) {
-        guard case .paragraph = state.currentContext else { return }
+        guard case let .paragraph(id) = state.currentContext else { return }
         let inlines = state.currentInlines
         state.currentInlines = []
         state.currentContext = state.contextStack.removeLast()
-        emitBlock(.paragraph(content: InlineRenderNormalizer.makeRenderedInlines(from: inlines)), state: &state)
+        emitBlock(
+            BlockNode(
+                block: .paragraph(content: InlineRenderNormalizer.makeRenderedInlines(from: inlines)),
+                id: id
+            ),
+            state: &state
+        )
     }
 
     static func handleEndTable(state: inout ReducerState) {
-        guard case let .table(rows) = state.currentContext else { return }
+        guard case let .table(id, rows) = state.currentContext else { return }
+        
         state.currentContext = state.contextStack.removeLast()
-
         guard let headerCells = rows.first else {
-            emitBlock(.table(columnAlignments: [], header: Block.TableRow(cells: []), rows: []), state: &state)
+            emitBlock(
+                BlockNode(
+                    block: .table(columnAlignments: [], header: Block.TableRow(cells: []), rows: []),
+                    id: id
+                ),
+                state: &state
+            )
             return
         }
 
@@ -210,7 +345,13 @@ private extension BlockReducer {
         let dataRows = rows.dropFirst().map { row in
             Block.TableRow(cells: row.map { Block.TableCell(content: [.text($0)]) })
         }
-        emitBlock(.table(columnAlignments: [], header: header, rows: dataRows), state: &state)
+        emitBlock(
+            BlockNode(
+                block: .table(columnAlignments: [], header: header, rows: dataRows),
+                id: id
+            ),
+            state: &state
+        )
     }
 }
 
@@ -218,16 +359,19 @@ private extension BlockReducer {
 
 private extension BlockReducer {
     static func handleCodeBlockText(_ text: String, state: inout ReducerState) {
-        guard case let .codeBlock(language, code) = state.currentContext else { return }
+        guard case let .codeBlock(language, code, id) = state.currentContext else { return }
 
-        state.currentContext = .codeBlock(language: language, code: code + text)
+        state.currentContext = .codeBlock(language: language, code: code + text, id: id)
     }
 
     static func handleTableRow(_ cells: [String], state: inout ReducerState) {
-        guard case .table(var rows) = state.currentContext else { return }
+        guard case let .table(id, rows) = state.currentContext else { return }
 
-        rows.append(cells)
-        state.currentContext = .table(rows: rows)
+        state.currentContext = .table(id: id, rows: rows + [cells])
+    }
+
+    static func makeBlockNode(_ block: Block, state: inout ReducerState) -> BlockNode {
+        BlockNode(block: block, id: state.identityGenerator.makeIdentity())
     }
 }
 
@@ -240,6 +384,7 @@ private extension BlockReducer {
 
     static func closeInlineFrame(state: inout ReducerState) {
         guard let frame = state.inlineStack.popLast() else { return }
+        
         let children = state.currentInlines
         state.currentInlines = frame.savedInlines
         state.currentInlines.append(wrapInline(frame.kind, children: children))
@@ -248,5 +393,12 @@ private extension BlockReducer {
     static func pushInlineFrame(_ kind: InlineKind, state: inout ReducerState) {
         state.inlineStack.append(InlineFrame(kind: kind, savedInlines: state.currentInlines))
         state.currentInlines = []
+    }
+}
+
+private extension BlockReducer {
+    enum PreviewValue {
+        case block(BlockNode)
+        case listItem(children: [BlockNode], checkbox: Block.Checkbox?)
     }
 }

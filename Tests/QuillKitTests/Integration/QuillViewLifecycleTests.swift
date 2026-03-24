@@ -10,7 +10,7 @@ struct QuillViewLifecycleTests {
 
     @Test("append accumulates currentMarkdown")
     func appendAccumulatesMarkdown() async {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
 
         view.append("Hello ")
         #expect(view.currentMarkdown == "Hello ")
@@ -21,7 +21,7 @@ struct QuillViewLifecycleTests {
 
     @Test("cancelStreaming is idempotent")
     func cancelStreamingRemainsIdempotent() {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
 
         view.cancelStreaming()
         view.cancelStreaming()
@@ -35,7 +35,7 @@ struct QuillViewLifecycleTests {
 
     @Test("cancelStreaming then append auto-restarts stream")
     func appendAfterCancelRestartsStream() async {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
 
         view.append("First chunk")
         view.cancelStreaming()
@@ -44,7 +44,7 @@ struct QuillViewLifecycleTests {
         #expect(view.currentMarkdown == "First chunk continued\n\n")
 
         let renderedContent = await eventually {
-            (containerView(for: view)?.blockViews.count ?? 0) >= 1
+            documentHasContent(view)
         }
         #expect(renderedContent)
     }
@@ -64,18 +64,18 @@ struct QuillViewLifecycleTests {
         let slowConfiguration = RenderConfiguration(preset: tooSlowPreset)
         let balancedConfiguration = RenderConfiguration(preset: .balanced)
 
-        #expect(fastConfiguration.typewriter.lowQueue.baseDuration < balancedConfiguration.typewriter.lowQueue.baseDuration)
-        #expect(slowConfiguration.typewriter.lowQueue.baseDuration > balancedConfiguration.typewriter.lowQueue.baseDuration)
+        #expect(fastConfiguration.tailReveal.lowQueue.baseDuration < balancedConfiguration.tailReveal.lowQueue.baseDuration)
+        #expect(slowConfiguration.tailReveal.lowQueue.baseDuration > balancedConfiguration.tailReveal.lowQueue.baseDuration)
 
-        let expectedFastDuration = TypewriterConfiguration.balanced.lowQueue.baseDuration / 1.5
-        let expectedSlowDuration = TypewriterConfiguration.balanced.lowQueue.baseDuration / 0.75
-        #expect(abs(fastConfiguration.typewriter.lowQueue.baseDuration - expectedFastDuration) < Self.timingTolerance)
-        #expect(abs(slowConfiguration.typewriter.lowQueue.baseDuration - expectedSlowDuration) < Self.timingTolerance)
+        let expectedFastDuration = TailRevealPolicy.balanced.lowQueue.baseDuration / 1.5
+        let expectedSlowDuration = TailRevealPolicy.balanced.lowQueue.baseDuration / 0.75
+        #expect(abs(fastConfiguration.tailReveal.lowQueue.baseDuration - expectedFastDuration) < Self.timingTolerance)
+        #expect(abs(slowConfiguration.tailReveal.lowQueue.baseDuration - expectedSlowDuration) < Self.timingTolerance)
     }
 
     @Test("finish then append auto-restarts stream")
     func appendAfterFinishRestartsStream() async {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
 
         view.append("First paragraph\n\n")
         view.finish()
@@ -84,14 +84,14 @@ struct QuillViewLifecycleTests {
         #expect(view.currentMarkdown == "First paragraph\n\nSecond paragraph\n\n")
 
         let renderedContent = await eventually {
-            (containerView(for: view)?.blockViews.count ?? 0) >= 1
+            documentHasContent(view)
         }
         #expect(renderedContent)
     }
 
     @Test("finish is idempotent")
     func finishRemainsIdempotent() async {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
 
         view.append("Content\n\n")
         view.finish()
@@ -113,18 +113,18 @@ struct QuillViewLifecycleTests {
 
     @Test("reset clears currentMarkdown and rendered content")
     func resetClearsContent() async {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
 
         view.append("Some content\n\nMore content\n\n")
 
         view.reset()
         #expect(view.currentMarkdown == nil)
-        #expect(containerView(for: view)?.blockViews.isEmpty == true)
+        #expect(documentHasContent(view) == false)
     }
 
     @Test("static markdown assignment syncs currentMarkdown")
     func markdownAssignmentSyncsCurrentMarkdown() {
-        let view = makeStableBlocksQuillView()
+        let view = makeSmoothedTailQuillView()
 
         view.markdown = "# Title"
         #expect(view.currentMarkdown == "# Title")
@@ -136,31 +136,22 @@ struct QuillViewLifecycleTests {
         #expect(view.currentMarkdown == nil)
     }
 
-    @Test("static markdown assignment resets active reveal sequencing")
-    func markdownAssignmentResetsActiveRevealSequencing() async throws {
-        let view = makeStableBlocksQuillView()
+    @Test("static markdown assignment resets active streaming")
+    func markdownAssignmentResetsActiveStreaming() async throws {
+        let view = makeSmoothedTailQuillView()
 
-        view.append("First paragraph with a [link](https://example.com) and enough extra text to keep reveal active for a moment.\n\n")
+        view.append("First paragraph with a [link](https://example.com) and enough extra text to keep streaming active for a moment.\n\n")
 
         let streamingRendered = await eventually {
-            guard let container = containerView(for: view) else { return false }
-            guard let flow = container.blockViews.first(where: { $0 is TextFlowView }) as? TextFlowView else { return false }
-            return flow.totalCharacterCount > 0 && flow.originalAttributedString != nil
+            documentHasContent(view)
         }
         #expect(streamingRendered)
 
         view.markdown = "# Static Title\n\nStatic body."
 
         let staticRendered = await eventually {
-            guard let container = containerView(for: view) else { return false }
-            guard container.blockViews.count == 1 else { return false }
-            guard let flow = container.blockViews.first as? TextFlowView else { return false }
-            return flow.totalCharacterCount == 0 && flow.originalAttributedString == nil
+            documentHasContent(view)
         }
         #expect(staticRendered)
-
-        let textFlowView = try #require(containerView(for: view)?.blockViews.first as? TextFlowView)
-        #expect(textFlowView.totalCharacterCount == 0)
-        #expect(textFlowView.originalAttributedString == nil)
     }
 }

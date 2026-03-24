@@ -3,6 +3,8 @@ import SwiftUI
 
 /// Static markdown rendering view backed by QuillView.
 public struct QuillMarkdownView: UIViewRepresentable {
+    @Environment(\.quillSyntaxHighlighter) private var syntaxHighlighter
+
     let markdown: String
     let linkTapHandler: ((URL) -> Void)?
 
@@ -42,9 +44,10 @@ public extension QuillMarkdownView {
 
 extension QuillMarkdownView {
     func applyConfiguration(to view: QuillView) {
-        view.onLinkTap = linkTapHandler
+        view.onLinkSelection = linkTapHandler
+        view.syntaxHighlighter = syntaxHighlighter
         guard view.markdown != markdown else { return }
-        
+
         view.markdown = markdown
     }
 }

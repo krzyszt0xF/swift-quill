@@ -20,13 +20,13 @@ func makeBufferedModulesQuillView(
 
 @MainActor
 func makeQuillView(
-    mode: StreamingMode = .stableBlocks,
+    mode: StreamingMode = .smoothedTail,
     bufferedStreamConfiguration: BufferedStreamConfiguration? = nil
 ) -> QuillView {
     var configuration = RenderConfiguration(
         streamingMode: mode,
         performanceProfile: .balanced,
-        typewriter: .balanced,
+        tailReveal: .balanced,
         layout: .init(heightMeasurementCoalescingInterval: 0.005),
         bufferedStream: .default
     )
@@ -37,6 +37,7 @@ func makeQuillView(
             maxBufferingDelay: 0.1
         )
     }
+
     let view = QuillView(
         frame: CGRect(x: 0, y: 0, width: 320, height: 0),
         configuration: configuration,
@@ -47,6 +48,6 @@ func makeQuillView(
 }
 
 @MainActor
-func makeStableBlocksQuillView() -> QuillView {
-    makeQuillView(mode: .stableBlocks)
+func makeSmoothedTailQuillView() -> QuillView {
+    makeQuillView(mode: .smoothedTail)
 }

@@ -1,5 +1,37 @@
+package struct BlockIdentity: Hashable, Sendable {
+    package let rawValue: UInt64
+
+    package init(rawValue: UInt64) {
+        self.rawValue = rawValue
+    }
+}
+
+package struct BlockNode: Equatable, Identifiable, Sendable {
+    package let block: Block
+    package let id: BlockIdentity
+
+    package init(block: Block, id: BlockIdentity) {
+        self.block = block
+        self.id = id
+    }
+}
+
+package struct BlockIdentityGenerator: Sendable {
+    private var nextRawValue: UInt64
+
+    package init(nextRawValue: UInt64 = 0) {
+        self.nextRawValue = nextRawValue
+    }
+
+    package mutating func makeIdentity() -> BlockIdentity {
+        let identity = BlockIdentity(rawValue: nextRawValue)
+        nextRawValue += 1
+        return identity
+    }
+}
+
 package indirect enum Block: Equatable, Sendable {
-    case blockquote(children: [Block])
+    case blockquote(children: [BlockNode])
     case codeBlock(language: String?, code: String)
     case heading(level: Int, content: [Inline])
     case htmlBlock(rawHTML: String)
@@ -26,9 +58,9 @@ package extension Block {
 
     struct ListItem: Equatable, Sendable {
         package let checkbox: Checkbox?
-        package let children: [Block]
+        package let children: [BlockNode]
 
-        package init(checkbox: Checkbox? = nil, children: [Block]) {
+        package init(checkbox: Checkbox? = nil, children: [BlockNode]) {
             self.checkbox = checkbox
             self.children = children
         }
