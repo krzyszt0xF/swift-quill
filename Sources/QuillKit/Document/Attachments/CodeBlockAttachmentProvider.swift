@@ -23,6 +23,12 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
 
         let view = CodeBlockView()
         view.configure(language: attachment.language, code: attachment.code)
+
+        if let highlighted = attachment.highlightStore?.highlightedResult(for: attachment.blockID) {
+            view.apply(highlightedCode: highlighted)
+        }
+
+        attachment.highlightStore?.registerSink(view, for: attachment.blockID)
         self.view = view
     }
 

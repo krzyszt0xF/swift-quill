@@ -13,7 +13,7 @@ public final class QuillView: UIView {
         didSet { streamCoordinator.onLinkSelection = onLinkSelection }
     }
 
-    public var syntaxHighlighter: (any SyntaxHighlighter)? {
+    public var syntaxHighlighter: (any SyntaxHighlighting)? {
         didSet { streamCoordinator.syntaxHighlighter = syntaxHighlighter }
     }
 

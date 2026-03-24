@@ -17,7 +17,7 @@ struct CodeBlockViewTests {
             string: "let x = 1",
             attributes: [.foregroundColor: UIColor.red]
         )
-        view.applyHighlightedCode(highlighted)
+        view.apply(highlightedCode: HighlightedCodeSnapshot(highlighted))
 
         let codeLabel = codeLabel(in: view)
         #expect(codeLabel?.attributedText?.string == "let x = 1")

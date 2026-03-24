@@ -72,8 +72,10 @@ final class CodeBlockView: UIView {
             + verticalInset
     }
 
-    func applyHighlightedCode(_ attributedString: NSAttributedString) {
-        let highlightedCode = NSMutableAttributedString(attributedString: attributedString)
+    func apply(highlightedCode: HighlightedCodeSnapshot) {
+        let highlightedCode = NSMutableAttributedString(
+            attributedString: highlightedCode.makeAttributedString()
+        )
         highlightedCode.addAttribute(
             .font,
             value: UIFont.code,
@@ -264,3 +266,5 @@ extension CodeBlockView: UIGestureRecognizerDelegate {
         return copyButton.frame.contains(location) == false
     }
 }
+
+extension CodeBlockView: CodeBlockHighlightSink {}

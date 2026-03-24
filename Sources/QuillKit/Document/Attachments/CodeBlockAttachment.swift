@@ -5,6 +5,7 @@ final class CodeBlockAttachment: NSTextAttachment {
     private var hasAnimatedAppearance = false
     let blockID: BlockIdentity
     let code: String
+    weak var highlightStore: (any CodeBlockHighlightStore)?
     let language: String?
 
     init(blockID: BlockIdentity, language: String?, code: String) {

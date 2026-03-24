@@ -11,7 +11,7 @@ final class StreamCoordinator {
     var onLinkSelection: ((URL) -> Void)? {
         didSet { renderer.textView.onLinkSelection = onLinkSelection }
     }
-    var syntaxHighlighter: (any SyntaxHighlighter)? {
+    var syntaxHighlighter: (any SyntaxHighlighting)? {
         didSet { renderer.set(highlighter: syntaxHighlighter) }
     }
 

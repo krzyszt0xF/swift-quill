@@ -3,27 +3,23 @@ import UIKit
 
 @MainActor
 final class HighlightCoordinator {
-    private(set) var pendingResults: [BlockIdentity: NSAttributedString] = [:]
-
-    private var highlighter: (any SyntaxHighlighter)?
+    private var highlighter: (any SyntaxHighlighting)?
     private let highlightQueue: DispatchQueue
     private var pendingBlockRequests: [BlockIdentity: UUID]
     private let cache: NSCache<NSString, NSAttributedString>
+    private let highlightStoreState: HighlightStoreState
 
     init(cacheLimit: Int, highlightQueue: DispatchQueue) {
         self.highlightQueue = highlightQueue
         self.pendingBlockRequests = .init()
         self.cache = NSCache<NSString, NSAttributedString>()
+        self.highlightStoreState = .init()
         self.cache.countLimit = cacheLimit
     }
 
     func cancelAll() {
         pendingBlockRequests.removeAll()
-        pendingResults.removeAll()
-    }
-
-    func consumePendingResult(for blockID: BlockIdentity) -> NSAttributedString? {
-        pendingResults.removeValue(forKey: blockID)
+        highlightStoreState.removeAll()
     }
 
     func reset() {
@@ -36,7 +32,9 @@ final class HighlightCoordinator {
 
         let cacheKey = "\(language):\(code)"
         if let cached = cache.object(forKey: cacheKey as NSString) {
-            pendingResults[blockID] = cached
+            let snapshot = HighlightedCodeSnapshot(cached)
+            let sink = highlightStoreState.storeResult(snapshot, for: blockID)
+            sink?.apply(highlightedCode: snapshot)
             return
         }
 
@@ -57,10 +55,24 @@ final class HighlightCoordinator {
         }
     }
 
-    func set(highlighter: (any SyntaxHighlighter)?) {
+    func set(highlighter: (any SyntaxHighlighting)?) {
         self.highlighter = highlighter
         cache.removeAllObjects()
         cancelAll()
+    }
+}
+
+extension HighlightCoordinator: CodeBlockHighlightStore {
+    nonisolated func highlightedResult(for blockID: BlockIdentity) -> HighlightedCodeSnapshot? {
+        highlightStoreState.highlightedResult(for: blockID)
+    }
+
+    nonisolated func registerSink(_ sink: any CodeBlockHighlightSink, for blockID: BlockIdentity) {
+        highlightStoreState.registerSink(sink, for: blockID)
+    }
+
+    nonisolated func unregisterSink(for blockID: BlockIdentity) {
+        highlightStoreState.unregisterSink(for: blockID)
     }
 }
 
@@ -89,7 +101,58 @@ private extension HighlightCoordinator {
 
         guard let result else { return }
 
-        cache.setObject(result, forKey: cacheKey as NSString)
-        pendingResults[blockID] = result
+        let cachedResult = NSAttributedString(attributedString: result)
+        let snapshot = HighlightedCodeSnapshot(cachedResult)
+        cache.setObject(cachedResult, forKey: cacheKey as NSString)
+
+        let sink = highlightStoreState.storeResult(snapshot, for: blockID)
+        sink?.apply(highlightedCode: snapshot)
+    }
+
+    // Safety: all mutable state serialized through NSLock.
+    final class HighlightStoreState: @unchecked Sendable {
+        private let lock = NSLock()
+        private var pendingResults: [BlockIdentity: HighlightedCodeSnapshot] = [:]
+        private var sinks: [BlockIdentity: WeakSinkBox] = [:]
+
+        func highlightedResult(for blockID: BlockIdentity) -> HighlightedCodeSnapshot? {
+            lock.withLock {
+                pendingResults[blockID]
+            }
+        }
+
+        func registerSink(_ sink: any CodeBlockHighlightSink, for blockID: BlockIdentity) {
+            lock.withLock {
+                sinks[blockID] = WeakSinkBox(sink: sink)
+            }
+        }
+
+        func removeAll() {
+            lock.withLock {
+                pendingResults.removeAll()
+                sinks.removeAll()
+            }
+        }
+
+        func storeResult(_ result: HighlightedCodeSnapshot, for blockID: BlockIdentity) -> (any CodeBlockHighlightSink)? {
+            lock.withLock {
+                pendingResults[blockID] = result
+                return sinks[blockID]?.sink
+            }
+        }
+
+        func unregisterSink(for blockID: BlockIdentity) {
+            lock.withLock {
+                sinks.removeValue(forKey: blockID)
+            }
+        }
+    }
+
+    final class WeakSinkBox {
+        weak var sink: (any CodeBlockHighlightSink)?
+
+        init(sink: any CodeBlockHighlightSink) {
+            self.sink = sink
+        }
     }
 }

@@ -45,7 +45,8 @@ final class DocumentRenderer {
     func render(blocks: [BlockNode], frozenCount: Int) -> RenderOutcome {
         let fragments = AttributedStringBuilder.buildDocumentFragments(
             from: blocks,
-            frozenCount: frozenCount
+            frozenCount: frozenCount,
+            highlightStore: highlightCoordinator
         )
         let previousFrozenCount = renderState.frozenBlockCount
         let renderOutcome: RenderOutcome
@@ -93,7 +94,7 @@ final class DocumentRenderer {
         }
     }
 
-    func set(highlighter: (any SyntaxHighlighter)?) {
+    func set(highlighter: (any SyntaxHighlighting)?) {
         highlightCoordinator.set(highlighter: highlighter)
     }
 }

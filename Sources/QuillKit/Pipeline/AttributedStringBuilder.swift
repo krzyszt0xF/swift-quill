@@ -17,7 +17,8 @@ enum AttributedStringBuilder {
 
     static func buildDocumentFragments(
         from nodes: [BlockNode],
-        frozenCount: Int
+        frozenCount: Int,
+        highlightStore: (any CodeBlockHighlightStore)? = nil
     ) -> [DocumentFragment] {
         var fragments: [DocumentFragment] = []
 
@@ -30,6 +31,7 @@ enum AttributedStringBuilder {
             case let .codeBlock(language, code):
                 if isFrozen {
                     let attachment = CodeBlockAttachment(blockID: blockID, language: language, code: code)
+                    attachment.highlightStore = highlightStore
                     let attachmentString = NSMutableAttributedString(attachment: attachment)
                     let style = NSMutableParagraphStyle()
                     style.paragraphSpacingBefore = 8
