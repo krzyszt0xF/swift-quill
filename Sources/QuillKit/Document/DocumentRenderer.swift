@@ -30,6 +30,7 @@ final class DocumentRenderer {
 
     func cancelStreaming() {
         tailRevealEngine.cancel()
+        renderState.resetSmoothedTailStart()
     }
 
     @discardableResult
@@ -210,47 +211,15 @@ private extension DocumentRenderer {
         )
     }
 
-    func makeCachedPrefixLength(
-        from fragments: [AttributedStringBuilder.DocumentFragment],
-        frozenCount: Int
-    ) -> Int {
-        if renderState.frozenPrefixCount == frozenCount {
-            return renderState.frozenPrefixLength
-        }
-
-        let prefixLength = makePrefixLength(from: fragments, frozenCount: frozenCount)
-        renderState.updateFrozenPrefix(count: frozenCount, length: prefixLength)
-        return prefixLength
-    }
-
     func makeDesiredTailContent(
         in document: NSAttributedString,
-        prefixLength: Int
+        tailStart: Int
     ) -> NSAttributedString {
-        guard document.length > prefixLength else { return NSAttributedString() }
+        guard document.length > tailStart else { return NSAttributedString() }
 
         return document.attributedSubstring(
-            from: NSRange(location: prefixLength, length: document.length - prefixLength)
+            from: NSRange(location: tailStart, length: document.length - tailStart)
         )
-    }
-
-    func makePrefixLength(
-        from fragments: [AttributedStringBuilder.DocumentFragment],
-        frozenCount: Int
-    ) -> Int {
-        guard frozenCount > 0 else { return 0 }
-
-        let prefixLimit = min(frozenCount, fragments.count)
-        var length = 0
-
-        for index in 0..<prefixLimit {
-            if index > 0 {
-                length += 1
-            }
-            length += fragments[index].attributedString.length
-        }
-
-        return length
     }
 
     func rebuildBlockIndex(
@@ -261,14 +230,30 @@ private extension DocumentRenderer {
             from: fragments,
             preservingPrefixCount: renderState.frozenBlockCount
         )
-        renderState.updateFrozenPrefix(
-            count: frozenCount,
-            length: makePrefixLength(from: fragments, frozenCount: frozenCount)
-        )
         renderState.updateFrozenBlockCount(
             to: frozenCount,
             blockCount: blockIndexer.blockSpans.count
         )
+    }
+
+    func makeSmoothedTailStart(
+        documentLength: Int,
+        frozenCount: Int
+    ) -> Int {
+        if renderState.smoothedTailFrozenCount == frozenCount,
+           let smoothedTailStart = renderState.smoothedTailStart {
+            return smoothedTailStart
+        }
+
+        let smoothedTailStart = blockIndexer.tailRange(
+            after: frozenCount,
+            documentLength: documentLength
+        )?.location ?? documentLength
+        renderState.updateSmoothedTailStart(
+            frozenCount: frozenCount,
+            location: smoothedTailStart
+        )
+        return smoothedTailStart
     }
 
     func renderImmediately(
@@ -277,6 +262,7 @@ private extension DocumentRenderer {
         previousFrozenCount: Int
     ) -> RenderOutcome {
         tailRevealEngine.cancel()
+        renderState.resetSmoothedTailStart()
 
         guard let contentStorage = textView.contentStorage,
               let currentString = contentStorage.attributedString
@@ -329,13 +315,15 @@ private extension DocumentRenderer {
         }
 
         let desiredDocument = AttributedStringBuilder.buildDocument(from: fragments)
-        let prefixLength = makeCachedPrefixLength(from: fragments, frozenCount: frozenCount)
-        let desiredTail = makeDesiredTailContent(in: desiredDocument, prefixLength: prefixLength)
         let currentDocumentLength = contentStorage.attributedString?.length ?? 0
-        let currentTailStart = blockIndexer.tailRange(
-            after: previousFrozenCount,
-            documentLength: currentDocumentLength
-        )?.location ?? currentDocumentLength
+        let currentTailStart = makeSmoothedTailStart(
+            documentLength: currentDocumentLength,
+            frozenCount: previousFrozenCount
+        )
+        let desiredTail = makeDesiredTailContent(
+            in: desiredDocument,
+            tailStart: currentTailStart
+        )
         let displayedTail = tailRevealEngine.rebase(
             to: desiredTail,
             policy: tailRevealPolicy
@@ -348,6 +336,14 @@ private extension DocumentRenderer {
         )
 
         rebuildBlockIndex(from: fragments, frozenCount: frozenCount)
+        if frozenCount < fragments.count {
+            renderState.updateSmoothedTailStart(
+                frozenCount: frozenCount,
+                location: currentTailStart
+            )
+        } else {
+            renderState.resetSmoothedTailStart()
+        }
         return RenderOutcome(invalidatedHeight: didMutateVisibleContent)
     }
 
@@ -408,18 +404,25 @@ private extension DocumentRenderer {
 private extension DocumentRenderer {
     struct RenderState {
         var frozenBlockCount = 0
-        var frozenPrefixCount = 0
-        var frozenPrefixLength = 0
+        var smoothedTailFrozenCount: Int?
+        var smoothedTailStart: Int?
 
         mutating func reset() {
             frozenBlockCount = 0
-            frozenPrefixCount = 0
-            frozenPrefixLength = 0
+            resetSmoothedTailStart()
         }
 
-        mutating func updateFrozenPrefix(count: Int, length: Int) {
-            frozenPrefixCount = count
-            frozenPrefixLength = length
+        mutating func resetSmoothedTailStart() {
+            smoothedTailFrozenCount = nil
+            smoothedTailStart = nil
+        }
+
+        mutating func updateSmoothedTailStart(
+            frozenCount: Int,
+            location: Int
+        ) {
+            smoothedTailFrozenCount = frozenCount
+            smoothedTailStart = location
         }
 
         mutating func updateFrozenBlockCount(to newValue: Int, blockCount: Int) {
