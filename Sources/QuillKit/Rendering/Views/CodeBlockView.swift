@@ -3,19 +3,19 @@ import UIKit
 @MainActor
 final class CodeBlockView: UIView {
     private let copyButton = UIButton(type: .system)
+    private let codeTextView = CodeTextView()
     private let headerView = UIView()
     private let languageLabel = UILabel()
     private let scrollView = UIScrollView()
-    private let codeLabel = UILabel()
+    private lazy var codeWidthConstraint = codeTextView.widthAnchor.constraint(equalToConstant: 0)
     private var copyRevertTask: Task<Void, Never>?
-    private lazy var selectionBlockerGesture = makeSelectionBlockerGesture()
 
     private(set) var currentCode: String = ""
 
     override var intrinsicContentSize: CGSize {
         CGSize(
             width: UIView.noIntrinsicMetric,
-            height: Self.measuredHeight(language: languageLabel.text, code: currentCode)
+            height: Self.measureHeight(of: currentCode, in: languageLabel.text)
         )
     }
 
@@ -33,7 +33,6 @@ final class CodeBlockView: UIView {
         setupLanguageLabel()
         setupScrollView()
         setupCodeLabel()
-        addGestureRecognizer(selectionBlockerGesture)
     }
 
     @available(*, unavailable)
@@ -45,11 +44,11 @@ final class CodeBlockView: UIView {
         let width = size.width > 0 ? size.width : bounds.width
         return CGSize(
             width: width,
-            height: Self.measuredHeight(language: languageLabel.text, code: currentCode)
+            height: Self.measureHeight(of: currentCode, in: languageLabel.text)
         )
     }
 
-    nonisolated static func measuredHeight(language: String?, code: String) -> CGFloat {
+    nonisolated static func measureHeight(of code: String, in language: String?) -> CGFloat {
         let displayCode = code.withoutTrailingNewline
         let lineCount = max(1, displayCode.components(separatedBy: "\n").count)
         let codeLineHeight = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular).lineHeight
@@ -72,8 +71,12 @@ final class CodeBlockView: UIView {
             + verticalInset
     }
 
-    func applyHighlightedCode(_ attributedString: NSAttributedString) {
-        let highlightedCode = NSMutableAttributedString(attributedString: attributedString)
+    func apply(highlightedCode: HighlightedCodeSnapshot) {
+        let selectedRange = codeTextView.selectedRange
+        let contentOffset = scrollView.contentOffset
+        let highlightedCode = NSMutableAttributedString(
+            attributedString: highlightedCode.makeAttributedString()
+        )
         highlightedCode.addAttribute(
             .font,
             value: UIFont.code,
@@ -85,13 +88,16 @@ final class CodeBlockView: UIView {
             range: NSRange(location: 0, length: highlightedCode.length)
         )
 
-        codeLabel.attributedText = highlightedCode
+        codeTextView.attributedText = highlightedCode
+        updateCodeWidth()
+        restoreSelection(selectedRange, textLength: highlightedCode.length)
+        scrollView.setContentOffset(contentOffset, animated: false)
         setStreamingState(false)
     }
 
     func configure(language: String?, code: String) {
         currentCode = code.withoutTrailingNewline
-        codeLabel.attributedText = NSAttributedString(
+        codeTextView.attributedText = NSAttributedString(
             string: currentCode,
             attributes: [
                 .font: UIFont.code,
@@ -99,6 +105,7 @@ final class CodeBlockView: UIView {
                 .paragraphStyle: NSParagraphStyle.code,
             ]
         )
+        updateCodeWidth()
 
         if let language, !language.isEmpty {
             languageLabel.text = language
@@ -118,8 +125,6 @@ final class CodeBlockView: UIView {
 }
 
 private extension CodeBlockView {
-    @objc func handleSelectionBlockerLongPress() {}
-
     @objc func copyTapped() {
         UIPasteboard.general.string = currentCode
 
@@ -136,26 +141,32 @@ private extension CodeBlockView {
             self.copyButton.tintColor = .label
         }
     }
+
+    func restoreSelection(_ selectedRange: NSRange, textLength: Int) {
+        guard selectedRange.location != NSNotFound else { return }
+
+        let clampedLocation = min(selectedRange.location, textLength)
+        let clampedLength = min(selectedRange.length, textLength - clampedLocation)
+        codeTextView.selectedRange = NSRange(location: clampedLocation, length: clampedLength)
+    }
 }
 
 private extension CodeBlockView {
-    func makeSelectionBlockerGesture() -> UILongPressGestureRecognizer {
-        let gesture = UILongPressGestureRecognizer(target: self, action: #selector(handleSelectionBlockerLongPress))
-        gesture.cancelsTouchesInView = true
-        gesture.delegate = self
-        return gesture
+    func updateCodeWidth() {
+        codeWidthConstraint.constant = measureWidth(of: currentCode)
     }
 
     func setupCodeLabel() {
-        codeLabel.numberOfLines = 0
-        scrollView.addSubview(codeLabel)
-        codeLabel.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(codeTextView)
+        codeTextView.translatesAutoresizingMaskIntoConstraints = false
+        codeWidthConstraint.priority = .defaultHigh
         NSLayoutConstraint.activate([
-            codeLabel.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-            codeLabel.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
-            codeLabel.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-            codeLabel.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
-            codeLabel.widthAnchor.constraint(greaterThanOrEqualTo: scrollView.frameLayoutGuide.widthAnchor)
+            codeTextView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            codeTextView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            codeTextView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            codeTextView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            codeTextView.widthAnchor.constraint(greaterThanOrEqualTo: scrollView.frameLayoutGuide.widthAnchor),
+            codeWidthConstraint,
         ])
     }
     
@@ -222,6 +233,14 @@ private extension CodeBlockView {
 }
 
 private extension CodeBlockView {
+    func measureWidth(of code: String) -> CGFloat {
+        let lines = code.isEmpty ? [""] : code.components(separatedBy: "\n")
+        let widestLine = lines.map { line in
+            ceil((line as NSString).size(withAttributes: [.font: UIFont.code]).width)
+        }.max() ?? 0
+        return widestLine
+    }
+
     enum Layout {
         enum Inset {
             static let vertical: CGFloat = 12
@@ -258,9 +277,43 @@ private extension UIFont {
     static let code = UIFont(name: "Menlo-Regular", size: 14) ?? .monospacedSystemFont(ofSize: 14, weight: .regular)
 }
 
-extension CodeBlockView: UIGestureRecognizerDelegate {
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        let location = touch.location(in: headerView)
-        return copyButton.frame.contains(location) == false
+@MainActor
+private final class CodeTextView: UITextView {
+    override var intrinsicContentSize: CGSize {
+        let width = bounds.width > 0 ? bounds.width : max(contentSize.width, 1)
+        let fittingSize = sizeThatFits(CGSize(width: width, height: CGFloat.greatestFiniteMagnitude))
+        return CGSize(width: UIView.noIntrinsicMetric, height: fittingSize.height)
+    }
+
+    override var contentSize: CGSize {
+        didSet {
+            if oldValue != contentSize {
+                invalidateIntrinsicContentSize()
+            }
+        }
+    }
+
+    override init(frame: CGRect, textContainer: NSTextContainer?) {
+        super.init(frame: frame, textContainer: textContainer)
+
+        backgroundColor = .clear
+        dataDetectorTypes = []
+        isEditable = false
+        isScrollEnabled = false
+        isSelectable = true
+        showsHorizontalScrollIndicator = false
+        showsVerticalScrollIndicator = false
+        textContainerInset = .zero
+        textContainer?.lineBreakMode = .byClipping
+        textContainer?.lineFragmentPadding = 0
+        textContainer?.widthTracksTextView = false
+        textDragInteraction?.isEnabled = false
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 }
+
+extension CodeBlockView: CodeBlockHighlightSink {}

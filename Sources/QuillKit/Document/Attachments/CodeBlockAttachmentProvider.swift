@@ -23,6 +23,12 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
 
         let view = CodeBlockView()
         view.configure(language: attachment.language, code: attachment.code)
+
+        if let highlighted = attachment.highlightStore?.highlightedResult(for: attachment.blockID) {
+            view.apply(highlightedCode: highlighted)
+        }
+
+        attachment.highlightStore?.registerSink(view, for: attachment.blockID)
         self.view = view
     }
 
@@ -42,10 +48,7 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
             return CGRect(origin: .zero, size: Layout.fallbackSize)
         }
 
-        let height = CodeBlockView.measuredHeight(
-            language: attachment.language,
-            code: attachment.code
-        )
+        let height = CodeBlockView.measureHeight(of: attachment.code, in: attachment.language)
         return CGRect(origin: .zero, size: CGSize(width: width, height: height))
     }
 }

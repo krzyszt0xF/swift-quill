@@ -238,6 +238,28 @@ struct QuillViewIntegrationTests {
         #expect(markdownMatched)
         #expect(view.currentMarkdown == fullMarkdown)
     }
+
+    @Test("Closed code block renders selectable text view")
+    func closedCodeBlockRendersSelectableTextView() async {
+        let view = makeSmoothedTailQuillView()
+
+        view.append("```swift\nlet value = 1\n```\n")
+        view.finish()
+
+        let rendered = await eventually(timeout: .milliseconds(1200)) {
+            guard let codeBlockView = documentCodeBlockView(for: view),
+                  let codeTextView = findSubview(
+                    of: UITextView.self,
+                    in: codeBlockView,
+                    matching: { $0.isSelectable && $0.isEditable == false }
+                  )
+            else { return false }
+
+            return codeTextView.attributedText.string.contains("let value = 1")
+        }
+
+        #expect(rendered)
+    }
 }
 
 private extension QuillViewIntegrationTests {

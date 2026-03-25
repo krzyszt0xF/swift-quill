@@ -17,7 +17,7 @@ struct InternalDependencyTests {
                 now: { 0 },
                 sleep: { _ in }
             ),
-            bufferedVisualFeeder: .live,
+            bufferedVisualFeeder: .init(),
             streamController: {
                 streamControllerFactory.increment()
                 return MarkdownStreamController()
@@ -58,7 +58,7 @@ struct InternalDependencyTests {
                     now: { 0 },
                     sleep: { _ in }
                 ),
-                bufferedVisualFeeder: .live,
+                bufferedVisualFeeder: .init(),
                 streamController: MarkdownStreamController.init
             )
         )
@@ -88,7 +88,7 @@ struct InternalDependencyTests {
                     now: { 0 },
                     sleep: { _ in }
                 ),
-                bufferedVisualFeeder: .live,
+                bufferedVisualFeeder: .init(),
                 streamController: {
                     streamControllerFactory.increment()
                     return MarkdownStreamController()

@@ -8,8 +8,8 @@ struct CodeBlockViewTests {
     private static let minimumVisibleHeight: CGFloat = 36
     private static let testWidth: CGFloat = 320
 
-    @Test("applyHighlightedCode replaces code label content")
-    func applyHighlightedCodeReplacesCodeLabelContent() {
+    @Test("applyHighlightedCode replaces code text view content")
+    func applyHighlightedCodeReplacesCodeTextViewContent() {
         let view = CodeBlockView()
         view.configure(language: "swift", code: "let x = 1")
 
@@ -17,10 +17,10 @@ struct CodeBlockViewTests {
             string: "let x = 1",
             attributes: [.foregroundColor: UIColor.red]
         )
-        view.applyHighlightedCode(highlighted)
+        view.apply(highlightedCode: HighlightedCodeSnapshot(highlighted))
 
-        let codeLabel = codeLabel(in: view)
-        #expect(codeLabel?.attributedText?.string == "let x = 1")
+        let codeTextView = codeTextView(in: view)
+        #expect(codeTextView?.attributedText?.string == "let x = 1")
     }
 
     @Test("Configured code block keeps visible fitting height")
@@ -42,8 +42,8 @@ struct CodeBlockViewTests {
         let view = CodeBlockView()
         view.configure(language: nil, code: "line1\nline2\n")
 
-        let codeLabel = codeLabel(in: view)
-        #expect(codeLabel?.attributedText?.string == "line1\nline2")
+        let codeTextView = codeTextView(in: view)
+        #expect(codeTextView?.attributedText?.string == "line1\nline2")
     }
 
     @Test("Configure with language shows language pill")
@@ -80,6 +80,27 @@ struct CodeBlockViewTests {
 
         let actions = button?.actions(forTarget: view, forControlEvent: .touchUpInside)
         #expect(actions?.isEmpty == false)
+    }
+
+    @Test("Code block view does not install long press gestures")
+    func codeBlockViewDoesNotInstallLongPressGestures() {
+        let view = CodeBlockView()
+        view.configure(language: "swift", code: "let x = 1")
+
+        let hasLongPressGesture = view.gestureRecognizers?.contains { $0 is UILongPressGestureRecognizer } ?? false
+        #expect(hasLongPressGesture == false)
+    }
+
+    @Test("Code text view is selectable and not scrollable")
+    func codeTextViewSupportsSelection() {
+        let view = CodeBlockView()
+        view.configure(language: "swift", code: "let x = 1")
+
+        let codeTextView = codeTextView(in: view)
+
+        #expect(codeTextView?.isEditable == false)
+        #expect(codeTextView?.isScrollEnabled == false)
+        #expect(codeTextView?.isSelectable == true)
     }
 
     @Test("Header bar visible with language")
@@ -132,14 +153,14 @@ struct CodeBlockViewTests {
         view.layoutIfNeeded()
 
         let languagePillLabel = findSubview(of: UILabel.self, in: view, matching: { $0.text == "json" })
-        let codeLabel = codeLabel(in: view)
+        let codeTextView = codeTextView(in: view)
 
         #expect(languagePillLabel != nil)
-        #expect(codeLabel != nil)
+        #expect(codeTextView != nil)
 
-        if let languagePillLabel, let codeLabel {
+        if let languagePillLabel, let codeTextView {
             let pillFrame = view.convert(languagePillLabel.bounds, from: languagePillLabel)
-            let textFrame = view.convert(codeLabel.bounds, from: codeLabel)
+            let textFrame = view.convert(codeTextView.bounds, from: codeTextView)
             #expect(textFrame.minY >= pillFrame.maxY)
         }
     }
@@ -175,10 +196,66 @@ struct CodeBlockViewTests {
         #expect(fittingSize.width == Self.testWidth)
         #expect(fittingSize.height > Self.minimumVisibleHeight)
     }
+
+    @Test("Highlighted code preserves text selection")
+    func highlightedCodePreservesTextSelection() throws {
+        let view = CodeBlockView()
+        view.configure(language: "swift", code: "let value = 123")
+
+        let codeTextView = try #require(codeTextView(in: view))
+        codeTextView.selectedRange = NSRange(location: 4, length: 5)
+
+        let highlighted = NSAttributedString(
+            string: "let value = 123",
+            attributes: [.foregroundColor: UIColor.red]
+        )
+        view.apply(highlightedCode: HighlightedCodeSnapshot(highlighted))
+
+        #expect(codeTextView.selectedRange == NSRange(location: 4, length: 5))
+    }
+
+    @Test("Selected fragment uses native copy")
+    func selectedFragmentUsesNativeCopy() throws {
+        let view = CodeBlockView()
+        view.configure(language: "swift", code: "let value = 123")
+
+        let codeTextView = try #require(codeTextView(in: view))
+        codeTextView.selectedRange = NSRange(location: 4, length: 5)
+        UIPasteboard.general.string = nil
+
+        _ = codeTextView.becomeFirstResponder()
+        codeTextView.copy(nil)
+
+        #expect(UIPasteboard.general.string == "value")
+    }
+
+    @Test("Highlighted code preserves horizontal scroll offset")
+    func highlightedCodePreservesHorizontalScrollOffset() throws {
+        let view = CodeBlockView()
+        view.configure(language: "swift", code: "let someVeryLongValueName = anotherVeryLongValueName")
+        view.frame = CGRect(x: 0, y: 0, width: Self.testWidth, height: 120)
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+
+        let scrollView = try #require(codeScrollView(in: view))
+        scrollView.contentOffset = CGPoint(x: 32, y: 0)
+
+        let highlighted = NSAttributedString(
+            string: "let someVeryLongValueName = anotherVeryLongValueName",
+            attributes: [.foregroundColor: UIColor.red]
+        )
+        view.apply(highlightedCode: HighlightedCodeSnapshot(highlighted))
+
+        #expect(scrollView.contentOffset.x == 32)
+    }
 }
 
 private extension CodeBlockViewTests {
-    func codeLabel(in view: CodeBlockView) -> UILabel? {
-        findSubview(of: UILabel.self, in: view, matching: { $0.numberOfLines == 0 })
+    func codeScrollView(in view: CodeBlockView) -> UIScrollView? {
+        findSubview(of: UIScrollView.self, in: view, matching: { $0 !== view })
+    }
+
+    func codeTextView(in view: CodeBlockView) -> UITextView? {
+        findSubview(of: UITextView.self, in: view, matching: { $0.isSelectable && $0.isEditable == false })
     }
 }
