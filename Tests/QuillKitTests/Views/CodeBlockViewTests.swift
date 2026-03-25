@@ -82,6 +82,15 @@ struct CodeBlockViewTests {
         #expect(actions?.isEmpty == false)
     }
 
+    @Test("Code block view does not install long press gestures")
+    func codeBlockViewDoesNotInstallLongPressGestures() {
+        let view = CodeBlockView()
+        view.configure(language: "swift", code: "let x = 1")
+
+        let hasLongPressGesture = view.gestureRecognizers?.contains { $0 is UILongPressGestureRecognizer } ?? false
+        #expect(hasLongPressGesture == false)
+    }
+
     @Test("Header bar visible with language")
     func headerBarVisibleWithLanguage() {
         let view = CodeBlockView()

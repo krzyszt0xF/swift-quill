@@ -8,7 +8,6 @@ final class CodeBlockView: UIView {
     private let scrollView = UIScrollView()
     private let codeLabel = UILabel()
     private var copyRevertTask: Task<Void, Never>?
-    private lazy var selectionBlockerGesture = makeSelectionBlockerGesture()
 
     private(set) var currentCode: String = ""
 
@@ -33,7 +32,6 @@ final class CodeBlockView: UIView {
         setupLanguageLabel()
         setupScrollView()
         setupCodeLabel()
-        addGestureRecognizer(selectionBlockerGesture)
     }
 
     @available(*, unavailable)
@@ -120,8 +118,6 @@ final class CodeBlockView: UIView {
 }
 
 private extension CodeBlockView {
-    @objc func handleSelectionBlockerLongPress() {}
-
     @objc func copyTapped() {
         UIPasteboard.general.string = currentCode
 
@@ -141,13 +137,6 @@ private extension CodeBlockView {
 }
 
 private extension CodeBlockView {
-    func makeSelectionBlockerGesture() -> UILongPressGestureRecognizer {
-        let gesture = UILongPressGestureRecognizer(target: self, action: #selector(handleSelectionBlockerLongPress))
-        gesture.cancelsTouchesInView = true
-        gesture.delegate = self
-        return gesture
-    }
-
     func setupCodeLabel() {
         codeLabel.numberOfLines = 0
         scrollView.addSubview(codeLabel)
@@ -258,13 +247,6 @@ private extension String {
 
 private extension UIFont {
     static let code = UIFont(name: "Menlo-Regular", size: 14) ?? .monospacedSystemFont(ofSize: 14, weight: .regular)
-}
-
-extension CodeBlockView: UIGestureRecognizerDelegate {
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        let location = touch.location(in: headerView)
-        return copyButton.frame.contains(location) == false
-    }
 }
 
 extension CodeBlockView: CodeBlockHighlightSink {}

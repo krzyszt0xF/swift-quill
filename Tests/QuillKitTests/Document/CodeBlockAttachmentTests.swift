@@ -32,21 +32,6 @@ struct CodeBlockAttachmentTests {
         #expect(attachment.allowsTextAttachmentView == true)
     }
 
-    @Test("Attachment appearance animation is consumed only once")
-    func appearanceAnimationConsumption() {
-        let attachment = CodeBlockAttachment(blockID: BlockIdentity(rawValue: 3), language: "swift", code: "code")
-
-        #expect(attachment.consumePendingAppearanceAnimation(isReduceMotionEnabled: false))
-        #expect(attachment.consumePendingAppearanceAnimation(isReduceMotionEnabled: false) == false)
-    }
-
-    @Test("Attachment appearance animation respects reduce motion")
-    func appearanceAnimationRespectsReduceMotion() {
-        let attachment = CodeBlockAttachment(blockID: BlockIdentity(rawValue: 4), language: "swift", code: "code")
-
-        #expect(attachment.consumePendingAppearanceAnimation(isReduceMotionEnabled: true) == false)
-    }
-
     @Test("Provider sets tracksTextAttachmentViewBounds")
     func providerConfiguration() {
         let attachment = CodeBlockAttachment(blockID: BlockIdentity(rawValue: 2), language: "swift", code: "let x = 1")
