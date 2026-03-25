@@ -33,6 +33,11 @@ func documentHasCodeBlockAttachment(_ view: QuillView) -> Bool {
 }
 
 @MainActor
+func documentCodeBlockView(for view: QuillView) -> CodeBlockView? {
+    findSubview(of: CodeBlockView.self, in: view)
+}
+
+@MainActor
 func findSubview<T: UIView>(
     of type: T.Type,
     in view: UIView,

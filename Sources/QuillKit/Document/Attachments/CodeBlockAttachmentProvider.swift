@@ -48,10 +48,7 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
             return CGRect(origin: .zero, size: Layout.fallbackSize)
         }
 
-        let height = CodeBlockView.measuredHeight(
-            language: attachment.language,
-            code: attachment.code
-        )
+        let height = CodeBlockView.measureHeight(of: attachment.code, in: attachment.language)
         return CGRect(origin: .zero, size: CGSize(width: width, height: height))
     }
 }

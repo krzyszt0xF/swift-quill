@@ -38,6 +38,7 @@ final class DocumentRenderer {
     func cancelStreaming() {
         tailRevealEngine.cancel()
         tailAnimator.cancel()
+        highlightCoordinator.cancelAll()
         renderState.resetSmoothedTailStart()
     }
 
