@@ -1,4 +1,9 @@
 enum StreamLineClassifier {
+    struct BlockquotePrefix {
+        let content: String
+        let depth: Int
+    }
+
     struct FenceInfo {
         let marker: Character
         let count: Int
@@ -30,6 +35,35 @@ enum StreamLineClassifier {
         }
         
         return content
+    }
+
+    static func parseBlockquotePrefix(_ line: String) -> BlockquotePrefix? {
+        var index = line.startIndex
+        var leadingSpaceCount = 0
+
+        while index < line.endIndex && line[index] == " " && leadingSpaceCount < 3 {
+            leadingSpaceCount += 1
+            index = line.index(after: index)
+        }
+
+        guard index < line.endIndex, line[index] == ">" else {
+            return nil
+        }
+
+        var depth = 0
+        while index < line.endIndex && line[index] == ">" {
+            depth += 1
+            index = line.index(after: index)
+
+            if index < line.endIndex && line[index] == " " {
+                index = line.index(after: index)
+            }
+        }
+
+        return BlockquotePrefix(
+            content: String(line[index...]),
+            depth: depth
+        )
     }
 
     static func extractHeadingContent(_ line: String, level: Int) -> String {

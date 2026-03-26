@@ -1,4 +1,5 @@
 struct StreamBuffer {
+    private var blockquoteDepth = 0
     private var partialLine = ""
     private var listStack: [ListContext] = []
     private var partialPreview: PartialPreview?
@@ -48,7 +49,6 @@ extension StreamBuffer {
     }
 
     enum State: Equatable {
-        case blockquote
         case codeFence(marker: Character, count: Int)
         case heading
         case idle
@@ -63,13 +63,25 @@ extension StreamBuffer {
 
 private extension StreamBuffer {
     mutating func closeCurrentBlock() -> [ParserEvent] {
-        let previousState = state
         partialPreview = nil
+        var events = closeOpenContent()
+        events.append(contentsOf: closeOpenBlockquotes())
+        return events
+    }
+
+    mutating func closeOpenBlockquotes() -> [ParserEvent] {
+        guard blockquoteDepth > 0 else { return [] }
+
+        let events = Array(repeating: ParserEvent.endBlockQuote, count: blockquoteDepth)
+        blockquoteDepth = 0
+        return events
+    }
+
+    mutating func closeOpenContent() -> [ParserEvent] {
+        let previousState = state
         state = .idle
 
         switch previousState {
-        case .blockquote:
-            return [.endParagraph, .endBlockQuote]
         case .codeFence:
             return [.endCodeBlock]
         case .heading:
@@ -105,6 +117,11 @@ private extension StreamBuffer {
             return []
         }
 
+        if StreamLineClassifier.parseBlockquotePrefix(partialLine) != nil {
+            partialPreview = nil
+            return []
+        }
+
         guard let preview = PartialLinePreviewer.makePreview(
             for: partialLine,
             previousPreview: partialPreview,
@@ -124,9 +141,25 @@ private extension StreamBuffer {
     }
 
     mutating func processLine(_ line: String) -> [ParserEvent] {
+        if let blockquotePrefix = StreamLineClassifier.parseBlockquotePrefix(line) {
+            return processQuotedLine(
+                blockquotePrefix.content,
+                depth: blockquotePrefix.depth
+            )
+        }
+
+        guard blockquoteDepth > 0 else {
+            return processContentLine(line)
+        }
+
+        var events = closeOpenContent()
+        events.append(contentsOf: closeOpenBlockquotes())
+        events.append(contentsOf: processContentLine(line))
+        return events
+    }
+
+    mutating func processContentLine(_ line: String) -> [ParserEvent] {
         switch state {
-        case .blockquote:
-            return processBlockquoteLine(line)
         case let .codeFence(marker, count):
             return processCodeFenceLine(line, marker: marker, count: count)
         case .heading:
@@ -173,12 +206,6 @@ private extension StreamBuffer {
             return [.startList(ordered: marker.ordered), item.startEvent, .startParagraph, .text(item.content)]
         }
 
-        if trimmed.hasPrefix(">") {
-            let content = StreamLineClassifier.extractBlockquoteContent(trimmed)
-            state = .blockquote
-            return [.startBlockQuote, .startParagraph, .text(content)]
-        }
-
         if trimmed.contains("|") && trimmed.hasPrefix("|") {
             state = .tableCandidate(headerLine: trimmed)
             return []
@@ -217,12 +244,6 @@ private extension StreamBuffer {
             state = .list
             listStack = [ListContext(indent: marker.indent, ordered: marker.ordered)]
             return [.endParagraph, .startList(ordered: marker.ordered), item.startEvent, .startParagraph, .text(item.content)]
-        }
-
-        if trimmed.hasPrefix(">") {
-            let content = StreamLineClassifier.extractBlockquoteContent(trimmed)
-            state = .blockquote
-            return [.endParagraph, .startBlockQuote, .startParagraph, .text(content)]
         }
 
         return [.text(StreamLineClassifier.makeContinuationText(from: trimmed))]
@@ -264,21 +285,41 @@ private extension StreamBuffer {
         return [.text(StreamLineClassifier.makeContinuationText(from: trimmed))]
     }
 
-    mutating func processBlockquoteLine(_ line: String) -> [ParserEvent] {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
+    mutating func processQuotedLine(
+        _ line: String,
+        depth: Int
+    ) -> [ParserEvent] {
+        var events = transitionBlockquoteDepth(to: depth)
 
-        if trimmed.isEmpty {
-            state = .idle
-            return [.endParagraph, .endBlockQuote]
+        if line.trimmingCharacters(in: .whitespaces).isEmpty {
+            if case let .codeFence(marker, count) = state {
+                events.append(contentsOf: processCodeFenceLine("", marker: marker, count: count))
+            } else {
+                events.append(contentsOf: closeOpenContent())
+            }
+            return events
         }
 
-        if trimmed.hasPrefix(">") {
-            let content = StreamLineClassifier.extractBlockquoteContent(trimmed)
-            return [.text(StreamLineClassifier.makeContinuationText(from: content))]
+        events.append(contentsOf: processContentLine(line))
+        return events
+    }
+
+    mutating func transitionBlockquoteDepth(to depth: Int) -> [ParserEvent] {
+        guard depth != blockquoteDepth else { return [] }
+
+        var events: [ParserEvent] = []
+        if shouldCloseOpenContentForBlockquoteDepthChange {
+            events.append(contentsOf: closeOpenContent())
         }
 
-        state = .idle
-        return [.endParagraph, .endBlockQuote]
+        if depth < blockquoteDepth {
+            events.append(contentsOf: Array(repeating: .endBlockQuote, count: blockquoteDepth - depth))
+        } else {
+            events.append(contentsOf: Array(repeating: .startBlockQuote, count: depth - blockquoteDepth))
+        }
+
+        blockquoteDepth = depth
+        return events
     }
 
     mutating func processTableCandidateLine(
@@ -313,5 +354,14 @@ private extension StreamBuffer {
 
         let cells = StreamLineClassifier.parseTableCells(trimmed)
         return [.tableRow(cells)]
+    }
+
+    var shouldCloseOpenContentForBlockquoteDepthChange: Bool {
+        switch state {
+        case .codeFence, .idle:
+            return false
+        case .heading, .list, .paragraph, .table, .tableCandidate:
+            return true
+        }
     }
 }

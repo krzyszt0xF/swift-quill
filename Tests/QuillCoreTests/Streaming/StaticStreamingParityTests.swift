@@ -213,6 +213,25 @@ struct StaticStreamingParityTests {
 
         #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
+
+    @Test("Nested blockquote with list matches between paths")
+    func nestedBlockquoteParity() async {
+        let markdown = """
+        > Level one quote
+        >
+        > > Nested quote level two
+        > >
+        > > - with a list item
+        > > - and another item
+        >
+
+        """
+
+        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
+        let streamedBlocks = await streamAndReduce(markdown, chunkSizes: [3, 2, 5, 4, 1, 6, 3, 7])
+
+        #expect(blocksMatch(staticBlocks, streamedBlocks))
+    }
 }
 
 private extension StaticStreamingParityTests {

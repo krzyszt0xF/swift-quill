@@ -21,7 +21,7 @@ struct PartialLinePreviewer {
                 for: partialLine,
                 previousPreview: previousPreview
             )
-        case .blockquote, .heading, .list, .table, .tableCandidate:
+        case .heading, .list, .table, .tableCandidate:
             return nil
         }
     }

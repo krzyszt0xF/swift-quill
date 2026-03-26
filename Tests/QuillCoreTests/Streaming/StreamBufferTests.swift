@@ -277,6 +277,47 @@ struct StreamBufferTests {
         ])
     }
 
+    @Test("Nested blockquote preserves depth transitions")
+    func nestedBlockquote() {
+        var buffer = StreamBuffer()
+        let events = buffer.append("> outer\n>> inner\n\n")
+        #expect(events == [
+            .startBlockQuote, .startParagraph, .text("outer"),
+            .endParagraph, .startBlockQuote, .startParagraph, .text("inner"),
+            .endParagraph, .endBlockQuote, .endBlockQuote,
+        ])
+    }
+
+    @Test("Nested blockquote list stays structural")
+    func nestedBlockquoteList() {
+        var buffer = StreamBuffer()
+        let events = buffer.append("> outer\n>\n> > inner\n> >\n> > - first\n> > - second\n\n")
+        #expect(events == [
+            .startBlockQuote, .startParagraph, .text("outer"),
+            .endParagraph,
+            .startBlockQuote, .startParagraph, .text("inner"),
+            .endParagraph,
+            .startList(ordered: false), .startListItem, .startParagraph, .text("first"),
+            .endParagraph, .endListItem, .startListItem, .startParagraph, .text("second"),
+            .endParagraph, .endListItem, .endList, .endBlockQuote, .endBlockQuote,
+        ])
+    }
+
+    @Test("Partial nested blockquote line does not preview raw markers")
+    func partialNestedBlockquoteLine() {
+        var buffer = StreamBuffer()
+        _ = buffer.append("> outer\n>\n> > inner\n> >\n")
+
+        let previewEvents = buffer.append("> > - fir")
+        #expect(previewEvents.isEmpty)
+
+        let completionEvents = buffer.append("st\n\n")
+        #expect(completionEvents == [
+            .startList(ordered: false), .startListItem, .startParagraph, .text("first"),
+            .endParagraph, .endListItem, .endList, .endBlockQuote, .endBlockQuote,
+        ])
+    }
+
     @Test("List continuation preserves word separator in text events")
     func listContinuationSpacing() {
         var buffer = StreamBuffer()
