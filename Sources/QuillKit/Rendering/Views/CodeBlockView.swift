@@ -49,9 +49,9 @@ final class CodeBlockView: UIView {
     }
 
     nonisolated static func measureHeight(of code: String, in language: String?) -> CGFloat {
-        let displayCode = code.withoutTrailingNewline
+        let displayCode = code
         let lineCount = max(1, displayCode.components(separatedBy: "\n").count)
-        let codeLineHeight = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular).lineHeight
+        let codeLineHeight = CodeBlockTextStyle.font.lineHeight
         let codeLineSpacing: CGFloat = 2
         let codeHeight = CGFloat(lineCount) * codeLineHeight
             + CGFloat(max(0, lineCount - 1)) * codeLineSpacing
@@ -74,37 +74,21 @@ final class CodeBlockView: UIView {
     func apply(highlightedCode: HighlightedCodeSnapshot) {
         let selectedRange = codeTextView.selectedRange
         let contentOffset = scrollView.contentOffset
-        let highlightedCode = NSMutableAttributedString(
-            attributedString: highlightedCode.makeAttributedString()
-        )
-        highlightedCode.addAttribute(
-            .font,
-            value: UIFont.code,
-            range: NSRange(location: 0, length: highlightedCode.length)
-        )
-        highlightedCode.addAttribute(
-            .paragraphStyle,
-            value: NSParagraphStyle.code,
-            range: NSRange(location: 0, length: highlightedCode.length)
+        let displayCode = CodeBlockDisplayRenderer.makeAttributedString(
+            from: highlightedCode,
+            code: currentCode
         )
 
-        codeTextView.attributedText = highlightedCode
+        codeTextView.attributedText = displayCode
         updateCodeWidth()
-        restoreSelection(selectedRange, textLength: highlightedCode.length)
+        restoreSelection(selectedRange, textLength: displayCode.length)
         scrollView.setContentOffset(contentOffset, animated: false)
         setStreamingState(false)
     }
 
     func configure(language: String?, code: String) {
-        currentCode = code.withoutTrailingNewline
-        codeTextView.attributedText = NSAttributedString(
-            string: currentCode,
-            attributes: [
-                .font: UIFont.code,
-                .foregroundColor: UIColor.label,
-                .paragraphStyle: NSParagraphStyle.code,
-            ]
-        )
+        currentCode = code
+        codeTextView.attributedText = CodeBlockDisplayRenderer.makeAttributedString(from: currentCode)
         updateCodeWidth()
 
         if let language, !language.isEmpty {
@@ -161,6 +145,7 @@ private extension CodeBlockView {
         codeTextView.translatesAutoresizingMaskIntoConstraints = false
         codeWidthConstraint.priority = .defaultHigh
         NSLayoutConstraint.activate([
+            scrollView.contentLayoutGuide.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
             codeTextView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             codeTextView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
             codeTextView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
@@ -236,7 +221,7 @@ private extension CodeBlockView {
     func measureWidth(of code: String) -> CGFloat {
         let lines = code.isEmpty ? [""] : code.components(separatedBy: "\n")
         let widestLine = lines.map { line in
-            ceil((line as NSString).size(withAttributes: [.font: UIFont.code]).width)
+            ceil((line as NSString).size(withAttributes: [.font: CodeBlockTextStyle.font]).width)
         }.max() ?? 0
         return widestLine
     }
@@ -256,25 +241,6 @@ private extension CodeBlockView {
             return max(copyButtonSize, ceil(labelHeight))
         }
     }
-}
-
-private extension NSParagraphStyle {
-    @MainActor
-    static let code: NSParagraphStyle = {
-        let style = NSMutableParagraphStyle()
-        style.lineSpacing = 2
-        return style
-    }()
-}
-
-private extension String {
-    var withoutTrailingNewline: String {
-        hasSuffix("\n") ? String(self.dropLast()) : self
-    }
-}
-
-private extension UIFont {
-    static let code = UIFont(name: "Menlo-Regular", size: 14) ?? .monospacedSystemFont(ofSize: 14, weight: .regular)
 }
 
 @MainActor

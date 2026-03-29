@@ -83,32 +83,49 @@ struct DocumentStreamingTests {
         renderer.render(blocks: makeNodes(blocks), frozenCount: 1)
 
         let textBeforeClose = renderer.textView.contentStorage?.attributedString
-        #expect(!containsCodeBlockAttachment(in: textBeforeClose))
+        #expect(!containsAttachment(CodeBlockAttachment.self, in: textBeforeClose))
 
         renderer.render(blocks: makeNodes(blocks), frozenCount: 2)
 
         let textAfterClose = renderer.textView.contentStorage?.attributedString
-        #expect(containsCodeBlockAttachment(in: textAfterClose))
+        #expect(containsAttachment(CodeBlockAttachment.self, in: textAfterClose))
+    }
+
+    @Test("Table block becomes attachment surface on freeze")
+    func tableFreeze() {
+        let renderer = DocumentRenderer.live
+        renderer.textView.frame = CGRect(x: 0, y: 0, width: 320, height: 400)
+        let blocks: [Block] = [
+            .paragraph(content: [.text("Before table")]),
+            .table(
+                columnAlignments: [.left, .center],
+                header: Block.TableRow(cells: [
+                    Block.TableCell(content: [.text("Feature")]),
+                    Block.TableCell(content: [.text("Status")]),
+                ]),
+                rows: [
+                    Block.TableRow(cells: [
+                        Block.TableCell(content: [.strong([.text("Tables")])]),
+                        Block.TableCell(content: [.emphasis([.text("ready")])]),
+                    ]),
+                ]
+            ),
+        ]
+
+        renderer.render(blocks: makeNodes(blocks), frozenCount: 1)
+
+        let textBeforeFreeze = renderer.textView.contentStorage?.attributedString
+        #expect(textBeforeFreeze?.string.contains("|") == true)
+        #expect(!containsAttachment(TableAttachment.self, in: textBeforeFreeze))
+
+        renderer.render(blocks: makeNodes(blocks), frozenCount: 2)
+
+        let textAfterFreeze = renderer.textView.contentStorage?.attributedString
+        #expect(containsAttachment(TableAttachment.self, in: textAfterFreeze))
     }
 }
 
 private extension DocumentStreamingTests {
-    func containsCodeBlockAttachment(in attributedString: NSAttributedString?) -> Bool {
-        guard let attributedString, attributedString.length > 0 else { return false }
-
-        var found = false
-        attributedString.enumerateAttribute(
-            .attachment,
-            in: NSRange(location: 0, length: attributedString.length)
-        ) { value, _, stop in
-            if value is CodeBlockAttachment {
-                found = true
-                stop.pointee = true
-            }
-        }
-        return found
-    }
-
     func extractFrozenText(from renderer: DocumentRenderer) -> String {
         guard let text = renderer.textView.contentStorage?.attributedString,
               text.length > 0

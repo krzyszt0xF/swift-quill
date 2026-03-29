@@ -62,6 +62,8 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 
 # Project instructions (local only)
+.agents
 .claude
 AGENTS.md
 CLAUDE.md
+Docs

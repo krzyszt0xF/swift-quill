@@ -128,12 +128,13 @@ struct BlockReducerTests {
     func table() {
         let blocks = reduce([
             .startTable,
+            .tableAlignments([nil, nil]),
             .tableRow(["A", "B"]),
             .tableRow(["1", "2"]),
             .endTable,
         ])
         #expect(blocks == [.table(
-            columnAlignments: [],
+            columnAlignments: [nil, nil],
             header: Block.TableRow(cells: [
                 Block.TableCell(content: [.text("A")]),
                 Block.TableCell(content: [.text("B")]),
@@ -144,6 +145,53 @@ struct BlockReducerTests {
                     Block.TableCell(content: [.text("2")]),
                 ]),
             ]
+        )])
+    }
+
+    @Test("Table keeps streamed alignments")
+    func tableAlignments() {
+        let blocks = reduce([
+            .startTable,
+            .tableAlignments([.left, .center, .right]),
+            .tableRow(["A", "B", "C"]),
+            .tableRow(["1", "2", "3"]),
+            .endTable,
+        ])
+
+        #expect(blocks == [.table(
+            columnAlignments: [.left, .center, .right],
+            header: Block.TableRow(cells: [
+                Block.TableCell(content: [.text("A")]),
+                Block.TableCell(content: [.text("B")]),
+                Block.TableCell(content: [.text("C")]),
+            ]),
+            rows: [
+                Block.TableRow(cells: [
+                    Block.TableCell(content: [.text("1")]),
+                    Block.TableCell(content: [.text("2")]),
+                    Block.TableCell(content: [.text("3")]),
+                ]),
+            ]
+        )])
+    }
+
+    @Test("Table parses inline cell content on freeze")
+    func tableInlineParsing() {
+        let blocks = reduce([
+            .startTable,
+            .tableAlignments([nil, nil, nil]),
+            .tableRow(["**bold**", "*italic*", "`code`"]),
+            .endTable,
+        ])
+
+        #expect(blocks == [.table(
+            columnAlignments: [nil, nil, nil],
+            header: Block.TableRow(cells: [
+                Block.TableCell(content: [.strong([.text("bold")])]),
+                Block.TableCell(content: [.emphasis([.text("italic")])]),
+                Block.TableCell(content: [.code("code")]),
+            ]),
+            rows: []
         )])
     }
 

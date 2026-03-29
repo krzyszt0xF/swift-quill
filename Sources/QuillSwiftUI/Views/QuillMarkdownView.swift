@@ -28,7 +28,7 @@ public struct QuillMarkdownView: UIViewRepresentable {
         _ proposal: ProposedViewSize,
         uiView: QuillView,
         context: Context) -> CGSize? {
-            fittedSize(for: uiView, proposal: proposal)
+            uiView.calculateFittedSize(for: proposal)
         }
     
     public func updateUIView(_ uiView: QuillView, context: Context) {

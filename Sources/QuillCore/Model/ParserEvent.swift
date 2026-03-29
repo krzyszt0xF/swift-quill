@@ -26,6 +26,7 @@ package enum ParserEvent: Equatable, Sendable {
     case startStrikethrough
     case startStrong
     case startTable
+    case tableAlignments([Block.ColumnAlignment?])
     case tableRow([String])
     case text(String)
     case thematicBreak

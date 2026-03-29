@@ -74,8 +74,11 @@ package enum BlockReducer {
             state.contextStack.append(state.currentContext)
             state.currentContext = .table(
                 id: state.identityGenerator.makeIdentity(),
+                alignments: [],
                 rows: []
             )
+        case let .tableAlignments(alignments):
+            handleTableAlignments(alignments, state: &state)
         case let .tableRow(cells):
             handleTableRow(cells, state: &state)
         case let .text(string):
@@ -111,7 +114,7 @@ extension BlockReducer {
         case list(id: BlockIdentity, ordered: Bool, items: [Block.ListItem])
         case listItem(blocks: [BlockNode], checkbox: Block.Checkbox?)
         case paragraph(id: BlockIdentity)
-        case table(id: BlockIdentity, rows: [[String]])
+        case table(id: BlockIdentity, alignments: [Block.ColumnAlignment?], rows: [[String]])
         case topLevel
     }
 
@@ -205,15 +208,24 @@ private extension BlockReducer {
             return .listItem(children: blocks, checkbox: checkbox)
         case let .paragraph(id):
             return .block(BlockNode(block: .paragraph(content: renderedInlines), id: id))
-        case let .table(id, rows):
-            guard let headerCells = rows.first else { return nil }
+        case let .table(id, alignments, rows):
+            guard let headerCells = rows.first else {
+                return .block(BlockNode(
+                    block: .table(
+                        columnAlignments: alignments,
+                        header: Block.TableRow(cells: []),
+                        rows: []
+                    ),
+                    id: id
+                ))
+            }
 
             let header = Block.TableRow(cells: headerCells.map { Block.TableCell(content: [.text($0)]) })
             let dataRows = rows.dropFirst().map { row in
                 Block.TableRow(cells: row.map { Block.TableCell(content: [.text($0)]) })
             }
             return .block(BlockNode(
-                block: .table(columnAlignments: [], header: header, rows: dataRows),
+                block: .table(columnAlignments: alignments, header: header, rows: dataRows),
                 id: id
             ))
         case .topLevel:
@@ -327,13 +339,13 @@ private extension BlockReducer {
     }
 
     static func handleEndTable(state: inout ReducerState) {
-        guard case let .table(id, rows) = state.currentContext else { return }
+        guard case let .table(id, alignments, rows) = state.currentContext else { return }
         
         state.currentContext = state.contextStack.removeLast()
         guard let headerCells = rows.first else {
             emitBlock(
                 BlockNode(
-                    block: .table(columnAlignments: [], header: Block.TableRow(cells: []), rows: []),
+                    block: .table(columnAlignments: alignments, header: Block.TableRow(cells: []), rows: []),
                     id: id
                 ),
                 state: &state
@@ -341,13 +353,17 @@ private extension BlockReducer {
             return
         }
 
-        let header = Block.TableRow(cells: headerCells.map { Block.TableCell(content: [.text($0)]) })
+        let header = Block.TableRow(cells: headerCells.map {
+            Block.TableCell(content: InlineParser.parse($0))
+        })
         let dataRows = rows.dropFirst().map { row in
-            Block.TableRow(cells: row.map { Block.TableCell(content: [.text($0)]) })
+            Block.TableRow(cells: row.map {
+                Block.TableCell(content: InlineParser.parse($0))
+            })
         }
         emitBlock(
             BlockNode(
-                block: .table(columnAlignments: [], header: header, rows: dataRows),
+                block: .table(columnAlignments: alignments, header: header, rows: dataRows),
                 id: id
             ),
             state: &state
@@ -364,10 +380,19 @@ private extension BlockReducer {
         state.currentContext = .codeBlock(language: language, code: code + text, id: id)
     }
 
-    static func handleTableRow(_ cells: [String], state: inout ReducerState) {
-        guard case let .table(id, rows) = state.currentContext else { return }
+    static func handleTableAlignments(
+        _ alignments: [Block.ColumnAlignment?],
+        state: inout ReducerState
+    ) {
+        guard case let .table(id, _, rows) = state.currentContext else { return }
 
-        state.currentContext = .table(id: id, rows: rows + [cells])
+        state.currentContext = .table(id: id, alignments: alignments, rows: rows)
+    }
+
+    static func handleTableRow(_ cells: [String], state: inout ReducerState) {
+        guard case let .table(id, alignments, rows) = state.currentContext else { return }
+
+        state.currentContext = .table(id: id, alignments: alignments, rows: rows + [cells])
     }
 
     static func makeBlockNode(_ block: Block, state: inout ReducerState) -> BlockNode {

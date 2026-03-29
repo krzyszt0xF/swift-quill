@@ -624,6 +624,219 @@ struct AttributedStringBuilderTests {
         #expect(result.string.contains("Col"))
         #expect(result.string.contains("|"))
     }
+
+    @Test("Frozen table produces attachment fragment")
+    func frozenTableFragment() {
+        let nodes = makeNodes([
+            .table(
+                columnAlignments: [.left],
+                header: Block.TableRow(cells: [
+                    Block.TableCell(content: [.text("Name")]),
+                ]),
+                rows: [
+                    Block.TableRow(cells: [
+                        Block.TableCell(content: [.text("Quill")]),
+                    ]),
+                ]
+            ),
+        ])
+
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 1)
+        let attachment = fragments.first?.attributedString.attribute(.attachment, at: 0, effectiveRange: nil)
+
+        #expect(fragments.count == 1)
+        #expect(attachment is TableAttachment)
+    }
+
+    @Test("Unfrozen table produces fallback text fragment")
+    func unfrozenTableFragment() {
+        let nodes = makeNodes([
+            .table(
+                columnAlignments: [.left],
+                header: Block.TableRow(cells: [
+                    Block.TableCell(content: [.text("Name")]),
+                ]),
+                rows: [
+                    Block.TableRow(cells: [
+                        Block.TableCell(content: [.text("Quill")]),
+                    ]),
+                ]
+            ),
+        ])
+
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 0)
+        let attachment = fragments.first?.attributedString.attribute(.attachment, at: 0, effectiveRange: nil)
+
+        #expect(fragments.first?.attributedString.string.contains("|") == true)
+        #expect(attachment == nil)
+    }
+
+    @Test("Frozen ordered list renders nested code block attachment")
+    func frozenOrderedListNestedCodeBlockAttachment() {
+        let nodes = makeNodes([
+            .orderedList(startIndex: 1, items: [
+                makeItem(
+                    .paragraph(content: [.text("Code")]),
+                    .codeBlock(language: "swift", code: "print(\"Hello\")\n")
+                ),
+            ]),
+        ])
+
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 1)
+
+        #expect(fragments.count == 2)
+        #expect(fragments[0].presentationRole == .indentedListText)
+        #expect(fragments[1].presentationRole == .fullWidthEmbeddedBlock)
+        #expect(containsAttachment(CodeBlockAttachment.self, in: fragments[1].attributedString))
+        let style = fragments[1].attributedString.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        #expect(style?.headIndent == 0)
+    }
+
+    @Test("Frozen unordered list renders nested table attachment")
+    func frozenUnorderedListNestedTableAttachment() {
+        let header = Block.TableRow(cells: [
+            Block.TableCell(content: [.text("Name")]),
+            Block.TableCell(content: [.text("Value")]),
+        ])
+        let rows = [
+            Block.TableRow(cells: [
+                Block.TableCell(content: [.text("Quill")]),
+                Block.TableCell(content: [.text("1")]),
+            ]),
+        ]
+        let nodes = makeNodes([
+            .unorderedList(items: [
+                makeItem(
+                    .paragraph(content: [.text("Table")]),
+                    .table(columnAlignments: [.left, .right], header: header, rows: rows)
+                ),
+            ]),
+        ])
+
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 1)
+
+        #expect(fragments.count == 2)
+        #expect(fragments[0].presentationRole == .indentedListText)
+        #expect(fragments[1].presentationRole == .fullWidthEmbeddedBlock)
+        #expect(containsAttachment(TableAttachment.self, in: fragments[1].attributedString))
+        let style = fragments[1].attributedString.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        #expect(style?.headIndent == 0)
+    }
+
+    @Test("Unfrozen unordered list keeps nested table fallback text visible")
+    func unfrozenUnorderedListNestedTableFallback() {
+        let header = Block.TableRow(cells: [
+            Block.TableCell(content: [.text("Name")]),
+            Block.TableCell(content: [.text("Value")]),
+        ])
+        let rows = [
+            Block.TableRow(cells: [
+                Block.TableCell(content: [.text("Quill")]),
+                Block.TableCell(content: [.text("1")]),
+            ]),
+        ]
+        let nodes = makeNodes([
+            .unorderedList(items: [
+                makeItem(
+                    .paragraph(content: [.text("Table")]),
+                    .table(columnAlignments: [.left, .right], header: header, rows: rows)
+                ),
+            ]),
+        ])
+
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 0)
+
+        #expect(fragments.count == 2)
+        #expect(fragments[1].attributedString.string.contains("Name"))
+        #expect(fragments[1].attributedString.string.contains("Quill"))
+        #expect(fragments[1].attributedString.string.contains("|"))
+        #expect(containsAttachment(TableAttachment.self, in: fragments[1].attributedString) == false)
+    }
+
+    @Test("List item without text emits standalone marker row above full-width code block")
+    func listItemMarkerOnlyRow() {
+        let nodes = makeNodes([
+            .unorderedList(items: [
+                makeItem(
+                    .codeBlock(language: "swift", code: "print(\"Hello\")\n")
+                ),
+            ]),
+        ])
+
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 1)
+
+        #expect(fragments.count == 2)
+        #expect(fragments[0].presentationRole == .standaloneListMarker)
+        #expect(fragments[1].presentationRole == .fullWidthEmbeddedBlock)
+
+        let style = fragments[1].attributedString.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        #expect(style?.paragraphSpacingBefore == 0)
+    }
+
+    @Test("Task list marker-only row keeps checkbox marker above full-width table")
+    func taskListMarkerOnlyRow() {
+        let header = Block.TableRow(cells: [
+            Block.TableCell(content: [.text("Name")]),
+        ])
+        let nodes = makeNodes([
+            .unorderedList(items: [
+                makeItem(
+                    checkbox: .checked,
+                    .table(
+                        columnAlignments: [.left],
+                        header: header,
+                        rows: []
+                    )
+                ),
+            ]),
+        ])
+
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 1)
+
+        #expect(fragments.count == 2)
+        #expect(fragments[0].presentationRole == .standaloneListMarker)
+        #expect(fragments[0].attributedString.string.contains("[x]"))
+        #expect(fragments[1].presentationRole == .fullWidthEmbeddedBlock)
+    }
+
+    @Test("Nested list code block keeps shared owner and child content IDs")
+    func nestedListFragmentMetadata() {
+        let paragraphID = BlockIdentity(rawValue: 11)
+        let codeID = BlockIdentity(rawValue: 12)
+        let listID = BlockIdentity(rawValue: 10)
+        let nodes = [
+            BlockNode(
+                block: .orderedList(startIndex: 1, items: [
+                    Block.ListItem(children: [
+                        BlockNode(block: .paragraph(content: [.text("Intro")]), id: paragraphID),
+                        BlockNode(block: .codeBlock(language: "swift", code: "print(\"Hello\")\n"), id: codeID),
+                    ]),
+                ]),
+                id: listID
+            ),
+        ]
+
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 1)
+        let document = AttributedStringBuilder.buildDocument(from: fragments)
+
+        let introRange = (document.string as NSString).range(of: "Intro")
+        let codeAttachmentIndex = firstAttachmentIndex(in: document)
+
+        let introOwnerID = document.attribute(.ownerBlockID, at: introRange.location, effectiveRange: nil) as? BlockIdentity
+        let introContentID = document.attribute(.contentBlockID, at: introRange.location, effectiveRange: nil) as? BlockIdentity
+        let codeOwnerID = codeAttachmentIndex.flatMap {
+            document.attribute(.ownerBlockID, at: $0, effectiveRange: nil) as? BlockIdentity
+        }
+        let codeContentID = codeAttachmentIndex.flatMap {
+            document.attribute(.contentBlockID, at: $0, effectiveRange: nil) as? BlockIdentity
+        }
+
+        #expect(codeAttachmentIndex != nil)
+        #expect(introOwnerID == listID)
+        #expect(introContentID == paragraphID)
+        #expect(codeOwnerID == listID)
+        #expect(codeContentID == codeID)
+    }
 }
 
 private extension AttributedStringBuilderTests {

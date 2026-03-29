@@ -8,18 +8,21 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
     let chunks: S
     let linkTapHandler: ((URL) -> Void)?
     let mode: StreamingMode
+    let onFinished: (@MainActor () -> Void)?
     let onError: (@Sendable (Error) -> Void)?
     let preset: QuillStreamingPreset
 
     public init(
         chunks: S,
         mode: StreamingMode = .smoothedTail,
+        onFinished: (@MainActor () -> Void)? = nil,
         onError: (@Sendable (Error) -> Void)? = nil,
         preset: QuillStreamingPreset = .balanced) {
             self.init(
                 chunks: chunks,
                 linkTapHandler: nil,
                 mode: mode,
+                onFinished: onFinished,
                 onError: onError,
                 preset: preset)
         }
@@ -28,12 +31,14 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
         chunks: S,
         linkTapHandler: ((URL) -> Void)?,
         mode: StreamingMode,
+        onFinished: (@MainActor () -> Void)?,
         onError: (@Sendable (Error) -> Void)?,
         preset: QuillStreamingPreset
     ) {
         self.chunks = chunks
         self.linkTapHandler = linkTapHandler
         self.mode = mode
+        self.onFinished = onFinished
         self.onError = onError
         self.preset = preset
     }
@@ -45,6 +50,7 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
     public func makeUIView(context: Context) -> QuillView {
         let coordinator = context.coordinator
         applyConfiguration(to: coordinator.quillView)
+        coordinator.setOnStreamFinished(onFinished)
         coordinator.subscribe(to: chunks, onError: onError)
         
         return coordinator.quillView
@@ -55,11 +61,12 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
         uiView: QuillView,
         context: Context
     ) -> CGSize? {
-        fittedSize(for: uiView, proposal: proposal)
+        uiView.calculateFittedSize(for: proposal)
     }
 
     public func updateUIView(_ uiView: QuillView, context: Context) {
         applyConfiguration(to: context.coordinator.quillView)
+        context.coordinator.setOnStreamFinished(onFinished)
     }
 
     public static func dismantleUIView(_ uiView: QuillView, coordinator: Coordinator) {
@@ -68,11 +75,23 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
 }
 
 public extension QuillStreamView {
-    func onQuillLinkTap(_ handler: @escaping (URL) -> Void) -> Self {
+    public func onQuillLinkTap(_ handler: @escaping (URL) -> Void) -> Self {
         Self(
             chunks: chunks,
             linkTapHandler: handler,
             mode: mode,
+            onFinished: onFinished,
+            onError: onError,
+            preset: preset
+        )
+    }
+
+    public func onQuillStreamFinished(_ handler: @escaping @MainActor () -> Void) -> Self {
+        Self(
+            chunks: chunks,
+            linkTapHandler: linkTapHandler,
+            mode: mode,
+            onFinished: handler,
             onError: onError,
             preset: preset
         )
@@ -113,6 +132,10 @@ public extension QuillStreamView {
             subscriptionTask?.cancel()
             subscriptionTask = nil
             quillView.cancelStreaming()
+        }
+
+        func setOnStreamFinished(_ handler: (@MainActor () -> Void)?) {
+            quillView.onStreamFinished = handler
         }
 
         func subscribe(to chunks: S, onError: (@Sendable (Error) -> Void)?) {
