@@ -11,7 +11,7 @@ struct QuillMarkdownViewTests {
     func fittedSizeReturnsNilForZeroWidth() {
         let view = QuillView()
         let proposal = ProposedViewSize(width: 0, height: nil)
-        let result = fittedSize(for: view, proposal: proposal)
+        let result = view.calculateFittedSize(for: proposal)
         #expect(result == nil)
     }
 
@@ -19,7 +19,7 @@ struct QuillMarkdownViewTests {
     func fittedSizeReturnsNilForNegativeWidth() {
         let view = QuillView()
         let proposal = ProposedViewSize(width: -10, height: nil)
-        let result = fittedSize(for: view, proposal: proposal)
+        let result = view.calculateFittedSize(for: proposal)
         #expect(result == nil)
     }
 
@@ -27,7 +27,7 @@ struct QuillMarkdownViewTests {
     func fittedSizeReturnsProposedWidth() {
         let view = QuillView()
         let proposal = ProposedViewSize(width: 320, height: nil)
-        let result = fittedSize(for: view, proposal: proposal)
+        let result = view.calculateFittedSize(for: proposal)
         #expect(result?.width == 320)
     }
 
@@ -35,9 +35,32 @@ struct QuillMarkdownViewTests {
     func fittedSizeReturnsMinimumHeight() {
         let view = QuillView()
         let proposal = ProposedViewSize(width: 320, height: nil)
-        let result = fittedSize(for: view, proposal: proposal)
+        let result = view.calculateFittedSize(for: proposal)
         #expect(result != nil)
         if let result { #expect(result.height >= 1) }
+    }
+
+    @Test("fittedSize falls back to bounds width when proposed width is infinite")
+    func fittedSizeFallsBackForInfiniteWidth() {
+        let view = QuillView(frame: CGRect(x: 0, y: 0, width: 280, height: 0))
+        let proposal = ProposedViewSize(width: .infinity, height: nil)
+        let result = view.calculateFittedSize(for: proposal)
+
+        #expect(result?.width == 280)
+        #expect(result?.width.isFinite == true)
+    }
+
+    @Test("fittedSize falls back to a finite width when proposed width is nan")
+    func fittedSizeFallsBackForNaNWidth() {
+        let view = QuillView()
+        let proposal = ProposedViewSize(width: .nan, height: nil)
+        let result = view.calculateFittedSize(for: proposal)
+
+        #expect(result != nil)
+        #expect(result?.width.isFinite == true)
+        if let result {
+            #expect(result.width > 0)
+        }
     }
 
     @Test("QuillView.markdown setter triggers static render")

@@ -42,4 +42,80 @@ struct StreamCoordinatorTests {
         #expect(chunks.contains("\n"))
         #expect(chunks.joined() == module)
     }
+
+    @Test("Buffered visual feed splits long flushed tail into multiple chunks")
+    func bufferedVisualFeedChunksSplitLongFlushedTail() {
+        let configuration = RenderConfiguration(
+            streamingMode: .bufferedModules,
+            performanceProfile: .balanced,
+            tailReveal: .balanced.scaled(by: 0.55),
+            layout: .default,
+            bufferedStream: .init(
+                minModuleLength: 120,
+                maxBufferingDelay: 1.2
+            )
+        )
+        let flushedTail = """
+        #### Line Breaks
+        * `---`
+        #### Bold
+        * `**bold**`
+        #### Italic
+        * `_italic_`
+        #### Underline
+        * `__underline__`
+        #### Strikethrough
+        * `~~strikethrough~~`
+        #### Horizontal Rule
+        * `------`
+        """
+
+        let chunks = BufferedVisualFeeder.makeVisualFeedChunks(
+            from: flushedTail,
+            policy: configuration.tailReveal
+        )
+
+        #expect(chunks.count > 8)
+        #expect(chunks.joined() == flushedTail)
+    }
+
+    @Test("Immediate feed keeps single-line chunks intact")
+    func immediateFeedKeepsSingleLineChunksIntact() {
+        let configuration = RenderConfiguration(
+            streamingMode: .smoothedTail,
+            performanceProfile: .balanced,
+            tailReveal: .balanced,
+            layout: .default,
+            bufferedStream: .default
+        )
+        let chunk = "Single line tail update"
+
+        let chunks = BufferedVisualFeeder.makeImmediateFeedChunks(
+            from: chunk,
+            policy: configuration.tailReveal
+        )
+
+        #expect(chunks == [chunk])
+    }
+
+    @Test("Immediate feed splits multiline chunks for smoother structural streaming")
+    func immediateFeedSplitsMultilineChunks() {
+        let configuration = RenderConfiguration(
+            streamingMode: .smoothedTail,
+            performanceProfile: .balanced,
+            tailReveal: .balanced,
+            layout: .default,
+            bufferedStream: .default
+        )
+        let chunk = "```\ncode\n```\n- after\n"
+
+        let chunks = BufferedVisualFeeder.makeImmediateFeedChunks(
+            from: chunk,
+            policy: configuration.tailReveal
+        )
+
+        #expect(chunks.count > 1)
+        #expect(chunks.joined() == chunk)
+        #expect(chunks.contains("\n"))
+    }
 }

@@ -8,6 +8,7 @@ final class StreamCoordinator {
     var hostView: DocumentTextView { renderer.textView }
 
     var onHeightInvalidated: (() -> Void)?
+    var onStreamFinished: (() -> Void)?
     var onLinkSelection: ((URL) -> Void)? {
         didSet { renderer.textView.onLinkSelection = onLinkSelection }
     }
@@ -85,24 +86,29 @@ extension StreamCoordinator {
         controller = nil
         let task = streamTask
         let generation = streamGeneration
+        let renderConfiguration = self.renderConfiguration
 
         finishTask?.cancel()
         finishTask = Task { [weak self] in
             guard let self else { return }
 
-            await self.bufferedVisualFeeder.waitUntilDrained()
-
             if renderConfiguration.streamingMode == .bufferedModules {
                 let remaining = self.bufferedStreamCommitScheduler.flushRemaining()
                 if !remaining.isEmpty {
-                    await streamController.append(remaining)
+                    self.bufferedVisualFeeder.enqueueBufferedModules(
+                        [remaining],
+                        policy: renderConfiguration.tailReveal,
+                        to: streamController
+                    )
                 }
             }
 
+            await self.bufferedVisualFeeder.waitUntilDrained()
             await streamController.finish()
             await task?.value
             guard self.streamGeneration == generation else { return }
             self.invalidateHeight(for: .streamFinished)
+            self.onStreamFinished?()
         }
     }
 
@@ -278,15 +284,15 @@ private extension StreamCoordinator {
 
         enqueueAppendChunk(chunk, to: streamController)
     }
-}
 
-// MARK: - Append Pipeline
-
-private extension StreamCoordinator {
     func enqueueAppendChunk(
         _ chunk: String,
         to streamController: MarkdownStreamController
     ) {
-        bufferedVisualFeeder.enqueueImmediateChunk(chunk, to: streamController)
+        bufferedVisualFeeder.enqueueImmediateChunk(
+            chunk,
+            policy: renderConfiguration.tailReveal,
+            to: streamController
+        )
     }
 }

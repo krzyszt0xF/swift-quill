@@ -142,7 +142,19 @@ struct QuillViewIntegrationTests {
         #expect(view.currentMarkdown == fullMarkdown)
     }
 
-    @Test("same markdown produces identical currentMarkdown across presets", arguments: [QuillStreamingPreset.balanced, .snappy, .longForm])
+    @Test(
+        "same markdown produces identical currentMarkdown across presets",
+        arguments: [
+            QuillStreamingPreset.balanced,
+            .bufferedCustom(
+                speedMultiplier: 0.55,
+                bufferingDelay: 1.2,
+                minModuleLength: 120
+            ),
+            .snappy,
+            .longForm,
+        ]
+    )
     func presetEquivalence(preset: QuillStreamingPreset) async {
         let view = QuillView(frame: CGRect(x: 0, y: 0, width: 320, height: 0))
         view.streamingPreset = preset
@@ -259,6 +271,34 @@ struct QuillViewIntegrationTests {
         }
 
         #expect(rendered)
+    }
+
+    @Test("Nested list code fence renders code block attachment")
+    func nestedListCodeFenceRendersAttachment() async {
+        let view = makeSmoothedTailQuillView()
+        let markdown = """
+        1. Headings:
+           - `#`
+             ```markdown
+             # Heading 1
+             ```
+           - `##`
+             ```python
+             print("Hello")
+             ```
+
+        """
+
+        for chunk in markdown.chunked(sizes: [4, 7, 5, 3]) {
+            view.append(chunk)
+        }
+        view.finish()
+
+        let renderedCodeBlock = await eventually(timeout: .milliseconds(1200)) {
+            documentHasCodeBlockAttachment(view)
+        }
+
+        #expect(renderedCodeBlock)
     }
 }
 

@@ -22,38 +22,30 @@ final class BufferedVisualFeeder {
         to streamController: MarkdownStreamController
     ) {
         for module in modules where module.isEmpty == false {
-            let visualChunks = Self.makeVisualFeedChunks(
-                from: module,
-                policy: policy
+            enqueueVisualChunks(
+                Self.makeVisualFeedChunks(
+                    from: module,
+                    policy: policy
+                ),
+                policy: policy,
+                to: streamController
             )
-
-            for (index, visualChunk) in visualChunks.enumerated() {
-                let delay: Duration?
-                if index == 0 {
-                    delay = nil
-                } else {
-                    delay = .seconds(
-                        makeBufferedVisualFeedDelay(
-                            after: visualChunk,
-                            policy: policy
-                        )
-                    )
-                }
-
-                enqueueChunk(
-                    visualChunk,
-                    delay: delay,
-                    to: streamController
-                )
-            }
         }
     }
 
     func enqueueImmediateChunk(
         _ chunk: String,
+        policy: TailRevealPolicy,
         to streamController: MarkdownStreamController
     ) {
-        enqueueChunk(chunk, delay: nil, to: streamController)
+        enqueueVisualChunks(
+            Self.makeImmediateFeedChunks(
+                from: chunk,
+                policy: policy
+            ),
+            policy: policy,
+            to: streamController
+        )
     }
 
     func waitUntilDrained() async {
@@ -63,6 +55,14 @@ final class BufferedVisualFeeder {
 }
 
 extension BufferedVisualFeeder {
+    nonisolated static func makeImmediateFeedChunks(
+        from text: String,
+        policy: TailRevealPolicy
+    ) -> [String] {
+        guard text.contains("\n") else { return [text] }
+        return makeVisualFeedChunks(from: text, policy: policy)
+    }
+
     nonisolated static func makeVisualFeedChunks(
         from text: String,
         policy: TailRevealPolicy
@@ -102,6 +102,28 @@ extension BufferedVisualFeeder {
 private extension BufferedVisualFeeder {
     enum Layout {
         static let minimumDelay: TimeInterval = 0.015
+    }
+
+    func enqueueVisualChunks(
+        _ chunks: [String],
+        policy: TailRevealPolicy,
+        to streamController: MarkdownStreamController
+    ) {
+        for (index, chunk) in chunks.enumerated() {
+            let delay = index == 0
+                ? nil
+                : Duration.seconds(
+                    makeBufferedVisualFeedDelay(
+                        after: chunk,
+                        policy: policy
+                    )
+                )
+            enqueueChunk(
+                chunk,
+                delay: delay,
+                to: streamController
+            )
+        }
     }
 
     func enqueueChunk(

@@ -1,6 +1,7 @@
 @testable import QuillKit
 @testable import QuillSwiftUI
 import QuillSharedTestSupport
+import SwiftUI
 import Testing
 import UIKit
 
@@ -83,6 +84,27 @@ struct QuillStreamViewTests {
         #expect(renderedMarkdown)
     }
 
+    @Test("Coordinator invokes on stream finished after completion")
+    func coordinatorInvokesOnStreamFinished() async throws {
+        let (stream, continuation) = AsyncStream<String>.makeStream()
+        let coordinator = makeCoordinator()
+        let finishCapture = SignalCapture()
+        coordinator.setOnStreamFinished {
+            Task {
+                await finishCapture.markReceived()
+            }
+        }
+        coordinator.subscribe(to: stream, onError: nil)
+
+        continuation.yield("Done")
+        continuation.finish()
+
+        let didFinish = await eventually {
+            await finishCapture.didReceive()
+        }
+        #expect(didFinish)
+    }
+
     @Test("Coordinator calls cancelStreaming and invokes onError when stream throws")
     func coordinatorHandlesStreamError() async throws {
         let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
@@ -90,11 +112,12 @@ struct QuillStreamViewTests {
             preset: .balanced,
             mode: .bufferedModules
         )
-        let errorCapture = ErrorCapture()
+        let errorCapture = SignalCapture()
 
         coordinator.subscribe(to: stream, onError: { error in
             Task {
-                await errorCapture.store(error)
+                _ = error
+                await errorCapture.markReceived()
             }
         })
 
@@ -106,7 +129,9 @@ struct QuillStreamViewTests {
 
         continuation.finish(throwing: TestStreamError.failed)
 
-        let recordedError = await errorCapture.waitForValue(timeout: .milliseconds(800))
+        let recordedError = await eventually {
+            await errorCapture.didReceive()
+        }
         #expect(recordedError)
         #expect(coordinator.quillView.currentMarkdown == "Partial ")
     }
@@ -150,32 +175,28 @@ struct QuillStreamViewTests {
         #expect(streamView.linkTapHandler != nil)
         #expect(tappedURL == URL(string: "https://example.com"))
     }
+
+    @Test("stream sizing returns a finite width for an infinite proposal")
+    func streamSizingFallsBackForInfiniteWidth() {
+        let coordinator = makeCoordinator()
+        coordinator.quillView.bounds.size.width = 260
+
+        let result = coordinator.quillView.calculateFittedSize(for: ProposedViewSize(width: .infinity, height: nil))
+
+        #expect(result?.width == 260)
+        #expect(result?.width.isFinite == true)
+    }
 }
 
-private actor ErrorCapture {
-    private var error: Error?
+private actor SignalCapture {
+    private var received = false
 
-    func hasValue() -> Bool {
-        error != nil
+    func didReceive() -> Bool {
+        received
     }
 
-    func waitForValue(timeout: Duration) async -> Bool {
-        let clock = ContinuousClock()
-        let deadline = clock.now.advanced(by: timeout)
-
-        while clock.now < deadline {
-            if hasValue() {
-                return true
-            }
-
-            try? await Task.sleep(for: .milliseconds(10))
-        }
-
-        return hasValue()
-    }
-
-    func store(_ error: Error) {
-        self.error = error
+    func markReceived() {
+        received = true
     }
 }
 
@@ -190,5 +211,4 @@ private extension QuillStreamViewTests {
             mode: .bufferedModules
         )
     }
-
 }

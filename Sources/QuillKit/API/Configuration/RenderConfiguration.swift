@@ -33,6 +33,18 @@ extension RenderConfiguration {
                 layout: .default,
                 bufferedStream: .default
             )
+        case let .bufferedCustom(speedMultiplier, bufferingDelay, minModuleLength):
+            let clampedSpeed = min(max(0.25, speedMultiplier), 1.5)
+            self = RenderConfiguration(
+                streamingMode: .smoothedTail,
+                performanceProfile: .balanced,
+                tailReveal: .balanced.scaled(by: clampedSpeed),
+                layout: .default,
+                bufferedStream: .init(
+                    minModuleLength: max(1, minModuleLength),
+                    maxBufferingDelay: max(0.1, bufferingDelay)
+                )
+            )
         case let .custom(speedMultiplier, bufferingDelay):
             let clampedSpeed = min(max(0.75, speedMultiplier), 1.5)
             self = RenderConfiguration(

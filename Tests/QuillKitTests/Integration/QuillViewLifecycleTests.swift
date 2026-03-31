@@ -73,6 +73,22 @@ struct QuillViewLifecycleTests {
         #expect(abs(slowConfiguration.tailReveal.lowQueue.baseDuration - expectedSlowDuration) < Self.timingTolerance)
     }
 
+    @Test("buffered custom preset clamps values and keeps module length")
+    func bufferedCustomPresetClampsValues() {
+        let preset = QuillStreamingPreset.bufferedCustom(
+            speedMultiplier: 0.1,
+            bufferingDelay: 0.01,
+            minModuleLength: 0
+        )
+
+        let configuration = RenderConfiguration(preset: preset)
+        let expectedDuration = TailRevealPolicy.balanced.lowQueue.baseDuration / 0.25
+
+        #expect(abs(configuration.tailReveal.lowQueue.baseDuration - expectedDuration) < Self.timingTolerance)
+        #expect(configuration.bufferedStream.maxBufferingDelay == 0.1)
+        #expect(configuration.bufferedStream.minModuleLength == 1)
+    }
+
     @Test("finish then append auto-restarts stream")
     func appendAfterFinishRestartsStream() async {
         let view = makeSmoothedTailQuillView()
