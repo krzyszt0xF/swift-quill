@@ -310,6 +310,34 @@ struct BlockReducerTests {
         ]))
     }
 
+    @Test("Open nested table keeps mutable list tail materialized before first row")
+    func openNestedTableMaterializesMutableTail() {
+        var state = BlockReducer.ReducerState()
+
+        BlockReducer.apply(.startList(ordered: false), to: &state)
+        BlockReducer.apply(.startListItem, to: &state)
+        BlockReducer.apply(.startParagraph, to: &state)
+        BlockReducer.apply(.text("item"), to: &state)
+        BlockReducer.apply(.endParagraph, to: &state)
+        BlockReducer.apply(.startTable, to: &state)
+        BlockReducer.apply(.tableAlignments([nil, nil]), to: &state)
+
+        #expect(state.frozenCount == 0)
+        #expect(state.blocks.count == 1)
+        #expect(canonicalBlocks(state.blocks.map(\.block)) == canonicalBlocks([
+            .unorderedList(items: [
+                makeItem(
+                    .paragraph(content: [.text("item")]),
+                    .table(
+                        columnAlignments: [nil, nil],
+                        header: Block.TableRow(cells: []),
+                        rows: []
+                    )
+                )
+            ])
+        ]))
+    }
+
     // MARK: - Determinism
 
     @Test("Deterministic: same events produce same blocks")

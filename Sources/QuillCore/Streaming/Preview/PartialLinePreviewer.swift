@@ -2,17 +2,18 @@ struct PartialLinePreviewer {
     static func makePreview(
         for partialLine: String,
         previousPreview: StreamBuffer.PartialPreview?,
-        state: StreamBuffer.State
+        blockState: StreamBuffer.BlockState
     ) -> PreviewResult? {
         guard partialLine.isEmpty == false else { return nil }
 
-        switch state {
-        case let .codeFence(marker, _):
+        switch blockState {
+        case let .codeFence(marker, _, indentToStrip):
             return makeCodeFencePreview(
                 for: partialLine,
+                indentToStrip: indentToStrip,
                 marker: marker,
                 previousPreview: previousPreview,
-                state: state
+                blockState: blockState
             )
         case .idle:
             return makeIdlePreview(for: partialLine)
@@ -21,7 +22,7 @@ struct PartialLinePreviewer {
                 for: partialLine,
                 previousPreview: previousPreview
             )
-        case .heading, .list, .table, .tableCandidate:
+        case .heading, .table, .tableCandidate:
             return nil
         }
     }
@@ -31,9 +32,9 @@ struct PartialLinePreviewer {
         preview: StreamBuffer.PartialPreview
     ) -> [ParserEvent]? {
         switch preview {
-        case let .codeBlockText(emittedText):
+        case let .codeBlockText(emittedText, indentToStrip):
             return makeRemainingCodeText(
-                fullText: line,
+                fullText: line.removingLeadingIndent(width: indentToStrip),
                 emittedText: emittedText,
                 appendsNewline: true
             )
@@ -48,40 +49,43 @@ struct PartialLinePreviewer {
 
 extension PartialLinePreviewer {
     struct PreviewResult {
+        let blockState: StreamBuffer.BlockState
         let events: [ParserEvent]
         let preview: StreamBuffer.PartialPreview
-        let state: StreamBuffer.State
     }
 }
 
 private extension PartialLinePreviewer {
     static func makeCodeFencePreview(
         for partialLine: String,
+        indentToStrip: Int,
         marker: Character,
         previousPreview: StreamBuffer.PartialPreview?,
-        state: StreamBuffer.State
+        blockState: StreamBuffer.BlockState
     ) -> PreviewResult? {
         guard partialLine.isClosingFencePrefix(of: marker) == false else {
             return nil
         }
 
+        let normalizedLine = partialLine.removingLeadingIndent(width: indentToStrip)
+
         let emittedText: String
-        if case let .codeBlockText(existingText)? = previousPreview {
+        if case let .codeBlockText(existingText, _)? = previousPreview {
             emittedText = existingText
         } else {
             emittedText = ""
         }
 
         let events = makeRemainingCodeText(
-            fullText: partialLine,
+            fullText: normalizedLine,
             emittedText: emittedText,
             appendsNewline: false
         )
 
         return PreviewResult(
+            blockState: blockState,
             events: events,
-            preview: .codeBlockText(emittedText: partialLine),
-            state: state
+            preview: .codeBlockText(emittedText: normalizedLine, indentToStrip: indentToStrip)
         )
     }
 
@@ -105,9 +109,9 @@ private extension PartialLinePreviewer {
         }
 
         return PreviewResult(
+            blockState: .paragraph,
             events: events,
-            preview: .paragraph(emittedText: trimmed, isContinuation: false),
-            state: .paragraph
+            preview: .paragraph(emittedText: trimmed, isContinuation: false)
         )
     }
 
@@ -133,9 +137,9 @@ private extension PartialLinePreviewer {
         )
 
         return PreviewResult(
+            blockState: .paragraph,
             events: events,
-            preview: .paragraph(emittedText: previewText, isContinuation: isContinuation),
-            state: .paragraph
+            preview: .paragraph(emittedText: previewText, isContinuation: isContinuation)
         )
     }
 
@@ -145,7 +149,8 @@ private extension PartialLinePreviewer {
         appendsNewline: Bool
     ) -> [ParserEvent] {
         guard let suffix = fullText.makeRemainingSuffix(after: emittedText) else {
-            return []
+            guard appendsNewline, fullText == emittedText else { return [] }
+            return [.codeBlockText("\n")]
         }
 
         let output = appendsNewline ? suffix + "\n" : suffix
@@ -188,6 +193,10 @@ private extension String {
         }
 
         if trimmed == "-" || trimmed == "*" || trimmed == "+" {
+            return true
+        }
+
+        if trimmed.allSatisfy(\.isNumber), trimmed.count <= 3 {
             return true
         }
 

@@ -18,7 +18,7 @@ package func collectEvents(
             collectedEvents.append(event)
         }
         
-        return collectedEvents
+        return normalizeCollectedEvents(collectedEvents)
 }
 
 package func reduce(_ events: [ParserEvent]) -> [Block] {
@@ -47,4 +47,31 @@ package func streamAndReduce(_ markdown: String, chunkSizes: [Int]) async -> [Bl
     }
 
     return normalizedBlocks(reducerState.blocks)
+}
+
+private func normalizeCollectedEvents(_ events: [ParserEvent]) -> [ParserEvent] {
+    var normalized: [ParserEvent] = []
+
+    for event in events {
+        switch event {
+        case let .codeBlockText(text):
+            if case let .codeBlockText(existing)? = normalized.last {
+                normalized.removeLast()
+                normalized.append(.codeBlockText(existing + text))
+            } else {
+                normalized.append(event)
+            }
+        case let .text(text):
+            if case let .text(existing)? = normalized.last {
+                normalized.removeLast()
+                normalized.append(.text(existing + text))
+            } else {
+                normalized.append(event)
+            }
+        default:
+            normalized.append(event)
+        }
+    }
+
+    return normalized
 }

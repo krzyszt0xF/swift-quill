@@ -49,6 +49,13 @@ struct StreamBufferTests {
         #expect(events == [.endParagraph])
     }
 
+    @Test("Injected state allows targeted finalize coverage")
+    func finalizeInjectedState() {
+        var buffer = StreamBuffer(state: .init(blockquoteDepth: 1, blockState: .paragraph))
+        let events = buffer.finalize()
+        #expect(events == [.endParagraph, .endBlockQuote])
+    }
+
     @Test("Multi-line paragraph accumulates text events")
     func multiLineParagraph() {
         var buffer = StreamBuffer()
@@ -254,6 +261,66 @@ struct StreamBufferTests {
         #expect(events == [.endParagraph, .endListItem, .endList])
     }
 
+    @Test("Nested fenced code block inside list item emits code block events")
+    func nestedFencedCodeBlockInListItem() {
+        var buffer = StreamBuffer()
+        let events = buffer.append("""
+        1. Outer
+           - Code
+             ```python
+             print("Hello")
+             ```
+
+        """)
+
+        #expect(events == [
+            .startList(ordered: true), .startListItem, .startParagraph, .text("Outer"),
+            .endParagraph, .startList(ordered: false), .startListItem, .startParagraph, .text("Code"),
+            .endParagraph,
+            .startCodeBlock(language: "python"),
+            .codeBlockText("print(\"Hello\")\n"),
+            .endCodeBlock,
+            .endListItem, .endList, .endListItem, .endList,
+        ])
+    }
+
+    @Test("Nested table inside list item stays in list-scoped routing")
+    func nestedTableInListItem() {
+        var buffer = StreamBuffer()
+        let events = buffer.append("""
+        - Outer
+          | A | B |
+          | - | - |
+          | 1 | 2 |
+        """)
+
+        #expect(events == [
+            .startList(ordered: false), .startListItem, .startParagraph, .text("Outer"),
+            .endParagraph,
+            .startTable, .tableAlignments([nil, nil]), .tableRow(["A", "B"]),
+            .tableRow(["1", "2"]),
+        ])
+
+        let finalEvents = buffer.finalize()
+        #expect(finalEvents == [.endTable, .endListItem, .endList])
+    }
+
+    @Test("Blank line closes list before dedented top-level paragraph")
+    func blankLineClosesListBeforeTopLevelParagraph() {
+        var buffer = StreamBuffer()
+        let events = buffer.append("""
+        - item
+
+        After
+        """)
+
+        #expect(events == [
+            .startList(ordered: false), .startListItem, .startParagraph, .text("item"),
+            .endParagraph, .endListItem, .endList,
+            .startParagraph, .text("After"),
+        ])
+    }
+
     // MARK: - Blockquote Detection
 
     @Test("Simple blockquote")
@@ -329,6 +396,24 @@ struct StreamBufferTests {
         ])
     }
 
+    @Test("Prompt nested ordered list emits nested ordered events")
+    func promptNestedOrderedList() {
+        var buffer = StreamBuffer()
+        let events = buffer.append("""
+        1. Parse markdown into a stable block tree
+           1. Preserve nested ordered numbering
+           2. Keep wrapped lines aligned under the marker when they span more than one visual row in the narrow stream pane
+
+        """)
+
+        #expect(events == [
+            .startList(ordered: true), .startListItem, .startParagraph, .text("Parse markdown into a stable block tree"),
+            .endParagraph, .startList(ordered: true), .startListItem, .startParagraph, .text("Preserve nested ordered numbering"),
+            .endParagraph, .endListItem, .startListItem, .startParagraph, .text("Keep wrapped lines aligned under the marker when they span more than one visual row in the narrow stream pane"),
+            .endParagraph, .endListItem, .endList, .endListItem, .endList,
+        ])
+    }
+
     @Test("Finalize closes open blockquote")
     func finalizeBlockquote() {
         var buffer = StreamBuffer()
@@ -344,8 +429,21 @@ struct StreamBufferTests {
         var buffer = StreamBuffer()
         let events = buffer.append("| A | B |\n| - | - |\n| 1 | 2 |\n\n")
         #expect(events == [
-            .startTable, .tableRow(["A", "B"]),
+            .startTable, .tableAlignments([nil, nil]), .tableRow(["A", "B"]),
             .tableRow(["1", "2"]),
+            .endTable,
+        ])
+    }
+
+    @Test("Table separator with mixed alignments emits alignment event")
+    func tableMixedAlignments() {
+        var buffer = StreamBuffer()
+        let events = buffer.append("| A | B | C |\n| :--- | :---: | ---: |\n| 1 | 2 | 3 |\n\n")
+        #expect(events == [
+            .startTable,
+            .tableAlignments([.left, .center, .right]),
+            .tableRow(["A", "B", "C"]),
+            .tableRow(["1", "2", "3"]),
             .endTable,
         ])
     }
@@ -395,6 +493,14 @@ struct StreamBufferTests {
         #expect(events3 == [.startParagraph, .text("World")])
     }
 
+    @Test("Top-level numeric paragraph still previews as paragraph")
+    func topLevelNumericParagraphPreview() {
+        var buffer = StreamBuffer()
+
+        let events = buffer.append("2026")
+        #expect(events == [.startParagraph, .text("2026")])
+    }
+
     @Test("Partial list item waits for newline")
     func partialListItemWaitsForNewline() {
         var buffer = StreamBuffer()
@@ -406,6 +512,23 @@ struct StreamBufferTests {
         #expect(events2.isEmpty)
     }
 
+    @Test("Partial next task list item does not leak into current paragraph preview")
+    func partialNextTaskListItemDoesNotLeakIntoCurrentParagraphPreview() {
+        var buffer = StreamBuffer()
+
+        let events1 = buffer.append("- [x] first\n- [x] se")
+        #expect(events1 == [
+            .startList(ordered: false), .startTaskListItem(checkbox: .checked), .startParagraph, .text("first"),
+        ])
+
+        let events2 = buffer.append("cond\n\n")
+        #expect(events2 == [
+            .endParagraph, .endListItem,
+            .startTaskListItem(checkbox: .checked), .startParagraph, .text("second"),
+            .endParagraph, .endListItem, .endList,
+        ])
+    }
+
     @Test("Partial code line streams before newline inside fence")
     func partialCodeLineStreamsBeforeNewline() {
         var buffer = StreamBuffer()
@@ -415,6 +538,32 @@ struct StreamBufferTests {
 
         let events2 = buffer.append("nt\n")
         #expect(events2 == [.codeBlockText("nt\n")])
+    }
+
+    @Test("Previewed full code line still emits trailing newline")
+    func previewedFullCodeLineStillEmitsTrailingNewline() {
+        var buffer = StreamBuffer()
+
+        let events1 = buffer.append("```\nprint")
+        #expect(events1 == [.startCodeBlock(language: nil), .codeBlockText("print")])
+
+        let events2 = buffer.append("\n")
+        #expect(events2 == [.codeBlockText("\n")])
+    }
+
+    @Test("Partial nested ordered item does not leak into parent paragraph preview")
+    func partialNestedOrderedItemDoesNotLeakIntoParentParagraphPreview() {
+        var buffer = StreamBuffer()
+
+        let events1 = buffer.append("1. Parse markdown into a stable block tree\n   1")
+        #expect(events1 == [
+            .startList(ordered: true), .startListItem, .startParagraph, .text("Parse markdown into a stable block tree"),
+        ])
+
+        let events2 = buffer.append(". Preserve nested ordered numbering\n")
+        #expect(events2 == [
+            .endParagraph, .startList(ordered: true), .startListItem, .startParagraph, .text("Preserve nested ordered numbering"),
+        ])
     }
 
     @Test("Adversarial: heading split mid-prefix")
@@ -525,10 +674,9 @@ struct StreamBufferTests {
     @Test("Finalize with partial line processes it first")
     func finalizePartialLine() {
         var buffer = StreamBuffer()
-        _ = buffer.append("partial")
-        let events = buffer.finalize()
-        #expect(events.contains(.startParagraph))
-        #expect(events.contains(.text("partial")))
-        #expect(events.contains(.endParagraph))
+        let appendEvents = buffer.append("partial")
+        let finalizeEvents = buffer.finalize()
+        #expect(appendEvents == [.startParagraph, .text("partial")])
+        #expect(finalizeEvents == [.endParagraph])
     }
 }

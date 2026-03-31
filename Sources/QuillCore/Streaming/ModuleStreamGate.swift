@@ -71,21 +71,21 @@ package struct ModuleStreamGate: Sendable {
         } else {
             hasExceededDelay = false
         }
-        let pendingStructure = detectPendingStructure(in: accumulatedText)
-        guard
-            hasExceededDelay,
-            pendingStructure == nil,
-            let boundary = timeoutBoundary(from: lastSafePosition)
-        else {
+        guard hasExceededDelay else {
             return []
         }
+
+        guard
+            detectPendingStructure(in: accumulatedText) == nil,
+            let boundary = makeTimeoutCommitBoundary(from: lastSafePosition)
+        else { return [] }
 
         let committed = commit(upTo: boundary)
         if committed.isEmpty == false {
             compactCommittedPrefix()
         }
         self.pendingSince = hasPendingText ? now : nil
-        
+
         return committed
     }
 
@@ -94,10 +94,10 @@ package struct ModuleStreamGate: Sendable {
         accumulatedText = ""
         lastSafePosition = 0
         pendingSince = nil
-        
+
         return remaining
     }
-    
+
     package struct AppendResult: Equatable, Sendable {
         package var committedChunks: [String]
         package var hasPendingText: Bool
@@ -123,7 +123,7 @@ private extension ModuleStreamGate {
 
     mutating func commitCompleteModules() -> AppendResult {
         let startPosition = lastSafePosition
-        if let _ = detectPendingStructure(in: accumulatedText) {
+        if detectPendingStructure(in: accumulatedText) != nil {
             return AppendResult(
                 committedChunks: [],
                 hasPendingText: hasPendingText,
@@ -158,13 +158,13 @@ private extension ModuleStreamGate {
 
     mutating func commit(upTo boundary: Int) -> [String] {
         guard boundary > lastSafePosition else { return [] }
-        
+
         let module = rawText(from: lastSafePosition, to: boundary)
         lastSafePosition = boundary
         guard module.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
             return []
         }
-        
+
         return [module]
     }
 
@@ -298,11 +298,11 @@ private extension ModuleStreamGate {
         let distance = remaining.distance(from: remaining.startIndex, to: range.upperBound)
         let boundary = startPosition + distance
         guard boundary > startPosition else { return nil }
-        
+
         return boundary
     }
 
-    func timeoutBoundary(from startPosition: Int) -> Int? {
+    func makeTimeoutCommitBoundary(from startPosition: Int) -> Int? {
         guard startPosition < accumulatedText.count else { return nil }
 
         let remainingText = rawText(from: startPosition, to: accumulatedText.count)

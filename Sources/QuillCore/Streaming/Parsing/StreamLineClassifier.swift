@@ -66,10 +66,49 @@ enum StreamLineClassifier {
         )
     }
 
+    static func isListEmbeddedBlockCandidate(
+        _ line: String,
+        currentListIndent: Int
+    ) -> Bool {
+        let indent = leadingIndentWidth(in: line)
+        return indent >= currentListIndent + 2
+    }
+
+    static func isPotentialListMarkerPrefix(_ line: String) -> Bool {
+        if parseListMarker(line) != nil {
+            return true
+        }
+
+        let indent = leadingIndentWidth(in: line)
+        let contentStart = line.index(line.startIndex, offsetBy: indent, limitedBy: line.endIndex) ?? line.endIndex
+        let trimmed = String(line[contentStart...]).trimmingCharacters(in: .whitespaces)
+
+        guard trimmed.isEmpty == false else { return false }
+
+        if trimmed == "-" || trimmed == "*" || trimmed == "+" {
+            return true
+        }
+
+        if trimmed.allSatisfy(\.isNumber) {
+            return true
+        }
+
+        guard let last = trimmed.last, last == "." || last == ")" else {
+            return false
+        }
+
+        let prefix = trimmed.dropLast()
+        return prefix.isEmpty == false && prefix.allSatisfy(\.isNumber)
+    }
+
     static func extractHeadingContent(_ line: String, level: Int) -> String {
         let prefixCount = level + 1
         
         return String(line.dropFirst(prefixCount)).trimmingCharacters(in: .whitespaces)
+    }
+
+    static func leadingIndentWidth(in line: String) -> Int {
+        line.prefix { $0 == " " || $0 == "\t" }.count
     }
 
     static func isClosingFence(_ line: String, marker: Character, minimumCount: Int) -> Bool {
@@ -195,6 +234,25 @@ enum StreamLineClassifier {
         }
 
         return nil
+    }
+
+    static func parseTableAlignments(_ line: String) -> [Block.ColumnAlignment?] {
+        line.split(separator: "|", omittingEmptySubsequences: false)
+            .compactMap { cell -> Block.ColumnAlignment?? in
+                let trimmed = cell.trimmingCharacters(in: .whitespaces)
+                guard trimmed.isEmpty == false else { return nil }
+
+                if trimmed.hasPrefix(":") && trimmed.hasSuffix(":") {
+                    return .some(.center)
+                }
+                if trimmed.hasPrefix(":") {
+                    return .some(.left)
+                }
+                if trimmed.hasSuffix(":") {
+                    return .some(.right)
+                }
+                return .some(nil)
+            }
     }
 
     static func parseTableCells(_ line: String) -> [String] {
