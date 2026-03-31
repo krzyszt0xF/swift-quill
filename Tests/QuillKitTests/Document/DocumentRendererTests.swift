@@ -86,7 +86,33 @@ struct DocumentRendererTests {
 
         let text = renderer.textView.contentStorage?.attributedString
         #expect(text != nil)
-        #expect(containsCodeBlockAttachment(in: text))
+        #expect(containsAttachment(CodeBlockAttachment.self, in: text))
+    }
+
+    @Test("List with nested code block renders full-width attachment for frozen list")
+    func frozenListNestedCodeBlockAttachment() {
+        let renderer = DocumentRenderer.live
+        let blocks: [Block] = [
+            .orderedList(startIndex: 1, items: [
+                makeItem(
+                    .paragraph(content: [.text("Code")]),
+                    .codeBlock(language: "swift", code: "print(\"Hello\")\n")
+                ),
+            ]),
+        ]
+
+        renderer.render(blocks: makeNodes(blocks), frozenCount: 1)
+
+        let text = renderer.textView.contentStorage?.attributedString
+        let attachmentIndex = firstAttachmentIndex(in: text)
+        let paragraphStyle = attachmentIndex.flatMap {
+            text?.attribute(.paragraphStyle, at: $0, effectiveRange: nil) as? NSParagraphStyle
+        }
+
+        #expect(text?.string.contains("Code") == true)
+        #expect(attachmentIndex != nil)
+        #expect(containsAttachment(CodeBlockAttachment.self, in: text))
+        #expect(paragraphStyle?.headIndent == 0)
     }
 
     @Test("Open code fence remains plain text before close")
@@ -100,7 +126,7 @@ struct DocumentRendererTests {
 
         let text = renderer.textView.contentStorage?.attributedString
         #expect(text != nil)
-        #expect(!containsCodeBlockAttachment(in: text))
+        #expect(!containsAttachment(CodeBlockAttachment.self, in: text))
         #expect(text?.string.contains("let x = 1") == true)
     }
 
@@ -254,22 +280,6 @@ struct DocumentRendererTests {
 }
 
 private extension DocumentRendererTests {
-    func containsCodeBlockAttachment(in attributedString: NSAttributedString?) -> Bool {
-        guard let attributedString, attributedString.length > 0 else { return false }
-
-        var found = false
-        attributedString.enumerateAttribute(
-            .attachment,
-            in: NSRange(location: 0, length: attributedString.length)
-        ) { value, _, stop in
-            if value is CodeBlockAttachment {
-                found = true
-                stop.pointee = true
-            }
-        }
-        return found
-    }
-
     func extractPrefix(from renderer: DocumentRenderer, frozenCount: Int) -> String {
         guard let text = renderer.textView.contentStorage?.attributedString,
               text.length > 0

@@ -118,7 +118,7 @@ private extension BlockquoteBackgroundView {
                   ),
                   offset >= 0,
                   offset < attributedString.length,
-                  let blockID = attributedString.attribute(.blockID, at: offset, effectiveRange: nil) as? BlockIdentity,
+                  let ownerBlockID = attributedString.attribute(.ownerBlockID, at: offset, effectiveRange: nil) as? BlockIdentity,
                   let blockquoteDepth = attributedString.attribute(.blockquoteDepth, at: offset, effectiveRange: nil) as? Int,
                   blockquoteDepth > 0
             else { return true }
@@ -126,7 +126,7 @@ private extension BlockquoteBackgroundView {
             let frame = layoutFragment.layoutFragmentFrame
             fragments.append(
                 BlockquoteBarLayout.FragmentContext(
-                    blockID: blockID,
+                    ownerBlockID: ownerBlockID,
                     depth: blockquoteDepth,
                     maxY: frame.maxY,
                     minY: frame.minY

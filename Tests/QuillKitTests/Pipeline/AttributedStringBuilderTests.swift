@@ -271,6 +271,37 @@ struct AttributedStringBuilderTests {
         #expect(innerIndent > outerIndent)
     }
 
+    @Test("Nested ordered list keeps greater indentation in built document fragments")
+    func nestedOrderedListDocumentIndentation() {
+        let blocks: [Block] = [
+            .orderedList(startIndex: 1, items: [
+                makeItem(
+                    .paragraph(content: [.text("Parse markdown into a stable block tree")]),
+                    .orderedList(startIndex: 1, items: [
+                        makeItem(.paragraph(content: [.text("Preserve nested ordered numbering")])),
+                        makeItem(.paragraph(content: [.text("Keep wrapped lines aligned under the marker when they span more than one visual row in the narrow stream pane")])),
+                    ])
+                ),
+            ]),
+        ]
+
+        let fragments = AttributedStringBuilder.buildRenderFragments(
+            from: makeNodes(blocks),
+            frozenCount: blocks.count
+        )
+        let document = AttributedStringBuilder.buildDocument(from: fragments)
+
+        let parentRange = (document.string as NSString).range(of: "Parse markdown into a stable block tree")
+        let childRange = (document.string as NSString).range(of: "Preserve nested ordered numbering")
+
+        let parentStyle = document.attribute(.paragraphStyle, at: parentRange.location, effectiveRange: nil) as? NSParagraphStyle
+        let childStyle = document.attribute(.paragraphStyle, at: childRange.location, effectiveRange: nil) as? NSParagraphStyle
+
+        #expect((childStyle?.headIndent ?? 0) > (parentStyle?.headIndent ?? 0))
+        #expect((parentStyle?.headIndent ?? 0) > (parentStyle?.firstLineHeadIndent ?? 0))
+        #expect((childStyle?.headIndent ?? 0) > (childStyle?.firstLineHeadIndent ?? 0))
+    }
+
     @Test("Ordered list respects startIndex")
     func orderedListStartIndex() {
         let items = [
@@ -292,6 +323,38 @@ struct AttributedStringBuilderTests {
 
         #expect(result.string.contains("[x]\t"))
         #expect(result.string.contains("[ ]\t"))
+    }
+
+    @Test("Ordered list preserves nested code block text")
+    func orderedListNestedCodeBlock() {
+        let items = [
+            makeItem(
+                .paragraph(content: [.text("Intro")]),
+                .codeBlock(language: "swift", code: "print(\"Hello\")\n")
+            ),
+        ]
+        let result = AttributedStringBuilder.build(
+            from: segment(.orderedList(startIndex: 1, items: items))
+        )
+
+        #expect(result.string.contains("Intro"))
+        #expect(result.string.contains("print(\"Hello\")"))
+    }
+
+    @Test("Unordered list preserves nested code block text")
+    func unorderedListNestedCodeBlock() {
+        let items = [
+            makeItem(
+                .paragraph(content: [.text("Intro")]),
+                .codeBlock(language: nil, code: "code\n")
+            ),
+        ]
+        let result = AttributedStringBuilder.build(
+            from: segment(.unorderedList(items: items))
+        )
+
+        #expect(result.string.contains("Intro"))
+        #expect(result.string.contains("code"))
     }
 
     // MARK: - Blockquote Tests
@@ -449,7 +512,7 @@ struct AttributedStringBuilderTests {
             .paragraph(content: [.text("Hello")]),
             .paragraph(content: [.text("World")]),
         ]
-        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: blocks.count)
 
         #expect(fragments.count == 2)
         #expect(fragments[0].attributedString.string.contains("Hello"))
@@ -463,7 +526,7 @@ struct AttributedStringBuilderTests {
             .codeBlock(language: "swift", code: "let x = 1\n"),
             .paragraph(content: [.text("After")]),
         ]
-        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: blocks.count)
 
         #expect(fragments.count == 3)
 
@@ -483,10 +546,11 @@ struct AttributedStringBuilderTests {
             .paragraph(content: [.text("Before")]),
             .codeBlock(language: "swift", code: "let x = 1\n"),
         ]
-        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: 1)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: 1)
 
         #expect(fragments.count == 2)
         #expect(fragments[1].attributedString.string.contains("let x = 1"))
+        #expect(fragments[1].attributedString.string.hasSuffix("\n"))
 
         var foundCodeBlockAttachment = false
         fragments[1].attributedString.enumerateAttribute(
@@ -516,7 +580,7 @@ struct AttributedStringBuilderTests {
         let blocks: [Block] = [
             .table(columnAlignments: [nil, nil], header: header, rows: rows),
         ]
-        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: blocks.count)
 
         #expect(fragments.count == 1)
 
@@ -533,7 +597,7 @@ struct AttributedStringBuilderTests {
         let blocks: [Block] = [
             makeBlockquote(makeBlockquote(.paragraph(content: [.text("deep")]))),
         ]
-        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: blocks.count)
 
         #expect(fragments.count == 1)
 
@@ -544,7 +608,7 @@ struct AttributedStringBuilderTests {
 
     @Test("Empty input produces no fragments")
     func documentEmptyInput() {
-        let fragments = AttributedStringBuilder.buildDocumentFragments(from: [], frozenCount: 0)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: [], frozenCount: 0)
         #expect(fragments.isEmpty)
     }
 
@@ -554,7 +618,7 @@ struct AttributedStringBuilderTests {
             .paragraph(content: [.text("one")]),
             .paragraph(content: [.text("two")]),
         ]
-        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: blocks.count)
         let document = AttributedStringBuilder.buildDocument(from: fragments)
 
         #expect(document.string.contains("one"))
@@ -562,37 +626,40 @@ struct AttributedStringBuilderTests {
         #expect(document.string.contains("\n"))
     }
 
-    @Test("buildDocument stamps blockID attribute on each fragment range")
-    func buildDocumentBlockIDAttribute() {
+    @Test("buildDocument stamps owner and content block IDs on each fragment range")
+    func buildDocumentBlockIDAttributes() {
         let id1 = BlockIdentity(rawValue: 10)
         let id2 = BlockIdentity(rawValue: 11)
         let nodes = [
             BlockNode(block: .paragraph(content: [.text("alpha")]), id: id1),
             BlockNode(block: .paragraph(content: [.text("beta")]), id: id2),
         ]
-        let fragments = AttributedStringBuilder.buildDocumentFragments(from: nodes, frozenCount: nodes.count)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: nodes.count)
         let document = AttributedStringBuilder.buildDocument(from: fragments)
 
         let alphaRange = (document.string as NSString).range(of: "alpha")
         let betaRange = (document.string as NSString).range(of: "beta")
 
-        let alphaBlockID = document.attribute(.blockID, at: alphaRange.location, effectiveRange: nil) as? BlockIdentity
-        let betaBlockID = document.attribute(.blockID, at: betaRange.location, effectiveRange: nil) as? BlockIdentity
+        let alphaContentBlockID = document.attribute(.contentBlockID, at: alphaRange.location, effectiveRange: nil) as? BlockIdentity
+        let alphaOwnerBlockID = document.attribute(.ownerBlockID, at: alphaRange.location, effectiveRange: nil) as? BlockIdentity
+        let betaContentBlockID = document.attribute(.contentBlockID, at: betaRange.location, effectiveRange: nil) as? BlockIdentity
+        let betaOwnerBlockID = document.attribute(.ownerBlockID, at: betaRange.location, effectiveRange: nil) as? BlockIdentity
 
-        #expect(alphaBlockID == id1)
-        #expect(betaBlockID == id2)
+        #expect(alphaContentBlockID == id1)
+        #expect(alphaOwnerBlockID == id1)
+        #expect(betaContentBlockID == id2)
+        #expect(betaOwnerBlockID == id2)
     }
 
-    @Test("Each fragment has a unique blockID")
-    func documentFragmentUniqueBlockIDs() {
+    @Test("Each simple top-level fragment keeps matching owner and content IDs")
+    func documentFragmentMatchingIDs() {
         let blocks: [Block] = [
             .paragraph(content: [.text("a")]),
             .paragraph(content: [.text("b")]),
             .codeBlock(language: nil, code: "c"),
         ]
-        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: blocks.count)
-        let ids = fragments.map(\.blockID)
-        #expect(Set(ids).count == ids.count)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        #expect(fragments.allSatisfy { $0.ownerBlockID == $0.contentBlockID })
     }
 
     @Test("Mixed document preserves paragraph-style spacing")
@@ -601,7 +668,7 @@ struct AttributedStringBuilderTests {
             .heading(level: 1, content: [.text("Title")]),
             .paragraph(content: [.text("Body")]),
         ]
-        let fragments = AttributedStringBuilder.buildDocumentFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: blocks.count)
         let document = AttributedStringBuilder.buildDocument(from: fragments)
 
         let titleRange = (document.string as NSString).range(of: "Title")

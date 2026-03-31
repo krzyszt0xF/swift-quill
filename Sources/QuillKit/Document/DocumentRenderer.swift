@@ -44,7 +44,7 @@ final class DocumentRenderer {
 
     @discardableResult
     func render(blocks: [BlockNode], frozenCount: Int) -> RenderOutcome {
-        let fragments = AttributedStringBuilder.buildDocumentFragments(
+        let fragments = AttributedStringBuilder.buildRenderFragments(
             from: blocks,
             frozenCount: frozenCount,
             highlightStore: highlightCoordinator
@@ -68,7 +68,6 @@ final class DocumentRenderer {
 
         scheduleHighlightsForNewlyFrozenCodeBlocks(
             blocks: blocks,
-            fragments: fragments,
             previousFrozenCount: previousFrozenCount,
             newFrozenCount: frozenCount
         )
@@ -181,7 +180,7 @@ private extension DocumentRenderer {
     }
 
     func installFullDocument(
-        fragments: [AttributedStringBuilder.DocumentFragment],
+        fragments: [RenderFragment],
         frozenCount: Int
     ) -> Bool {
         let document = AttributedStringBuilder.buildDocument(from: fragments)
@@ -239,7 +238,7 @@ private extension DocumentRenderer {
     }
 
     func rebuildBlockIndex(
-        from fragments: [AttributedStringBuilder.DocumentFragment],
+        from fragments: [RenderFragment],
         frozenCount: Int
     ) {
         blockIndexer.rebuild(
@@ -273,7 +272,7 @@ private extension DocumentRenderer {
     }
 
     func renderImmediately(
-        fragments: [AttributedStringBuilder.DocumentFragment],
+        fragments: [RenderFragment],
         frozenCount: Int,
         previousFrozenCount: Int
     ) -> RenderOutcome {
@@ -317,7 +316,7 @@ private extension DocumentRenderer {
     }
 
     func renderWithSmoothedTail(
-        fragments: [AttributedStringBuilder.DocumentFragment],
+        fragments: [RenderFragment],
         frozenCount: Int,
         previousFrozenCount: Int
     ) -> RenderOutcome {
@@ -357,7 +356,7 @@ private extension DocumentRenderer {
         )
 
         rebuildBlockIndex(from: fragments, frozenCount: frozenCount)
-        if frozenCount < fragments.count {
+        if frozenCount < blockIndexer.blockSpans.count {
             renderState.updateSmoothedTailStart(
                 frozenCount: frozenCount,
                 location: currentTailStart
@@ -370,25 +369,19 @@ private extension DocumentRenderer {
 
     func scheduleHighlightsForNewlyFrozenCodeBlocks(
         blocks: [BlockNode],
-        fragments: [AttributedStringBuilder.DocumentFragment],
         previousFrozenCount: Int,
         newFrozenCount: Int
     ) {
         guard newFrozenCount > previousFrozenCount else { return }
 
-        for index in previousFrozenCount..<min(newFrozenCount, min(blocks.count, fragments.count)) {
-            guard
-                case let .codeBlock(language, code) = blocks[index].block,
-                let language,
-                !language.isEmpty
-            else { continue }
-
-            let blockID = fragments[index].blockID
-            highlightCoordinator.scheduleHighlight(
-                blockID: blockID,
-                code: code.hasSuffix("\n") ? String(code.dropLast()) : code,
-                language: language
-            )
+        for index in previousFrozenCount..<min(newFrozenCount, blocks.count) {
+            for codeBlock in makeHighlightedCodeBlocks(from: blocks[index]) {
+                highlightCoordinator.scheduleHighlight(
+                    blockID: codeBlock.blockID,
+                    code: codeBlock.code,
+                    language: codeBlock.language
+                )
+            }
         }
     }
 
@@ -435,6 +428,12 @@ private extension DocumentRenderer {
 }
 
 private extension DocumentRenderer {
+    struct HighlightableCodeBlock {
+        let blockID: BlockIdentity
+        let code: String
+        let language: String
+    }
+
     struct RenderState {
         var frozenBlockCount = 0
         var smoothedTailFrozenCount: Int?
@@ -460,6 +459,30 @@ private extension DocumentRenderer {
 
         mutating func updateFrozenBlockCount(to newValue: Int, blockCount: Int) {
             frozenBlockCount = min(newValue, blockCount)
+        }
+    }
+
+    func makeHighlightedCodeBlocks(from node: BlockNode) -> [HighlightableCodeBlock] {
+        switch node.block {
+        case let .blockquote(children):
+            return children.flatMap(makeHighlightedCodeBlocks)
+        case let .codeBlock(language, code):
+            guard let language, !language.isEmpty else { return [] }
+            return [HighlightableCodeBlock(
+                blockID: node.id,
+                code: code,
+                language: language
+            )]
+        case let .orderedList(_, items):
+            return items.flatMap { item in
+                item.children.flatMap(makeHighlightedCodeBlocks)
+            }
+        case let .unorderedList(items):
+            return items.flatMap { item in
+                item.children.flatMap(makeHighlightedCodeBlocks)
+            }
+        default:
+            return []
         }
     }
 }

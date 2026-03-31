@@ -23,6 +23,29 @@ struct CodeBlockViewTests {
         #expect(codeTextView?.attributedText?.string == "let x = 1")
     }
 
+    @Test("applyHighlightedCode preserves syntax colors")
+    func applyHighlightedCodePreservesSyntaxColors() throws {
+        let view = CodeBlockView()
+        view.configure(language: "swift", code: "let x = 1")
+
+        let highlighted = NSMutableAttributedString(string: "let x = 1")
+        highlighted.addAttribute(
+            .foregroundColor,
+            value: UIColor.systemRed,
+            range: NSRange(location: 0, length: 3)
+        )
+
+        view.apply(highlightedCode: HighlightedCodeSnapshot(highlighted))
+
+        let textView = try #require(codeTextView(in: view))
+        let foregroundColor = textView.attributedText?.attribute(
+            .foregroundColor,
+            at: 1,
+            effectiveRange: nil
+        ) as? UIColor
+        #expect(foregroundColor == UIColor.systemRed)
+    }
+
     @Test("Configured code block keeps visible fitting height")
     func configuredCodeBlockKeepsVisibleFittingHeight() {
         let view = CodeBlockView()
@@ -37,13 +60,13 @@ struct CodeBlockViewTests {
         #expect(fittingSize.height > Self.minimumVisibleHeight)
     }
 
-    @Test("Configure trims trailing newline")
-    func configureTrimsTrailingNewline() {
+    @Test("Configure preserves trailing newline")
+    func configurePreservesTrailingNewline() {
         let view = CodeBlockView()
         view.configure(language: nil, code: "line1\nline2\n")
 
         let codeTextView = codeTextView(in: view)
-        #expect(codeTextView?.attributedText?.string == "line1\nline2")
+        #expect(codeTextView?.attributedText?.string == "line1\nline2\n")
     }
 
     @Test("Configure with language shows language pill")
@@ -202,8 +225,8 @@ struct CodeBlockViewTests {
         let view = CodeBlockView()
         view.configure(language: "swift", code: "let value = 123")
 
-        let codeTextView = try #require(codeTextView(in: view))
-        codeTextView.selectedRange = NSRange(location: 4, length: 5)
+        let textView = try #require(codeTextView(in: view))
+        textView.selectedRange = NSRange(location: 4, length: 5)
 
         let highlighted = NSAttributedString(
             string: "let value = 123",
@@ -211,7 +234,22 @@ struct CodeBlockViewTests {
         )
         view.apply(highlightedCode: HighlightedCodeSnapshot(highlighted))
 
-        #expect(codeTextView.selectedRange == NSRange(location: 4, length: 5))
+        #expect(textView.selectedRange == NSRange(location: 4, length: 5))
+    }
+
+    @Test("Highlighted code preserves trailing newline")
+    func highlightedCodePreservesTrailingNewline() throws {
+        let view = CodeBlockView()
+        view.configure(language: "swift", code: "let value = 123\n")
+
+        let highlighted = NSAttributedString(
+            string: "let value = 123",
+            attributes: [.foregroundColor: UIColor.red]
+        )
+        view.apply(highlightedCode: HighlightedCodeSnapshot(highlighted))
+
+        let textView = try #require(codeTextView(in: view))
+        #expect(textView.attributedText?.string == "let value = 123\n")
     }
 
     @Test("Selected fragment uses native copy")
@@ -219,12 +257,12 @@ struct CodeBlockViewTests {
         let view = CodeBlockView()
         view.configure(language: "swift", code: "let value = 123")
 
-        let codeTextView = try #require(codeTextView(in: view))
-        codeTextView.selectedRange = NSRange(location: 4, length: 5)
+        let textView = try #require(codeTextView(in: view))
+        textView.selectedRange = NSRange(location: 4, length: 5)
         UIPasteboard.general.string = nil
 
-        _ = codeTextView.becomeFirstResponder()
-        codeTextView.copy(nil)
+        _ = textView.becomeFirstResponder()
+        textView.copy(nil)
 
         #expect(UIPasteboard.general.string == "value")
     }
@@ -247,6 +285,32 @@ struct CodeBlockViewTests {
         view.apply(highlightedCode: HighlightedCodeSnapshot(highlighted))
 
         #expect(scrollView.contentOffset.x == 32)
+    }
+
+    @Test("Wide code block keeps horizontal-only scroll content")
+    func wideCodeBlockKeepsHorizontalOnlyScrollContent() throws {
+        let view = CodeBlockView()
+        view.configure(
+            language: "md",
+            code: """
+            #### Line Breaks
+            * `---`
+            #### Vertical Rule
+            * `|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|`
+            """
+        )
+
+        let fittingSize = view.sizeThatFits(
+            CGSize(width: Self.testWidth, height: CGFloat.greatestFiniteMagnitude)
+        )
+        view.frame = CGRect(x: 0, y: 0, width: Self.testWidth, height: fittingSize.height)
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+
+        let scrollView = try #require(codeScrollView(in: view))
+
+        #expect(scrollView.contentSize.width > scrollView.bounds.width)
+        #expect(abs(scrollView.contentSize.height - scrollView.bounds.height) <= 1)
     }
 }
 

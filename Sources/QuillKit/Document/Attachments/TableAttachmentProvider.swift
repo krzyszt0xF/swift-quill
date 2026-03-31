@@ -1,7 +1,8 @@
+import QuillCore
 import UIKit
 
 @MainActor
-final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
+final class TableAttachmentProvider: NSTextAttachmentViewProvider {
     override init(
         textAttachment: NSTextAttachment,
         parentView: UIView?,
@@ -19,21 +20,13 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
     }
 
     override func loadView() {
-        guard let attachment = textAttachment as? CodeBlockAttachment else { return }
-
-        let view = CodeBlockView()
-        view.configure(language: attachment.language, code: attachment.code)
-
-        let highlighted = attachment.highlightStore?.highlightedResult(for: attachment.blockID)
-
-        if let highlighted {
-            view.apply(highlightedCode: highlighted)
-        }
-
-        attachment.highlightStore?.registerSink(view, for: attachment.blockID)
-        self.view = view
+        guard let attachment = textAttachment as? TableAttachment else { return }
+        let content = TableSurfaceContent(from: attachment)
+        let surfaceView = TableSurfaceView()
+        surfaceView.configure(content: content)
+        view = surfaceView
     }
-
+    
     override func attachmentBounds(
         for attributes: [NSAttributedString.Key: Any],
         location: any NSTextLocation,
@@ -41,7 +34,7 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
         proposedLineFragment: CGRect,
         position: CGPoint
     ) -> CGRect {
-        guard let attachment = textAttachment as? CodeBlockAttachment else {
+        guard let attachment = textAttachment as? TableAttachment else {
             return CGRect(origin: .zero, size: Layout.fallbackSize)
         }
 
@@ -49,14 +42,18 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
         guard width > 0 else {
             return CGRect(origin: .zero, size: Layout.fallbackSize)
         }
-
-        let height = CodeBlockView.measureHeight(of: attachment.code, in: attachment.language)
+        
+        let content = TableSurfaceContent(from: attachment)
+        let height = TableSurfaceLayoutBuilder.makeLayout(
+            content: content,
+            viewportWidth: width
+        ).contentSize.height
         return CGRect(origin: .zero, size: CGSize(width: width, height: height))
     }
 }
 
-private extension CodeBlockAttachmentProvider {
+private extension TableAttachmentProvider {
     enum Layout {
-        static let fallbackSize = CGSize(width: 320, height: 80)
+        static let fallbackSize = CGSize(width: 320, height: 120)
     }
 }

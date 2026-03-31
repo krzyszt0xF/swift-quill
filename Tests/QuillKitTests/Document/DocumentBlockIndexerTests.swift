@@ -20,17 +20,17 @@ struct DocumentBlockIndexerTests {
 
         indexer.rebuild(
             from: [
-                makeFragment("Alpha", blockID: 0),
-                makeFragment("Beta", blockID: 1),
-                makeFragment("Gamma", blockID: 2),
+                makeFragment("Alpha", ownerBlockID: 0),
+                makeFragment("Beta", ownerBlockID: 1),
+                makeFragment("Gamma", ownerBlockID: 2),
             ],
             preservingPrefixCount: 0
         )
 
         #expect(indexer.blockSpans.count == 3)
-        #expect(indexer.blockSpans[0].blockID == BlockIdentity(rawValue: 0))
-        #expect(indexer.blockSpans[1].blockID == BlockIdentity(rawValue: 1))
-        #expect(indexer.blockSpans[2].blockID == BlockIdentity(rawValue: 2))
+        #expect(indexer.blockSpans[0].ownerBlockID == BlockIdentity(rawValue: 0))
+        #expect(indexer.blockSpans[1].ownerBlockID == BlockIdentity(rawValue: 1))
+        #expect(indexer.blockSpans[2].ownerBlockID == BlockIdentity(rawValue: 2))
     }
 
     @Test("Rebuild replaces only tail after preserved prefix")
@@ -39,44 +39,44 @@ struct DocumentBlockIndexerTests {
 
         indexer.rebuild(
             from: [
-                makeFragment("Alpha", blockID: 0),
-                makeFragment("Beta", blockID: 1),
-                makeFragment("Gamma", blockID: 2),
+                makeFragment("Alpha", ownerBlockID: 0),
+                makeFragment("Beta", ownerBlockID: 1),
+                makeFragment("Gamma", ownerBlockID: 2),
             ],
             preservingPrefixCount: 0
         )
 
         indexer.rebuild(
             from: [
-                makeFragment("Alpha", blockID: 0),
-                makeFragment("Beta", blockID: 1),
-                makeFragment("Delta", blockID: 3),
+                makeFragment("Alpha", ownerBlockID: 0),
+                makeFragment("Beta", ownerBlockID: 1),
+                makeFragment("Delta", ownerBlockID: 3),
             ],
             preservingPrefixCount: 2
         )
 
         #expect(indexer.blockSpans.count == 3)
-        #expect(indexer.blockSpans[0].blockID == BlockIdentity(rawValue: 0))
-        #expect(indexer.blockSpans[1].blockID == BlockIdentity(rawValue: 1))
-        #expect(indexer.blockSpans[2].blockID == BlockIdentity(rawValue: 3))
+        #expect(indexer.blockSpans[0].ownerBlockID == BlockIdentity(rawValue: 0))
+        #expect(indexer.blockSpans[1].ownerBlockID == BlockIdentity(rawValue: 1))
+        #expect(indexer.blockSpans[2].ownerBlockID == BlockIdentity(rawValue: 3))
     }
 
     @Test("Lookup by block ID returns matching span")
     func blockIDLookup() {
         var indexer = DocumentBlockIndexer()
         let spanA = DocumentBlockIndexer.BlockSpan(
-            blockID: BlockIdentity(rawValue: 0),
+            ownerBlockID: BlockIdentity(rawValue: 0),
             range: NSRange(location: 0, length: 5)
         )
         let spanB = DocumentBlockIndexer.BlockSpan(
-            blockID: BlockIdentity(rawValue: 1),
+            ownerBlockID: BlockIdentity(rawValue: 1),
             range: NSRange(location: 6, length: 4)
         )
 
         indexer.rebuild(
             from: [
-                makeFragment("Alpha", blockID: 0),
-                makeFragment("Beta", blockID: 1),
+                makeFragment("Alpha", ownerBlockID: 0),
+                makeFragment("Beta", ownerBlockID: 1),
             ],
             preservingPrefixCount: 0
         )
@@ -86,16 +86,36 @@ struct DocumentBlockIndexerTests {
         #expect(indexer.blockSpan(for: BlockIdentity(rawValue: 99)) == nil)
     }
 
+    @Test("Multiple render fragments with same owner form one block span")
+    func groupedOwnerFragments() {
+        var indexer = DocumentBlockIndexer()
+
+        indexer.rebuild(
+            from: [
+                makeFragment("1.\tItem", ownerBlockID: 0, contentBlockID: 1),
+                makeFragment("print(\"Hi\")", ownerBlockID: 0, contentBlockID: 2),
+                makeFragment("Next", ownerBlockID: 3, contentBlockID: 4),
+            ],
+            preservingPrefixCount: 0
+        )
+
+        #expect(indexer.blockSpans.count == 2)
+        #expect(indexer.blockSpans[0].ownerBlockID == BlockIdentity(rawValue: 0))
+        #expect(indexer.blockSpans[0].range == NSRange(location: 0, length: 19))
+        #expect(indexer.blockSpans[1].ownerBlockID == BlockIdentity(rawValue: 3))
+        #expect(indexer.blockSpans[1].range == NSRange(location: 20, length: 4))
+    }
+
     @Test("Tail range returns contiguous range after preserved prefix")
     func contiguousTailRange() {
         var indexer = DocumentBlockIndexer()
 
         indexer.rebuild(
             from: [
-                makeFragment("Alpha", blockID: 0),
-                makeFragment("Beta", blockID: 1),
-                makeFragment("Gamma", blockID: 2),
-                makeFragment("Delta", blockID: 3),
+                makeFragment("Alpha", ownerBlockID: 0),
+                makeFragment("Beta", ownerBlockID: 1),
+                makeFragment("Gamma", ownerBlockID: 2),
+                makeFragment("Delta", ownerBlockID: 3),
             ],
             preservingPrefixCount: 0
         )
@@ -112,7 +132,7 @@ struct DocumentBlockIndexerTests {
 
         indexer.rebuild(
             from: [
-                makeFragment("Alpha", blockID: 0),
+                makeFragment("Alpha", ownerBlockID: 0),
             ],
             preservingPrefixCount: 0
         )
@@ -126,8 +146,8 @@ struct DocumentBlockIndexerTests {
 
         indexer.rebuild(
             from: [
-                makeFragment("Alpha", blockID: 0),
-                makeFragment("Beta", blockID: 1),
+                makeFragment("Alpha", ownerBlockID: 0),
+                makeFragment("Beta", ownerBlockID: 1),
             ],
             preservingPrefixCount: 0
         )
@@ -140,10 +160,16 @@ struct DocumentBlockIndexerTests {
 }
 
 private extension DocumentBlockIndexerTests {
-    func makeFragment(_ text: String, blockID: UInt64) -> AttributedStringBuilder.DocumentFragment {
-        AttributedStringBuilder.DocumentFragment(
+    func makeFragment(
+        _ text: String,
+        ownerBlockID: UInt64,
+        contentBlockID: UInt64? = nil
+    ) -> RenderFragment {
+        RenderFragment(
             attributedString: NSAttributedString(string: text),
-            blockID: BlockIdentity(rawValue: blockID)
+            contentBlockID: BlockIdentity(rawValue: contentBlockID ?? ownerBlockID),
+            ownerBlockID: BlockIdentity(rawValue: ownerBlockID),
+            presentationRole: .regularBlock
         )
     }
 }

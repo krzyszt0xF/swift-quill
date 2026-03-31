@@ -1,16 +1,22 @@
 import QuillCore
 import UIKit
 
-final class CodeBlockAttachment: NSTextAttachment {
+final class TableAttachment: NSTextAttachment {
     let blockID: BlockIdentity
-    let code: String
-    weak var highlightStore: (any CodeBlockHighlightStore)?
-    let language: String?
+    let columnAlignments: [Block.ColumnAlignment?]
+    let header: Block.TableRow
+    let rows: [Block.TableRow]
 
-    init(blockID: BlockIdentity, language: String?, code: String) {
+    init(
+        blockID: BlockIdentity,
+        columnAlignments: [Block.ColumnAlignment?],
+        header: Block.TableRow,
+        rows: [Block.TableRow]
+    ) {
         self.blockID = blockID
-        self.code = code
-        self.language = language
+        self.columnAlignments = columnAlignments
+        self.header = header
+        self.rows = rows
         super.init(data: nil, ofType: nil)
 
         allowsTextAttachmentView = true
@@ -26,7 +32,7 @@ final class CodeBlockAttachment: NSTextAttachment {
         location: any NSTextLocation,
         textContainer: NSTextContainer?
     ) -> NSTextAttachmentViewProvider? {
-        CodeBlockAttachmentProvider(
+        TableAttachmentProvider(
             textAttachment: self,
             parentView: parentView,
             textLayoutManager: textContainer?.textLayoutManager,

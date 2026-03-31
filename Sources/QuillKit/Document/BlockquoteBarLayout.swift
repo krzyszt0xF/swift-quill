@@ -3,14 +3,14 @@ import UIKit
 
 struct BlockquoteBarLayout {
     struct BarRun: Equatable {
-        let blockID: BlockIdentity
+        let ownerBlockID: BlockIdentity
         let level: Int
         let maxY: CGFloat
         let minY: CGFloat
     }
 
     struct FragmentContext {
-        let blockID: BlockIdentity
+        let ownerBlockID: BlockIdentity
         let depth: Int
         let maxY: CGFloat
         let minY: CGFloat
@@ -28,9 +28,9 @@ struct BlockquoteBarLayout {
             )
 
             for level in 1...fragment.depth {
-                if var activeRun = activeRuns[level], activeRun.blockID == fragment.blockID {
+                if var activeRun = activeRuns[level], activeRun.ownerBlockID == fragment.ownerBlockID {
                     activeRun = BarRun(
-                        blockID: activeRun.blockID,
+                        ownerBlockID: activeRun.ownerBlockID,
                         level: activeRun.level,
                         maxY: max(activeRun.maxY, fragment.maxY),
                         minY: min(activeRun.minY, fragment.minY)
@@ -43,7 +43,7 @@ struct BlockquoteBarLayout {
                     barRuns.append(activeRun)
                 }
                 activeRuns[level] = BarRun(
-                    blockID: fragment.blockID,
+                    ownerBlockID: fragment.ownerBlockID,
                     level: level,
                     maxY: fragment.maxY,
                     minY: fragment.minY
@@ -69,7 +69,7 @@ private extension BlockquoteBarLayout {
     ) {
         let inactiveLevels = activeRuns.keys.filter { level in
             guard let activeRun = activeRuns[level] else { return false }
-            return level > fragment.depth || activeRun.blockID != fragment.blockID
+            return level > fragment.depth || activeRun.ownerBlockID != fragment.ownerBlockID
         }
 
         for level in inactiveLevels.sorted() {
