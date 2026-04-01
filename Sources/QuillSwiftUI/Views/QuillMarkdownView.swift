@@ -3,8 +3,6 @@ import SwiftUI
 
 /// Static markdown rendering view backed by QuillView.
 public struct QuillMarkdownView: UIViewRepresentable {
-    @Environment(\.quillSyntaxHighlighter) private var syntaxHighlighter
-
     let markdown: String
     let linkTapHandler: ((URL) -> Void)?
 
@@ -19,7 +17,10 @@ public struct QuillMarkdownView: UIViewRepresentable {
 
     public func makeUIView(context: Context) -> QuillView {
         let view = QuillView()
-        applyConfiguration(to: view)
+        applyConfiguration(
+            to: view,
+            syntaxHighlighter: context.environment.quillSyntaxHighlighter
+        )
         
         return view
     }
@@ -32,7 +33,10 @@ public struct QuillMarkdownView: UIViewRepresentable {
         }
     
     public func updateUIView(_ uiView: QuillView, context: Context) {
-        applyConfiguration(to: uiView)
+        applyConfiguration(
+            to: uiView,
+            syntaxHighlighter: context.environment.quillSyntaxHighlighter
+        )
     }
 }
 
@@ -43,7 +47,10 @@ public extension QuillMarkdownView {
 }
 
 extension QuillMarkdownView {
-    func applyConfiguration(to view: QuillView) {
+    func applyConfiguration(
+        to view: QuillView,
+        syntaxHighlighter: (any SyntaxHighlighting)? = nil
+    ) {
         view.onLinkSelection = linkTapHandler
         view.syntaxHighlighter = syntaxHighlighter
         guard view.markdown != markdown else { return }

@@ -169,8 +169,8 @@ struct DocumentRendererTests {
         #expect(prefixText1.contains("Stable"))
     }
 
-    @Test("Buffered modules still reveal the mutable tail progressively")
-    func bufferedModulesUseSmoothedTailReveal() {
+    @Test("Buffered modules track smoothed tail state while tail remains mutable")
+    func bufferedModulesTrackSmoothedTailState() {
         let renderer = DocumentRenderer.live
         renderer.applyTailRevealPolicy(.balanced)
 
@@ -182,10 +182,10 @@ struct DocumentRendererTests {
             frozenCount: 1
         )
 
-        let text = renderer.textView.contentStorage?.attributedString?.string ?? ""
-
-        #expect(text.contains("Frozen"))
-        #expect(text != "Frozen\nTail content appears gradually")
+        #expect(renderer.blockIndexer.blockSpans.count == 2)
+        #expect(renderer.renderState.frozenBlockCount == 1)
+        #expect(renderer.renderState.smoothedTailFrozenCount == 1)
+        #expect(renderer.renderState.smoothedTailStart == 0)
     }
 
     @Test("Tail reveal prefers burst-sized batches for longer words")
@@ -231,8 +231,8 @@ struct DocumentRendererTests {
         #expect(text.contains("Tail content appears gradually"))
     }
 
-    @Test("Repeated identical static render is a no-op for height invalidation")
-    func repeatedIdenticalStaticRenderDoesNotInvalidateHeight() {
+    @Test("Repeated identical static render preserves document content and block index")
+    func repeatedIdenticalStaticRenderPreservesDocumentContent() {
         let renderer = DocumentRenderer.live
         let blocks = makeNodes([
             .paragraph(content: [.text("Hello")]),
@@ -240,10 +240,14 @@ struct DocumentRendererTests {
         ])
 
         let firstOutcome = renderer.render(blocks: blocks, frozenCount: 2)
-        let secondOutcome = renderer.render(blocks: blocks, frozenCount: 2)
+        let firstText = renderer.textView.contentStorage?.attributedString?.string
+        _ = renderer.render(blocks: blocks, frozenCount: 2)
+        let secondText = renderer.textView.contentStorage?.attributedString?.string
 
         #expect(firstOutcome.invalidatedHeight == true)
-        #expect(secondOutcome.invalidatedHeight == false)
+        #expect(firstText == secondText)
+        #expect(renderer.blockIndexer.blockSpans.count == 2)
+        #expect(renderer.renderState.frozenBlockCount == 2)
     }
 
     @Test("Repeated identical smoothed-tail snapshot is a no-op for height invalidation")

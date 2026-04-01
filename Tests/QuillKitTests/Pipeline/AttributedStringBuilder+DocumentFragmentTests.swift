@@ -2,6 +2,7 @@ import QuillCore
 import QuillCoreTestSupport
 @testable import QuillKit
 import Testing
+import UIKit
 
 @Suite("AttributedStringBuilder Document Fragments")
 struct AttributedStringBuilderDocumentFragmentTests {

@@ -49,6 +49,20 @@
                ReferencedContainer = "container:">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "QuillHighlight"
+               BuildableName = "QuillHighlight"
+               BlueprintName = "QuillHighlight"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -85,6 +99,16 @@
                BlueprintIdentifier = "QuillSwiftUITests"
                BuildableName = "QuillSwiftUITests"
                BlueprintName = "QuillSwiftUITests"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "QuillHighlightTests"
+               BuildableName = "QuillHighlightTests"
+               BlueprintName = "QuillHighlightTests"
                ReferencedContainer = "container:">
             </BuildableReference>
          </TestableReference>

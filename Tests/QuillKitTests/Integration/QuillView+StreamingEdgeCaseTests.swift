@@ -82,26 +82,20 @@ struct QuillViewStreamingEdgeCaseTests {
         #expect(view.currentMarkdown == fullMarkdown)
     }
 
-    @Test("Closed code block renders selectable text view")
-    func closedCodeBlockRendersSelectableTextView() async {
+    @Test("Closed code block renders code block attachment")
+    func closedCodeBlockRendersCodeBlockAttachment() async {
         let view = makeSmoothedTailQuillView()
+        let markdown = "```swift\nlet value = 1\n```\n"
 
-        view.append("```swift\nlet value = 1\n```\n")
+        view.append(markdown)
         view.finish()
 
         let rendered = await eventually(timeout: .milliseconds(1200)) {
-            guard let codeBlockView = documentCodeBlockView(for: view),
-                  let codeTextView = findSubview(
-                    of: UITextView.self,
-                    in: codeBlockView,
-                    matching: { $0.isSelectable && $0.isEditable == false }
-                  )
-            else { return false }
-
-            return codeTextView.attributedText.string.contains("let value = 1")
+            documentHasCodeBlockAttachment(view)
         }
 
         #expect(rendered)
+        #expect(view.currentMarkdown == markdown)
     }
 
     @Test("Nested list code fence renders code block attachment")

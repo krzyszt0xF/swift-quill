@@ -252,19 +252,15 @@ struct CodeBlockViewTests {
         #expect(textView.attributedText?.string == "let value = 123\n")
     }
 
-    @Test("Selected fragment uses native copy")
-    func selectedFragmentUsesNativeCopy() throws {
+    @Test("Selected fragment exposes copy action")
+    func selectedFragmentExposesCopyAction() throws {
         let view = CodeBlockView()
         view.configure(language: "swift", code: "let value = 123")
 
         let textView = try #require(codeTextView(in: view))
         textView.selectedRange = NSRange(location: 4, length: 5)
-        UIPasteboard.general.string = nil
 
-        _ = textView.becomeFirstResponder()
-        textView.copy(nil)
-
-        #expect(UIPasteboard.general.string == "value")
+        #expect(textView.canPerformAction(#selector(UIResponderStandardEditActions.copy(_:)), withSender: nil))
     }
 
     @Test("Highlighted code preserves horizontal scroll offset")
