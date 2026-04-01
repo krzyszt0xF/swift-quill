@@ -22,8 +22,13 @@ struct PartialLinePreviewer {
                 for: partialLine,
                 previousPreview: previousPreview
             )
-        case .heading, .table, .tableCandidate:
+        case .heading, .tableCandidate:
             return nil
+        case .table:
+            return makeTablePreview(
+                for: partialLine,
+                previousPreview: previousPreview
+            )
         }
     }
 
@@ -43,6 +48,10 @@ struct PartialLinePreviewer {
                 fullText: line.makeParagraphPreviewText(isContinuation: isContinuation),
                 emittedText: emittedText
             )
+        case .tableRow:
+            // Table row previews are structural rather than diffable text updates,
+            // so the completed line does not emit a separate remainder payload.
+            return []
         }
     }
 }
@@ -68,6 +77,7 @@ private extension PartialLinePreviewer {
         }
 
         let normalizedLine = partialLine.removingLeadingIndent(width: indentToStrip)
+        guard normalizedLine.isEmpty == false else { return nil }
 
         let emittedText: String
         if case let .codeBlockText(existingText, _)? = previousPreview {
@@ -143,6 +153,31 @@ private extension PartialLinePreviewer {
         )
     }
 
+    static func makeTablePreview(
+        for partialLine: String,
+        previousPreview: StreamBuffer.PartialPreview?
+    ) -> PreviewResult? {
+        let trimmed = partialLine.trimmedLineForTablePreview
+        guard trimmed.hasPrefix("|"), trimmed.hasSuffix("|") else { return nil }
+        guard StreamLineClassifier.isTableSeparator(trimmed) == false else { return nil }
+        let cells = StreamLineClassifier.parseTableCells(trimmed)
+        guard cells.count >= 2 else { return nil }
+
+        if case let .tableRow(emittedLine)? = previousPreview, emittedLine == trimmed {
+            return PreviewResult(
+                blockState: .table,
+                events: [],
+                preview: .tableRow(emittedLine: emittedLine)
+            )
+        }
+
+        return PreviewResult(
+            blockState: .table,
+            events: [.tableRow(cells)],
+            preview: .tableRow(emittedLine: trimmed)
+        )
+    }
+
     static func makeRemainingCodeText(
         fullText: String,
         emittedText: String,
@@ -180,6 +215,10 @@ private extension PartialLinePreviewer {
 }
 
 private extension String {
+    var trimmedLineForTablePreview: String {
+        trimmingCharacters(in: .whitespaces)
+    }
+
     var isAmbiguousIdlePreviewPrefix: Bool {
         let trimmed = trimmingCharacters(in: .whitespaces)
         guard trimmed.isEmpty == false else { return false }

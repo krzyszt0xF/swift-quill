@@ -280,8 +280,10 @@ struct StreamBufferTests {
             .startCodeBlock(language: "python"),
             .codeBlockText("print(\"Hello\")\n"),
             .endCodeBlock,
-            .endListItem, .endList, .endListItem, .endList,
         ])
+
+        let finalEvents = buffer.finalize()
+        #expect(finalEvents == [.endListItem, .endList, .endListItem, .endList])
     }
 
     @Test("Nested table inside list item stays in list-scoped routing")
@@ -410,8 +412,10 @@ struct StreamBufferTests {
             .startList(ordered: true), .startListItem, .startParagraph, .text("Parse markdown into a stable block tree"),
             .endParagraph, .startList(ordered: true), .startListItem, .startParagraph, .text("Preserve nested ordered numbering"),
             .endParagraph, .endListItem, .startListItem, .startParagraph, .text("Keep wrapped lines aligned under the marker when they span more than one visual row in the narrow stream pane"),
-            .endParagraph, .endListItem, .endList, .endListItem, .endList,
         ])
+
+        let finalEvents = buffer.finalize()
+        #expect(finalEvents == [.endParagraph, .endListItem, .endList, .endListItem, .endList])
     }
 
     @Test("Finalize closes open blockquote")
