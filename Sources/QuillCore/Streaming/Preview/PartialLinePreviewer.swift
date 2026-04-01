@@ -2,7 +2,8 @@ struct PartialLinePreviewer {
     static func makePreview(
         for partialLine: String,
         previousPreview: StreamBuffer.PartialPreview?,
-        blockState: StreamBuffer.BlockState
+        blockState: StreamBuffer.BlockState,
+        allowHeadingTransitionFromParagraph: Bool
     ) -> PreviewResult? {
         guard partialLine.isEmpty == false else { return nil }
 
@@ -20,9 +21,15 @@ struct PartialLinePreviewer {
         case .paragraph:
             return makeParagraphPreview(
                 for: partialLine,
+                previousPreview: previousPreview,
+                allowHeadingTransition: allowHeadingTransitionFromParagraph
+            )
+        case .heading:
+            return makeHeadingPreview(
+                for: partialLine,
                 previousPreview: previousPreview
             )
-        case .heading, .tableCandidate:
+        case .tableCandidate:
             return nil
         case .table:
             return makeTablePreview(
@@ -48,6 +55,21 @@ struct PartialLinePreviewer {
                 fullText: line.makeParagraphPreviewText(isContinuation: isContinuation),
                 emittedText: emittedText
             )
+        case let .heading(level, emittedText):
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let fullText: String
+            if let parsedLevel = StreamLineClassifier.parseHeadingPrefix(trimmed), parsedLevel == level {
+                fullText = StreamLineClassifier.extractHeadingContent(trimmed, level: level)
+            } else {
+                fullText = emittedText
+            }
+
+            var events = makeRemainingText(
+                fullText: fullText,
+                emittedText: emittedText
+            )
+            events.append(.endHeading)
+            return events
         case .tableRow:
             // Table row previews are structural rather than diffable text updates,
             // so the completed line does not emit a separate remainder payload.
@@ -104,8 +126,18 @@ private extension PartialLinePreviewer {
         guard trimmed.isEmpty == false else { return nil }
         guard partialLine.isAmbiguousIdlePreviewPrefix == false else { return nil }
 
+        if let level = StreamLineClassifier.parseHeadingPrefix(trimmed) {
+            let content = StreamLineClassifier.extractHeadingContent(trimmed, level: level)
+            guard content.isEmpty == false else { return nil }
+
+            return PreviewResult(
+                blockState: .heading,
+                events: [.startHeading(level: level), .text(content)],
+                preview: .heading(level: level, emittedText: content)
+            )
+        }
+
         if StreamLineClassifier.parseFenceOpener(trimmed) != nil
-            || StreamLineClassifier.parseHeadingPrefix(trimmed) != nil
             || StreamLineClassifier.isThematicBreak(trimmed)
             || StreamLineClassifier.parseListMarker(partialLine) != nil
             || trimmed.hasPrefix(">")
@@ -127,8 +159,22 @@ private extension PartialLinePreviewer {
 
     static func makeParagraphPreview(
         for partialLine: String,
-        previousPreview: StreamBuffer.PartialPreview?
+        previousPreview: StreamBuffer.PartialPreview?,
+        allowHeadingTransition: Bool
     ) -> PreviewResult? {
+        let trimmed = partialLine.trimmingCharacters(in: .whitespaces)
+
+        if allowHeadingTransition, let level = StreamLineClassifier.parseHeadingPrefix(trimmed) {
+            let content = StreamLineClassifier.extractHeadingContent(trimmed, level: level)
+            guard content.isEmpty == false else { return nil }
+
+            return PreviewResult(
+                blockState: .heading,
+                events: [.endParagraph, .startHeading(level: level), .text(content)],
+                preview: .heading(level: level, emittedText: content)
+            )
+        }
+
         let emittedText: String
         let isContinuation: Bool
 
@@ -150,6 +196,35 @@ private extension PartialLinePreviewer {
             blockState: .paragraph,
             events: events,
             preview: .paragraph(emittedText: previewText, isContinuation: isContinuation)
+        )
+    }
+
+    static func makeHeadingPreview(
+        for partialLine: String,
+        previousPreview: StreamBuffer.PartialPreview?
+    ) -> PreviewResult? {
+        let trimmed = partialLine.trimmingCharacters(in: .whitespaces)
+        guard let level = StreamLineClassifier.parseHeadingPrefix(trimmed) else { return nil }
+
+        let fullText = StreamLineClassifier.extractHeadingContent(trimmed, level: level)
+        guard fullText.isEmpty == false else { return nil }
+
+        if case let .heading(previousLevel, emittedText)? = previousPreview,
+           previousLevel == level {
+            return PreviewResult(
+                blockState: .heading,
+                events: makeRemainingText(
+                    fullText: fullText,
+                    emittedText: emittedText
+                ),
+                preview: .heading(level: level, emittedText: fullText)
+            )
+        }
+
+        return PreviewResult(
+            blockState: .heading,
+            events: [.startHeading(level: level), .text(fullText)],
+            preview: .heading(level: level, emittedText: fullText)
         )
     }
 

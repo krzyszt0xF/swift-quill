@@ -44,6 +44,7 @@ extension StreamBuffer {
 
     enum PartialPreview: Equatable {
         case codeBlockText(emittedText: String, indentToStrip: Int)
+        case heading(level: Int, emittedText: String)
         case paragraph(emittedText: String, isContinuation: Bool)
         case tableRow(emittedLine: String)
     }

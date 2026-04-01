@@ -4,6 +4,10 @@ extension StreamBuffer {
 
         defer { state.partialPreview = nil }
 
+        if case .heading = partialPreview {
+            state.blockState = .idle
+        }
+
         return PartialLinePreviewer.makeRemainderEvents(
             for: line,
             preview: partialPreview
@@ -22,7 +26,6 @@ extension StreamBuffer {
         }
 
         applyPartialPreview(preview)
-
         return preview.events
     }
 
@@ -42,7 +45,8 @@ extension StreamBuffer {
         PartialLinePreviewer.makePreview(
             for: state.partialLine,
             previousPreview: state.partialPreview,
-            blockState: state.blockState
+            blockState: state.blockState,
+            allowHeadingTransitionFromParagraph: state.listStack.isEmpty
         )
     }
 

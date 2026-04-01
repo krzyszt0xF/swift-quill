@@ -157,6 +157,31 @@ struct StreamBufferTests {
         #expect(events == [.startHeading(level: 6), .text("Deep"), .endHeading])
     }
 
+    @Test("Partial heading streams incrementally before newline")
+    func partialHeadingStreamsIncrementally() {
+        var buffer = StreamBuffer()
+
+        let partialEvents = buffer.append("## Tit")
+        #expect(partialEvents == [.startHeading(level: 2), .text("Tit")])
+
+        let completionEvents = buffer.append("le\n")
+        #expect(completionEvents == [.text("le"), .endHeading])
+    }
+
+    @Test("Partial heading after paragraph closes paragraph before streaming heading")
+    func partialHeadingAfterParagraphStreamsIncrementally() {
+        var buffer = StreamBuffer()
+
+        let partialEvents = buffer.append("Intro paragraph\n## Tit")
+        #expect(partialEvents == [
+            .startParagraph, .text("Intro paragraph"),
+            .endParagraph, .startHeading(level: 2), .text("Tit"),
+        ])
+
+        let completionEvents = buffer.append("le\n")
+        #expect(completionEvents == [.text("le"), .endHeading])
+    }
+
     @Test("Seven hashes is not a heading")
     func sevenHashesNotHeading() {
         var buffer = StreamBuffer()
@@ -682,5 +707,16 @@ struct StreamBufferTests {
         let finalizeEvents = buffer.finalize()
         #expect(appendEvents == [.startParagraph, .text("partial")])
         #expect(finalizeEvents == [.endParagraph])
+    }
+
+    @Test("Finalize closes open partial heading without duplicating text")
+    func finalizePartialHeading() {
+        var buffer = StreamBuffer()
+
+        let appendEvents = buffer.append("## Title")
+        let finalizeEvents = buffer.finalize()
+
+        #expect(appendEvents == [.startHeading(level: 2), .text("Title")])
+        #expect(finalizeEvents == [.endHeading])
     }
 }

@@ -124,6 +124,57 @@ struct StreamControllerTests {
         #expect(singleEvents == splitEvents)
     }
 
+    @Test("Split heading emits incremental events before newline")
+    func splitHeadingEmitsIncrementalEvents() async {
+        let controller = MarkdownStreamController()
+        let eventStream = await controller.events()
+
+        Task {
+            await controller.append("# Hel")
+            await controller.append("lo\n")
+            await controller.finish()
+        }
+
+        var events: [ParserEvent] = []
+        for await event in eventStream {
+            events.append(event)
+        }
+
+        #expect(events == [
+            .startHeading(level: 1),
+            .text("Hel"),
+            .text("lo"),
+            .endHeading,
+        ])
+    }
+
+    @Test("Paragraph to split heading emits paragraph close before heading preview")
+    func paragraphToSplitHeadingEmitsIncrementalHeadingEvents() async {
+        let controller = MarkdownStreamController()
+        let eventStream = await controller.events()
+
+        Task {
+            await controller.append("Intro paragraph\n## Tit")
+            await controller.append("le\n")
+            await controller.finish()
+        }
+
+        var events: [ParserEvent] = []
+        for await event in eventStream {
+            events.append(event)
+        }
+
+        #expect(events == [
+            .startParagraph,
+            .text("Intro paragraph"),
+            .endParagraph,
+            .startHeading(level: 2),
+            .text("Tit"),
+            .text("le"),
+            .endHeading,
+        ])
+    }
+
     @Test("Immediate append after events installation does not drop prefix events")
     func immediateAppendKeepsPrefixEvents() async {
         let controller = MarkdownStreamController()
