@@ -3,6 +3,7 @@ import UIKit
 @MainActor
 final class TableSurfaceView: UIView {
     private let canvasView = TableSurfaceCanvasView()
+    private lazy var editMenuInteraction = UIEditMenuInteraction(delegate: self)
     private let scrollView = UIScrollView()
 
     private var currentViewportWidth: CGFloat = 0
@@ -15,6 +16,7 @@ final class TableSurfaceView: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
+        addInteraction(editMenuInteraction)
         backgroundColor = .clear
         isOpaque = false
         setupScrollView()
@@ -49,7 +51,7 @@ final class TableSurfaceView: UIView {
         guard tsv.isEmpty == false else { return }
         UIPasteboard.general.string = tsv
         self.selection = nil
-        UIMenuController.shared.hideMenu()
+        editMenuInteraction.dismissMenu()
     }
 
     override func layoutSubviews() {
@@ -87,7 +89,7 @@ final class TableSurfaceView: UIView {
         activityViewController.completionWithItemsHandler = { [weak self] _, _, _, _ in
             guard let self else { return }
             self.selection = nil
-            UIMenuController.shared.hideMenu()
+            self.editMenuInteraction.dismissMenu()
         }
 
         if let popover = activityViewController.popoverPresentationController {
@@ -124,7 +126,7 @@ private extension TableSurfaceView {
         }
         canvasView.onSelectionChanged = { [weak self] in
             guard self?.selection == nil else { return }
-            UIMenuController.shared.hideMenu()
+            self?.editMenuInteraction.dismissMenu()
         }
         canvasView.onSelectionCommitted = { [weak self] in
             self?.presentSelectionMenuIfNeeded()
@@ -136,14 +138,18 @@ private extension TableSurfaceView {
 
     func presentSelectionMenuIfNeeded() {
         guard selection != nil else {
-            UIMenuController.shared.hideMenu()
+            editMenuInteraction.dismissMenu()
             return
         }
 
         _ = becomeFirstResponder()
-        UIMenuController.shared.showMenu(
-            from: canvasView,
-            rect: canvasView.menuTargetRect ?? .zero
+        let targetRect = convert(canvasView.menuTargetRect ?? .zero, from: canvasView)
+        let sourcePoint = CGPoint(x: targetRect.midX, y: targetRect.midY)
+        editMenuInteraction.presentEditMenu(
+            with: UIEditMenuConfiguration(
+                identifier: nil,
+                sourcePoint: sourcePoint
+            )
         )
     }
 
@@ -154,5 +160,31 @@ private extension TableSurfaceView {
     func makeDocumentTextView() -> DocumentTextView? {
         sequence(first: superview, next: { $0?.superview })
             .first { $0 is DocumentTextView } as? DocumentTextView
+    }
+}
+
+extension TableSurfaceView: @MainActor UIEditMenuInteractionDelegate {
+    func editMenuInteraction(
+        _ interaction: UIEditMenuInteraction,
+        menuFor configuration: UIEditMenuConfiguration,
+        suggestedActions: [UIMenuElement]
+    ) -> UIMenu? {
+        guard selection != nil else { return nil }
+
+        let copyAction = UIAction(title: "Copy") { [weak self] _ in
+            self?.copy(nil)
+        }
+        let shareAction = UIAction(title: "Share") { [weak self] _ in
+            self?.share(nil)
+        }
+
+        return UIMenu(children: [copyAction, shareAction])
+    }
+
+    func editMenuInteraction(
+        _ interaction: UIEditMenuInteraction,
+        targetRectFor configuration: UIEditMenuConfiguration
+    ) -> CGRect {
+        convert(canvasView.menuTargetRect ?? .zero, from: canvasView)
     }
 }

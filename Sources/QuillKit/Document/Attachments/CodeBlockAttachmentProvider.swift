@@ -1,6 +1,5 @@
 import UIKit
 
-@MainActor
 final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
     override init(
         textAttachment: NSTextAttachment,
@@ -21,17 +20,13 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
     override func loadView() {
         guard let attachment = textAttachment as? CodeBlockAttachment else { return }
 
-        let view = CodeBlockView()
-        view.configure(language: attachment.language, code: attachment.code)
-
-        let highlighted = attachment.highlightStore?.highlightedResult(for: attachment.blockID)
-
-        if let highlighted {
-            view.apply(highlightedCode: highlighted)
+        let content = CodeBlockContent(from: attachment)
+        let store = attachment.highlightStore
+        
+        assert(Thread.isMainThread)
+        view = MainActor.assumeIsolated {
+            Self.makeBlockView(from: content, highlightStore: store)
         }
-
-        attachment.highlightStore?.registerSink(view, for: attachment.blockID)
-        self.view = view
     }
 
     override func attachmentBounds(
@@ -58,5 +53,20 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
 private extension CodeBlockAttachmentProvider {
     enum Layout {
         static let fallbackSize = CGSize(width: 320, height: 80)
+    }
+    
+    @MainActor
+    static func makeBlockView(from content: CodeBlockContent, highlightStore: CodeBlockHighlightStore?) -> CodeBlockView {
+        let view = CodeBlockView()
+        view.configure(language: content.language, code: content.code)
+        
+        let highlighted = highlightStore?.highlightedResult(for: content.blockID)
+        if let highlighted {
+            view.apply(highlightedCode: highlighted)
+        }
+        
+        highlightStore?.registerSink(view, for: content.blockID)
+        
+        return view
     }
 }

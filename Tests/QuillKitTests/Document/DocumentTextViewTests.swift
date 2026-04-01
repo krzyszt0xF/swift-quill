@@ -20,12 +20,7 @@ struct DocumentTextViewTests {
         var selectedURL: URL?
         textView.onLinkSelection = { selectedURL = $0 }
 
-        let shouldInteract = textView.textView(
-            textView,
-            shouldInteractWith: url,
-            in: NSRange(location: 0, length: 1),
-            interaction: .invokeDefaultAction
-        )
+        let shouldInteract = textView.handleLinkSelection(url)
 
         #expect(shouldInteract == false)
         #expect(selectedURL == url)

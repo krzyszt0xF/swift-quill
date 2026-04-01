@@ -56,10 +56,22 @@ final class DocumentTextView: UITextView {
 extension DocumentTextView: UITextViewDelegate {
     func textView(
         _ textView: UITextView,
-        shouldInteractWith url: URL,
-        in characterRange: NSRange,
-        interaction: UITextItemInteraction
-    ) -> Bool {
+        primaryActionFor textItem: UITextItem,
+        defaultAction: UIAction
+    ) -> UIAction? {
+        guard case let .link(url) = textItem.content else {
+            return defaultAction
+        }
+
+        return UIAction { [weak self] _ in
+            _ = self?.handleLinkSelection(url)
+        }
+    }
+}
+
+extension DocumentTextView {
+    @discardableResult
+    func handleLinkSelection(_ url: URL) -> Bool {
         onLinkSelection?(url)
         return false
     }

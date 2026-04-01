@@ -2,10 +2,6 @@ import QuillCore
 import UIKit
 
 enum AttributedStringBuilder {
-    static func build(from blocks: [Block]) -> NSAttributedString {
-        BlockAttributedStringRenderer.build(from: blocks)
-    }
-
     static func buildDocument(
         from fragments: [RenderFragment]
     ) -> NSAttributedString {

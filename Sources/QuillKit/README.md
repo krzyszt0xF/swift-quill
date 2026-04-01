@@ -22,10 +22,10 @@ The public surface is intentionally minimal:
 ## Pipeline
 
 ```
-Markdown -> Block AST -> AttributedStringBuilder -> DocumentRenderer
+Markdown -> Block AST -> RenderFragmentBuilder -> DocumentRenderer
 ```
 
-All pipeline internals (renderers, configuration structs) are internal to QuillKit.
+All pipeline internals (fragment builders, document assembly helpers, configuration structs) are internal to QuillKit.
 
 ## Dependencies
 

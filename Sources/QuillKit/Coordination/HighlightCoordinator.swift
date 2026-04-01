@@ -142,7 +142,7 @@ private extension HighlightCoordinator {
         }
 
         func unregisterSink(for blockID: BlockIdentity) {
-            lock.withLock {
+            _ = lock.withLock {
                 sinks.removeValue(forKey: blockID)
             }
         }
