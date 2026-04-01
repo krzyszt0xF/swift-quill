@@ -12,7 +12,7 @@ struct AttributedStringBuilderListAndStructureTests {
             makeItem(.paragraph(content: [.text("alpha")])),
             makeItem(.paragraph(content: [.text("beta")])),
         ]
-        let result = AttributedStringBuilder.build(from: attributedStringBuilderSegments(.unorderedList(items: items)))
+        let result = makePipelineDocument(.unorderedList(items: items))
         #expect(result.string.contains("+"))
         #expect(result.string.contains("alpha"))
         #expect(result.string.contains("beta"))
@@ -24,7 +24,7 @@ struct AttributedStringBuilderListAndStructureTests {
             makeItem(.paragraph(content: [.text("first")])),
             makeItem(.paragraph(content: [.text("second")])),
         ]
-        let result = AttributedStringBuilder.build(from: attributedStringBuilderSegments(.orderedList(startIndex: 1, items: items)))
+        let result = makePipelineDocument(.orderedList(startIndex: 1, items: items))
         #expect(result.string.contains("1."))
         #expect(result.string.contains("2."))
     }
@@ -37,7 +37,7 @@ struct AttributedStringBuilderListAndStructureTests {
         let outerList = Block.unorderedList(items: [
             makeItem(.paragraph(content: [.text("top")]), innerList)
         ])
-        let result = AttributedStringBuilder.build(from: attributedStringBuilderSegments(outerList))
+        let result = makePipelineDocument(outerList)
 
         var outerIndent: CGFloat = 0
         var innerIndent: CGFloat = 0
@@ -49,7 +49,7 @@ struct AttributedStringBuilderListAndStructureTests {
         #expect(innerIndent > outerIndent)
     }
 
-    @Test("Nested ordered list keeps greater indentation in built document fragments")
+    @Test("Nested ordered list keeps greater indentation in built render fragments")
     func nestedOrderedListDocumentIndentation() {
         let blocks: [Block] = [
             .orderedList(startIndex: 1, items: [
@@ -86,7 +86,7 @@ struct AttributedStringBuilderListAndStructureTests {
             makeItem(.paragraph(content: [.text("a")])),
             makeItem(.paragraph(content: [.text("b")])),
         ]
-        let result = AttributedStringBuilder.build(from: attributedStringBuilderSegments(.orderedList(startIndex: 3, items: items)))
+        let result = makePipelineDocument(.orderedList(startIndex: 3, items: items))
         #expect(result.string.contains("3."))
         #expect(result.string.contains("4."))
     }
@@ -97,13 +97,13 @@ struct AttributedStringBuilderListAndStructureTests {
             makeItem(checkbox: .checked, .paragraph(content: [.text("done")])),
             makeItem(checkbox: .unchecked, .paragraph(content: [.text("pending")])),
         ]
-        let result = AttributedStringBuilder.build(from: attributedStringBuilderSegments(.unorderedList(items: items)))
+        let result = makePipelineDocument(.unorderedList(items: items))
 
         #expect(result.string.contains("[x]\t"))
         #expect(result.string.contains("[ ]\t"))
     }
 
-    @Test("Ordered list preserves nested code block text")
+    @Test("Unfrozen ordered list preserves nested code block text")
     func orderedListNestedCodeBlock() {
         let items = [
             makeItem(
@@ -111,15 +111,16 @@ struct AttributedStringBuilderListAndStructureTests {
                 .codeBlock(language: "swift", code: "print(\"Hello\")\n")
             ),
         ]
-        let result = AttributedStringBuilder.build(
-            from: attributedStringBuilderSegments(.orderedList(startIndex: 1, items: items))
+        let result = makePipelineDocument(
+            .orderedList(startIndex: 1, items: items),
+            frozenCount: 0
         )
 
         #expect(result.string.contains("Intro"))
         #expect(result.string.contains("print(\"Hello\")"))
     }
 
-    @Test("Unordered list preserves nested code block text")
+    @Test("Unfrozen unordered list preserves nested code block text")
     func unorderedListNestedCodeBlock() {
         let items = [
             makeItem(
@@ -127,8 +128,9 @@ struct AttributedStringBuilderListAndStructureTests {
                 .codeBlock(language: nil, code: "code\n")
             ),
         ]
-        let result = AttributedStringBuilder.build(
-            from: attributedStringBuilderSegments(.unorderedList(items: items))
+        let result = makePipelineDocument(
+            .unorderedList(items: items),
+            frozenCount: 0
         )
 
         #expect(result.string.contains("Intro"))
@@ -139,7 +141,7 @@ struct AttributedStringBuilderListAndStructureTests {
     func blockquoteIndentation() {
         let blockquote = makeBlockquote(.paragraph(content: [.text("quoted")]))
         let plainParagraph = Block.paragraph(content: [.text("plain")])
-        let result = AttributedStringBuilder.build(from: attributedStringBuilderSegments(blockquote, plainParagraph))
+        let result = makePipelineDocument(blockquote, plainParagraph)
 
         var blockquoteIndent: CGFloat = 0
         var plainIndent: CGFloat = 0
@@ -159,7 +161,7 @@ struct AttributedStringBuilderListAndStructureTests {
     func nestedBlockquoteIndentation() {
         let nestedBlockquote = makeBlockquote(.paragraph(content: [.text("deep")]))
         let outerBlockquote = makeBlockquote(.paragraph(content: [.text("shallow")]), nestedBlockquote)
-        let result = AttributedStringBuilder.build(from: attributedStringBuilderSegments(outerBlockquote))
+        let result = makePipelineDocument(outerBlockquote)
 
         let shallowRange = (result.string as NSString).range(of: "shallow")
         let deepRange = (result.string as NSString).range(of: "deep")
@@ -173,11 +175,35 @@ struct AttributedStringBuilderListAndStructureTests {
     @Test("Blockquote carries blockquoteDepth custom attribute")
     func blockquoteDepthAttribute() {
         let blockquote = makeBlockquote(.paragraph(content: [.text("quoted")]))
-        let result = AttributedStringBuilder.build(from: attributedStringBuilderSegments(blockquote))
+        let result = makePipelineDocument(blockquote)
 
         let quotedRange = (result.string as NSString).range(of: "quoted")
         let blockquoteDepth = result.attribute(.blockquoteDepth, at: quotedRange.location, effectiveRange: nil) as? Int
         #expect(blockquoteDepth == 1)
+    }
+
+    @Test("Blockquote preserves nested list markers and indentation")
+    func blockquoteNestedListMarkersAndIndentation() {
+        let quotedList = makeBlockquote(.unorderedList(items: [
+            makeItem(.paragraph(content: [.text("quoted item")]))
+        ]))
+        let plainList = Block.unorderedList(items: [
+            makeItem(.paragraph(content: [.text("plain item")]))
+        ])
+        let result = makePipelineDocument(quotedList, plainList)
+
+        #expect(result.string.contains("+\tquoted item"))
+        #expect(result.string.contains("+\tplain item"))
+
+        let quotedRange = (result.string as NSString).range(of: "quoted item")
+        let plainRange = (result.string as NSString).range(of: "plain item")
+
+        let quotedDepth = result.attribute(.blockquoteDepth, at: quotedRange.location, effectiveRange: nil) as? Int
+        let quotedStyle = result.attribute(.paragraphStyle, at: quotedRange.location, effectiveRange: nil) as? NSParagraphStyle
+        let plainStyle = result.attribute(.paragraphStyle, at: plainRange.location, effectiveRange: nil) as? NSParagraphStyle
+
+        #expect(quotedDepth == 1)
+        #expect((quotedStyle?.headIndent ?? 0) > (plainStyle?.headIndent ?? 0))
     }
 
     @Test("Unordered list has structuralMarker on bullet+tab characters")
@@ -185,7 +211,7 @@ struct AttributedStringBuilderListAndStructureTests {
         let items = [
             makeItem(.paragraph(content: [.text("alpha")])),
         ]
-        let result = AttributedStringBuilder.build(from: attributedStringBuilderSegments(.unorderedList(items: items)))
+        let result = makePipelineDocument(.unorderedList(items: items))
 
         let markerString = "+\t"
         let markerRange = NSRange(location: 0, length: markerString.count)
@@ -206,7 +232,7 @@ struct AttributedStringBuilderListAndStructureTests {
         let items = [
             makeItem(.paragraph(content: [.text("first")])),
         ]
-        let result = AttributedStringBuilder.build(from: attributedStringBuilderSegments(.orderedList(startIndex: 1, items: items)))
+        let result = makePipelineDocument(.orderedList(startIndex: 1, items: items))
 
         let markerString = "1.\t"
         let hasMarker = result.attribute(.structuralMarker, at: 0, effectiveRange: nil) as? Bool
@@ -226,7 +252,7 @@ struct AttributedStringBuilderListAndStructureTests {
         let items = [
             makeItem(checkbox: .checked, .paragraph(content: [.text("first")])),
         ]
-        let result = AttributedStringBuilder.build(from: attributedStringBuilderSegments(.unorderedList(items: items)))
+        let result = makePipelineDocument(.unorderedList(items: items))
 
         let markerString = "[x]\t"
         let hasMarker = result.attribute(.structuralMarker, at: 0, effectiveRange: nil) as? Bool
@@ -243,7 +269,7 @@ struct AttributedStringBuilderListAndStructureTests {
 
     @Test("Heading does NOT have structuralMarker")
     func headingNoStructuralMarker() {
-        let result = AttributedStringBuilder.build(from: attributedStringBuilderSegments(.heading(level: 1, content: [.text("Title")])))
+        let result = makePipelineDocument(.heading(level: 1, content: [.text("Title")]))
 
         var hasStructuralMarker = false
         result.enumerateAttribute(.structuralMarker, in: NSRange(location: 0, length: result.length)) { value, _, _ in
@@ -255,7 +281,7 @@ struct AttributedStringBuilderListAndStructureTests {
     @Test("Blockquote does NOT have structuralMarker")
     func blockquoteNoStructuralMarker() {
         let blockquote = makeBlockquote(.paragraph(content: [.text("quoted")]))
-        let result = AttributedStringBuilder.build(from: attributedStringBuilderSegments(blockquote))
+        let result = makePipelineDocument(blockquote)
 
         var hasStructuralMarker = false
         result.enumerateAttribute(.structuralMarker, in: NSRange(location: 0, length: result.length)) { value, _, _ in
@@ -266,7 +292,7 @@ struct AttributedStringBuilderListAndStructureTests {
 
     @Test("Thematic break produces NSTextAttachment")
     func thematicBreakPresent() {
-        let result = AttributedStringBuilder.build(from: attributedStringBuilderSegments(.thematicBreak))
+        let result = makePipelineDocument(.thematicBreak)
         #expect(result.length > 0)
 
         var hasAttachment = false

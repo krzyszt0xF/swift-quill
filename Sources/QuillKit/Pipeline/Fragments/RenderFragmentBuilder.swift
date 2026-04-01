@@ -55,7 +55,7 @@ enum RenderFragmentBuilder {
                 nestingContext: nestingContext,
                 renderContext: renderContext
             )
-        default:
+        case .codeBlock, .heading, .htmlBlock, .paragraph, .table, .thematicBreak:
             return [makeRenderFragment(
                 for: node,
                 ownerBlockID: ownerBlockID,
@@ -130,6 +130,22 @@ private extension RenderFragmentBuilder {
                     presentationRole: presentationRole
                 )
             }
+        case let .heading(level, content):
+            attributedString = TextBlockAttributedStringRenderer.makeHeadingAttributedString(
+                content: content,
+                level: level,
+                nestingContext: nestingContext
+            )
+        case let .htmlBlock(rawHTML):
+            attributedString = TextBlockAttributedStringRenderer.makeHTMLBlockAttributedString(
+                nestingContext: nestingContext,
+                rawHTML: rawHTML
+            )
+        case let .paragraph(content):
+            attributedString = TextBlockAttributedStringRenderer.makeParagraphAttributedString(
+                content: content,
+                nestingContext: nestingContext
+            )
         case let .table(columnAlignments, header, rows):
             if renderContext.rendersAttachments {
                 attributedString = EmbeddedBlockRenderer.makeTableAttachmentAttributedString(
@@ -148,12 +164,10 @@ private extension RenderFragmentBuilder {
                     presentationRole: presentationRole
                 )
             }
-        default:
-            attributedString = BlockAttributedStringRenderer.makeAttributedString(
-                for: node.block,
-                nestingContext: nestingContext,
-                renderContext: renderContext
-            )
+        case .thematicBreak:
+            attributedString = EmbeddedBlockRenderer.makeThematicBreakAttributedString()
+        case .blockquote, .orderedList, .unorderedList:
+            preconditionFailure("Lists and blockquotes are rendered through makeRenderFragments")
         }
 
         return RenderFragment(

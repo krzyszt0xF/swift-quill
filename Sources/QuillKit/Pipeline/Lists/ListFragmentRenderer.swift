@@ -125,7 +125,6 @@ private extension ListFragmentRenderer {
     }
 
     static func makeListItemChildRenderUnit(
-        bodyFont: UIFont,
         child: BlockNode,
         ownerBlockID: BlockIdentity,
         nestingContext: NestingContext,
@@ -137,7 +136,7 @@ private extension ListFragmentRenderer {
                 canCarryMarker: true,
                 fragments: [makeTextListRenderFragment(
                     attributedString: NSMutableAttributedString(
-                        attributedString: BlockAttributedStringRenderer.makeHeadingAttributedString(
+                        attributedString: TextBlockAttributedStringRenderer.makeHeadingAttributedString(
                             content: content,
                             level: level,
                             nestingContext: nestingContext
@@ -154,7 +153,7 @@ private extension ListFragmentRenderer {
                 canCarryMarker: true,
                 fragments: [makeTextListRenderFragment(
                     attributedString: NSMutableAttributedString(
-                        attributedString: BlockAttributedStringRenderer.makeHTMLBlockAttributedString(
+                        attributedString: TextBlockAttributedStringRenderer.makeHTMLBlockAttributedString(
                             nestingContext: nestingContext,
                             rawHTML: rawHTML
                         )
@@ -170,7 +169,10 @@ private extension ListFragmentRenderer {
                 canCarryMarker: true,
                 fragments: [makeTextListRenderFragment(
                     attributedString: NSMutableAttributedString(
-                        attributedString: InlineContentRenderer.attributedString(for: content, baseFont: bodyFont)
+                        attributedString: TextBlockAttributedStringRenderer.makeParagraphAttributedString(
+                            content: content,
+                            nestingContext: nestingContext
+                        )
                     ),
                     contentBlockID: child.id,
                     nestingContext: nestingContext,
@@ -202,7 +204,6 @@ private extension ListFragmentRenderer {
         let childContext = nestingContext.incrementingListLevel()
         let childUnits = item.children.map { child in
             makeListItemChildRenderUnit(
-                bodyFont: bodyFont,
                 child: child,
                 ownerBlockID: ownerBlockID,
                 nestingContext: childContext,
