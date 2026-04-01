@@ -16,16 +16,16 @@ final class StreamCoordinator {
         didSet { renderer.set(highlighter: syntaxHighlighter) }
     }
 
-    private let bufferedStreamCommitScheduler: BufferedStreamCommitScheduler
-    private let bufferedVisualFeeder: BufferedVisualFeeder
-    private var controller: MarkdownStreamController?
-    private var finishTask: Task<Void, Never>?
-    private var lastTailRevealHeightInvalidation = 0.0
-    private let makeStreamController: () -> MarkdownStreamController
-    private var renderConfiguration: RenderConfiguration
-    private let renderer: DocumentRenderer
-    private var streamGeneration = 0
-    private var streamTask: Task<Void, Never>?
+    let bufferedStreamCommitScheduler: BufferedStreamCommitScheduler
+    let bufferedVisualFeeder: BufferedVisualFeeder
+    var controller: MarkdownStreamController?
+    var finishTask: Task<Void, Never>?
+    var lastTailRevealHeightInvalidation = 0.0
+    let makeStreamController: () -> MarkdownStreamController
+    var renderConfiguration: RenderConfiguration
+    let renderer: DocumentRenderer
+    var streamGeneration = 0
+    var streamTask: Task<Void, Never>?
 
     init(
         renderer: DocumentRenderer,
@@ -123,9 +123,7 @@ extension StreamCoordinator {
     }
 }
 
-// MARK: - Task Management
-
-private extension StreamCoordinator {
+extension StreamCoordinator {
     enum HeightInvalidationReason {
         case rendererSnapshotApplied
         case streamFinished
@@ -136,163 +134,5 @@ private extension StreamCoordinator {
     struct StreamingSnapshot {
         let blocks: [BlockNode]
         let frozenCount: Int
-    }
-
-    func applyStreamingSnapshot(_ snapshot: StreamingSnapshot) {
-        let outcome = renderer.render(
-            blocks: snapshot.blocks,
-            frozenCount: snapshot.frozenCount
-        )
-
-        guard outcome.invalidatedHeight else { return }
-        invalidateHeight(for: .rendererSnapshotApplied)
-    }
-
-    func cancelAllTasks() {
-        lastTailRevealHeightInvalidation = 0
-        renderer.cancelStreaming()
-        bufferedVisualFeeder.cancel()
-        streamTask?.cancel()
-        streamTask = nil
-        finishTask?.cancel()
-        finishTask = nil
-        bufferedStreamCommitScheduler.reset()
-        controller = nil
-        streamGeneration += 1
-    }
-
-    func handleParserEvent(
-        _ event: ParserEvent,
-        state: inout BlockReducer.ReducerState
-    ) {
-        BlockReducer.apply(event, to: &state)
-
-        let snapshot = StreamingSnapshot(
-            blocks: state.blocks,
-            frozenCount: state.frozenCount
-        )
-        applyStreamingSnapshot(snapshot)
-    }
-
-    func invalidateHeight(for reason: HeightInvalidationReason) {
-        switch reason {
-        case .rendererSnapshotApplied, .streamFinished, .streamReset:
-            lastTailRevealHeightInvalidation = Date.timeIntervalSinceReferenceDate
-            onHeightInvalidated?()
-        case .tailRevealProgress:
-            let now = Date.timeIntervalSinceReferenceDate
-            let minimumInterval = max(
-                0.04,
-                renderConfiguration.layout.heightMeasurementCoalescingInterval * 2
-            )
-            guard now - lastTailRevealHeightInvalidation >= minimumInterval else { return }
-
-            lastTailRevealHeightInvalidation = now
-            onHeightInvalidated?()
-        }
-    }
-
-    func startStream(bootstrap: String? = nil) {
-        cancelStreaming()
-
-        let streamController = makeStreamController()
-        controller = streamController
-
-        let generation = streamGeneration
-        streamTask = Task { [weak self] in
-            var state = BlockReducer.ReducerState()
-            let events = await streamController.events()
-
-            if let bootstrap, !bootstrap.isEmpty {
-                await streamController.append(bootstrap)
-            }
-
-            for await event in events {
-                guard !Task.isCancelled, let self, self.streamGeneration == generation else { break }
-
-                self.handleParserEvent(event, state: &state)
-            }
-        }
-    }
-
-    func startStreamIfNeeded(currentMarkdown: String?, needsRestart: Bool) {
-        guard needsRestart else { return }
-        startStream(bootstrap: currentMarkdown)
-    }
-
-    func syncConfiguration(_ configuration: RenderConfiguration) {
-        renderConfiguration = configuration
-        bufferedStreamCommitScheduler.applyConfiguration(configuration)
-        renderer.applyTailRevealPolicy(configuration.tailReveal)
-    }
-}
-
-// MARK: - Buffered Streaming
-
-private extension StreamCoordinator {
-    func appendBufferedChunk(
-        _ chunk: String,
-        to streamController: MarkdownStreamController
-    ) {
-        bufferedStreamCommitScheduler.append(
-            chunk,
-            generation: streamGeneration,
-            commitChunks: { [weak self] chunks in
-                guard let self else { return }
-                self.bufferedVisualFeeder.enqueueBufferedModules(
-                    chunks,
-                    policy: self.renderConfiguration.tailReveal,
-                    to: streamController
-                )
-            },
-            onFlushDue: { [weak self] generation in
-                self?.flushBufferedChunks(generation: generation, to: streamController)
-            }
-        )
-    }
-
-    func flushBufferedChunks(
-        generation: Int,
-        to streamController: MarkdownStreamController
-    ) {
-        guard streamGeneration == generation else { return }
-
-        bufferedStreamCommitScheduler.flushIfNeeded(
-            generation: generation,
-            commitChunks: { [weak self] chunks in
-                guard let self else { return }
-                self.bufferedVisualFeeder.enqueueBufferedModules(
-                    chunks,
-                    policy: self.renderConfiguration.tailReveal,
-                    to: streamController
-                )
-            },
-            onFlushDue: { [weak self] nextGeneration in
-                self?.flushBufferedChunks(generation: nextGeneration, to: streamController)
-            }
-        )
-    }
-
-    func routeIncomingChunk(
-        _ chunk: String,
-        to streamController: MarkdownStreamController
-    ) {
-        if renderConfiguration.streamingMode == .bufferedModules {
-            appendBufferedChunk(chunk, to: streamController)
-            return
-        }
-
-        enqueueAppendChunk(chunk, to: streamController)
-    }
-
-    func enqueueAppendChunk(
-        _ chunk: String,
-        to streamController: MarkdownStreamController
-    ) {
-        bufferedVisualFeeder.enqueueImmediateChunk(
-            chunk,
-            policy: renderConfiguration.tailReveal,
-            to: streamController
-        )
     }
 }

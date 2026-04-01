@@ -1,3 +1,5 @@
+import QuillCore
+import QuillSharedTestSupport
 @testable import QuillKit
 import Testing
 
@@ -117,5 +119,50 @@ struct StreamCoordinatorTests {
         #expect(chunks.count > 1)
         #expect(chunks.joined() == chunk)
         #expect(chunks.contains("\n"))
+    }
+
+    @MainActor
+    @Test("Finish flushes pending buffered content into the stream")
+    func finishFlushesPendingBufferedContent() async throws {
+        let renderer = makeDocumentRenderer()
+        let configuration = RenderConfiguration(
+            streamingMode: .bufferedModules,
+            performanceProfile: .balanced,
+            tailReveal: .balanced,
+            layout: .default,
+            bufferedStream: .init(
+                minModuleLength: 200,
+                maxBufferingDelay: 10
+            )
+        )
+        let coordinator = StreamCoordinator(
+            renderer: renderer,
+            renderConfiguration: configuration,
+            bufferedStreamCommitScheduler: BufferedStreamCommitScheduler(
+                moduleStreamGate: .init(),
+                now: { 0 },
+                sleep: { _ in }
+            ),
+            bufferedVisualFeeder: .init(),
+            streamController: MarkdownStreamController.init
+        )
+        let pendingChunk = "Buffered content should remain pending until finish flushes the scheduler."
+
+        coordinator.append(
+            pendingChunk,
+            currentMarkdown: nil,
+            configuration: configuration,
+            needsRestart: true
+        )
+
+        #expect(renderer.textView.contentStorage?.attributedString?.length ?? 0 == 0)
+
+        coordinator.finish(configuration: configuration)
+
+        let rendered = await eventually(timeout: .milliseconds(800)) {
+            renderer.textView.contentStorage?.attributedString?.string.contains("Buffered content") == true
+        }
+
+        #expect(rendered)
     }
 }
