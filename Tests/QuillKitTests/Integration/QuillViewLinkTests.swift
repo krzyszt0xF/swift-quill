@@ -17,11 +17,11 @@ struct QuillViewLinkTests {
         view.markdown = "[click](https://example.com)"
 
         let rendered = await eventually {
-            documentHasContent(view)
+            view.hasDocumentContent
         }
         #expect(rendered)
 
-        let textView = try #require(documentTextView(for: view))
+        let textView = try #require(view.firstDocumentTextView())
         textView.layoutIfNeeded()
 
         #expect(view.onLinkSelection != nil)

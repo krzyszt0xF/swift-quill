@@ -21,13 +21,13 @@ struct QuillViewStreamingContractTests {
 
         let markdownMatched = await eventually { streamedView.currentMarkdown == fullMarkdown }
         let streamedContentRendered = await eventually {
-            documentHasContent(streamedView)
+            streamedView.hasDocumentContent
         }
         let staticContentRendered = await eventually {
-            documentHasContent(staticView)
+            staticView.hasDocumentContent
         }
         let codeBlockRendered = await eventually(timeout: .milliseconds(1200)) {
-            documentHasCodeBlockAttachment(streamedView)
+            streamedView.hasCodeBlockAttachment
         }
 
         #expect(markdownMatched)
@@ -48,9 +48,9 @@ struct QuillViewStreamingContractTests {
         }
 
         let renderedContentBeforeFinish = await eventually {
-            documentHasContent(view)
+            view.hasDocumentContent
         }
-        let codeBlockBeforeFinish = documentHasCodeBlockAttachment(view)
+        let codeBlockBeforeFinish = view.hasCodeBlockAttachment
 
         view.finish()
 
@@ -85,7 +85,7 @@ struct QuillViewStreamingContractTests {
         #expect(view.currentMarkdown == "First paragraph\n\nSecond paragraph\n\n")
 
         let renderedContent = await eventually {
-            documentHasContent(view)
+            view.hasDocumentContent
         }
         #expect(renderedContent)
     }
@@ -102,7 +102,7 @@ struct QuillViewStreamingContractTests {
         #expect(view.currentMarkdown == "Before cancel\n\nAfter cancel\n\n")
 
         let renderedContent = await eventually {
-            documentHasContent(view)
+            view.hasDocumentContent
         }
         #expect(renderedContent)
     }
@@ -117,6 +117,6 @@ struct QuillViewStreamingContractTests {
         view.reset()
 
         #expect(view.currentMarkdown == nil)
-        #expect(documentHasContent(view) == false)
+        #expect(view.hasDocumentContent == false)
     }
 }

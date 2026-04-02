@@ -22,7 +22,7 @@ func makePipelineDocument(
     frozenCount: Int? = nil
 ) -> NSAttributedString {
     let fragments = AttributedStringBuilder.buildRenderFragments(
-        from: makeNodes(blocks),
+        from: blocks.makeNodes(),
         frozenCount: frozenCount ?? blocks.count
     )
     return AttributedStringBuilder.buildDocument(from: fragments)

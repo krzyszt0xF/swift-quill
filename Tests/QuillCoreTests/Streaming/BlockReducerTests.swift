@@ -9,28 +9,28 @@ struct BlockReducerTests {
 
     @Test("Simple paragraph")
     func simpleParagraph() {
-        let blocks = reduce([
-            .startParagraph, .text("Hello"), .endParagraph,
-        ])
+        let blocks = [
+            ParserEvent.startParagraph, .text("Hello"), .endParagraph,
+        ].reduceToBlocks()
         #expect(blocks == [.paragraph(content: [.text("Hello")])])
     }
 
     @Test("Bold text in paragraph")
     func boldText() {
-        let blocks = reduce([
-            .startParagraph,
+        let blocks = [
+            ParserEvent.startParagraph,
             .text("a "), .startStrong, .text("bold"), .endStrong,
             .endParagraph,
-        ])
+        ].reduceToBlocks()
         #expect(blocks == [.paragraph(content: [.text("a "), .strong([.text("bold")])])])
     }
 
     @Test("Multiple blocks")
     func multipleBlocks() {
-        let blocks = reduce([
-            .startParagraph, .text("First"), .endParagraph,
+        let blocks = [
+            ParserEvent.startParagraph, .text("First"), .endParagraph,
             .startParagraph, .text("Second"), .endParagraph,
-        ])
+        ].reduceToBlocks()
         #expect(blocks.count == 2)
         #expect(blocks == [
             .paragraph(content: [.text("First")]),
@@ -42,9 +42,9 @@ struct BlockReducerTests {
 
     @Test("Heading with level")
     func heading() {
-        let blocks = reduce([
-            .startHeading(level: 2), .text("Title"), .endHeading,
-        ])
+        let blocks = [
+            ParserEvent.startHeading(level: 2), .text("Title"), .endHeading,
+        ].reduceToBlocks()
         #expect(blocks == [.heading(level: 2, content: [.text("Title")])])
     }
 
@@ -52,12 +52,12 @@ struct BlockReducerTests {
 
     @Test("Code block with language")
     func codeBlock() {
-        let blocks = reduce([
-            .startCodeBlock(language: "swift"),
+        let blocks = [
+            ParserEvent.startCodeBlock(language: "swift"),
             .codeBlockText("let x = 1\n"),
             .codeBlockText("let y = 2\n"),
             .endCodeBlock,
-        ])
+        ].reduceToBlocks()
         #expect(blocks == [.codeBlock(language: "swift", code: "let x = 1\nlet y = 2\n")])
     }
 
@@ -65,61 +65,61 @@ struct BlockReducerTests {
 
     @Test("Unordered list")
     func unorderedList() {
-        let blocks = reduce([
-            .startList(ordered: false),
+        let blocks = [
+            ParserEvent.startList(ordered: false),
             .startListItem, .startParagraph, .text("item"), .endParagraph, .endListItem,
             .endList,
-        ])
-        #expect(canonicalBlocks(blocks) == canonicalBlocks([.unorderedList(items: [
-            makeItem(.paragraph(content: [.text("item")])),
-        ])]))
+        ].reduceToBlocks()
+        #expect(blocks.canonicalBlocks() == [Block.unorderedList(items: [
+            Block.ListItem(blocks: .paragraph(content: [.text("item")])),
+        ])].canonicalBlocks())
     }
 
     @Test("Ordered list")
     func orderedList() {
-        let blocks = reduce([
-            .startList(ordered: true),
+        let blocks = [
+            ParserEvent.startList(ordered: true),
             .startListItem, .startParagraph, .text("first"), .endParagraph, .endListItem,
             .startListItem, .startParagraph, .text("second"), .endParagraph, .endListItem,
             .endList,
-        ])
-        #expect(canonicalBlocks(blocks) == canonicalBlocks([.orderedList(startIndex: 1, items: [
-            makeItem(.paragraph(content: [.text("first")])),
-            makeItem(.paragraph(content: [.text("second")])),
-        ])]))
+        ].reduceToBlocks()
+        #expect(blocks.canonicalBlocks() == [Block.orderedList(startIndex: 1, items: [
+            Block.ListItem(blocks: .paragraph(content: [.text("first")])),
+            Block.ListItem(blocks: .paragraph(content: [.text("second")])),
+        ])].canonicalBlocks())
     }
 
     @Test("Task list keeps checkbox state")
     func taskList() {
-        let blocks = reduce([
-            .startList(ordered: false),
+        let blocks = [
+            ParserEvent.startList(ordered: false),
             .startTaskListItem(checkbox: .checked), .startParagraph, .text("done"), .endParagraph, .endListItem,
             .startTaskListItem(checkbox: .unchecked), .startParagraph, .text("pending"), .endParagraph, .endListItem,
             .endList,
-        ])
-        #expect(canonicalBlocks(blocks) == canonicalBlocks([.unorderedList(items: [
-            makeItem(checkbox: .checked, .paragraph(content: [.text("done")])),
-            makeItem(checkbox: .unchecked, .paragraph(content: [.text("pending")])),
-        ])]))
+        ].reduceToBlocks()
+        #expect(blocks.canonicalBlocks() == [Block.unorderedList(items: [
+            Block.ListItem(checkbox: .checked, blocks: .paragraph(content: [.text("done")])),
+            Block.ListItem(checkbox: .unchecked, blocks: .paragraph(content: [.text("pending")])),
+        ])].canonicalBlocks())
     }
 
     // MARK: - Blockquotes
 
     @Test("Blockquote with paragraph")
     func blockquote() {
-        let blocks = reduce([
-            .startBlockQuote,
+        let blocks = [
+            ParserEvent.startBlockQuote,
             .startParagraph, .text("quoted"), .endParagraph,
             .endBlockQuote,
-        ])
-        #expect(canonicalBlocks(blocks) == canonicalBlocks([makeBlockquote(.paragraph(content: [.text("quoted")]))]))
+        ].reduceToBlocks()
+        #expect(blocks.canonicalBlocks() == [Block.makeBlockquote(.paragraph(content: [.text("quoted")]))].canonicalBlocks())
     }
 
     // MARK: - Thematic Break
 
     @Test("Thematic break")
     func thematicBreak() {
-        let blocks = reduce([.thematicBreak])
+        let blocks = [ParserEvent.thematicBreak].reduceToBlocks()
         #expect(blocks == [.thematicBreak])
     }
 
@@ -127,13 +127,13 @@ struct BlockReducerTests {
 
     @Test("Table with header and data row")
     func table() {
-        let blocks = reduce([
-            .startTable,
+        let blocks = [
+            ParserEvent.startTable,
             .tableAlignments([nil, nil]),
             .tableRow(["A", "B"]),
             .tableRow(["1", "2"]),
             .endTable,
-        ])
+        ].reduceToBlocks()
         #expect(blocks == [.table(
             columnAlignments: [nil, nil],
             header: Block.TableRow(cells: [
@@ -151,13 +151,13 @@ struct BlockReducerTests {
 
     @Test("Table keeps streamed alignments")
     func tableAlignments() {
-        let blocks = reduce([
-            .startTable,
+        let blocks = [
+            ParserEvent.startTable,
             .tableAlignments([.left, .center, .right]),
             .tableRow(["A", "B", "C"]),
             .tableRow(["1", "2", "3"]),
             .endTable,
-        ])
+        ].reduceToBlocks()
 
         #expect(blocks == [.table(
             columnAlignments: [.left, .center, .right],
@@ -178,12 +178,12 @@ struct BlockReducerTests {
 
     @Test("Table parses inline cell content on freeze")
     func tableInlineParsing() {
-        let blocks = reduce([
-            .startTable,
+        let blocks = [
+            ParserEvent.startTable,
             .tableAlignments([nil, nil, nil]),
             .tableRow(["**bold**", "*italic*", "`code`"]),
             .endTable,
-        ])
+        ].reduceToBlocks()
 
         #expect(blocks == [.table(
             columnAlignments: [nil, nil, nil],
@@ -200,11 +200,11 @@ struct BlockReducerTests {
 
     @Test("Nested inline: emphasis wrapping strong")
     func nestedInline() {
-        let blocks = reduce([
-            .startParagraph,
+        let blocks = [
+            ParserEvent.startParagraph,
             .startEmphasis, .startStrong, .text("both"), .endStrong, .endEmphasis,
             .endParagraph,
-        ])
+        ].reduceToBlocks()
         #expect(blocks == [.paragraph(content: [
             .emphasis([.strong([.text("both")])]),
         ])])
@@ -212,21 +212,21 @@ struct BlockReducerTests {
 
     @Test("Inline code")
     func inlineCode() {
-        let blocks = reduce([
-            .startParagraph,
+        let blocks = [
+            ParserEvent.startParagraph,
             .startInlineCode, .text("code"), .endInlineCode,
             .endParagraph,
-        ])
+        ].reduceToBlocks()
         #expect(blocks == [.paragraph(content: [.code("code")])])
     }
 
     @Test("Link")
     func link() {
-        let blocks = reduce([
-            .startParagraph,
+        let blocks = [
+            ParserEvent.startParagraph,
             .startLink(destination: "url"), .text("click"), .endLink,
             .endParagraph,
-        ])
+        ].reduceToBlocks()
         #expect(blocks == [.paragraph(content: [
             .link(destination: "url", children: [.text("click")]),
         ])])
@@ -234,21 +234,21 @@ struct BlockReducerTests {
 
     @Test("Strikethrough")
     func strikethrough() {
-        let blocks = reduce([
-            .startParagraph,
+        let blocks = [
+            ParserEvent.startParagraph,
             .startStrikethrough, .text("deleted"), .endStrikethrough,
             .endParagraph,
-        ])
+        ].reduceToBlocks()
         #expect(blocks == [.paragraph(content: [.strikethrough([.text("deleted")])])])
     }
 
     @Test("Image in paragraph")
     func image() {
-        let blocks = reduce([
-            .startParagraph,
+        let blocks = [
+            ParserEvent.startParagraph,
             .image(source: "url", title: "t", alt: "a"),
             .endParagraph,
-        ])
+        ].reduceToBlocks()
         #expect(blocks == [.paragraph(content: [
             .image(source: "url", title: "t", alt: [.text("a")]),
         ])])
@@ -304,11 +304,11 @@ struct BlockReducerTests {
 
         #expect(state.frozenCount == 0)
         #expect(state.blocks.count == 1)
-        #expect(canonicalBlocks(state.blocks.map(\.block)) == canonicalBlocks([
-            .unorderedList(items: [
-                makeItem(.paragraph(content: [.text("item")]))
+        #expect(state.blocks.map(\.block).canonicalBlocks() == [
+            Block.unorderedList(items: [
+                Block.ListItem(blocks: .paragraph(content: [.text("item")]))
             ])
-        ]))
+        ].canonicalBlocks())
     }
 
     @Test("Open nested table keeps mutable list tail materialized before first row")
@@ -325,10 +325,10 @@ struct BlockReducerTests {
 
         #expect(state.frozenCount == 0)
         #expect(state.blocks.count == 1)
-        #expect(canonicalBlocks(state.blocks.map(\.block)) == canonicalBlocks([
-            .unorderedList(items: [
-                makeItem(
-                    .paragraph(content: [.text("item")]),
+        #expect(state.blocks.map(\.block).canonicalBlocks() == [
+            Block.unorderedList(items: [
+                Block.ListItem(
+                    blocks: .paragraph(content: [.text("item")]),
                     .table(
                         columnAlignments: [nil, nil],
                         header: Block.TableRow(cells: []),
@@ -336,7 +336,7 @@ struct BlockReducerTests {
                     )
                 )
             ])
-        ]))
+        ].canonicalBlocks())
     }
 
     // MARK: - Determinism
@@ -348,8 +348,8 @@ struct BlockReducerTests {
             .startHeading(level: 2), .text("Title"), .endHeading,
             .thematicBreak,
         ]
-        let blocks1 = reduce(events)
-        let blocks2 = reduce(events)
+        let blocks1 = events.reduceToBlocks()
+        let blocks2 = events.reduceToBlocks()
         #expect(blocks1 == blocks2)
     }
 
@@ -357,26 +357,26 @@ struct BlockReducerTests {
 
     @Test("List item with multiple blocks")
     func listItemWithMultipleBlocks() {
-        let blocks = reduce([
-            .startList(ordered: false),
+        let blocks = [
+            ParserEvent.startList(ordered: false),
             .startListItem,
             .startParagraph, .text("text"), .endParagraph,
             .startCodeBlock(language: nil), .codeBlockText("code\n"), .endCodeBlock,
             .endListItem,
             .endList,
-        ])
-        #expect(canonicalBlocks(blocks) == canonicalBlocks([.unorderedList(items: [
-            makeItem(
-                .paragraph(content: [.text("text")]),
+        ].reduceToBlocks()
+        #expect(blocks.canonicalBlocks() == [Block.unorderedList(items: [
+            Block.ListItem(
+                blocks: .paragraph(content: [.text("text")]),
                 .codeBlock(language: nil, code: "code\n"),
             ),
-        ])]))
+        ])].canonicalBlocks())
     }
 
     @Test("Nested list inside list item")
     func nestedList() {
-        let blocks = reduce([
-            .startList(ordered: true),
+        let blocks = [
+            ParserEvent.startList(ordered: true),
             .startListItem,
             .startParagraph, .text("outer"), .endParagraph,
             .startList(ordered: false),
@@ -384,28 +384,28 @@ struct BlockReducerTests {
             .endList,
             .endListItem,
             .endList,
-        ])
-        #expect(canonicalBlocks(blocks) == canonicalBlocks([.orderedList(startIndex: 1, items: [
-            makeItem(
-                .paragraph(content: [.text("outer")]),
+        ].reduceToBlocks()
+        #expect(blocks.canonicalBlocks() == [Block.orderedList(startIndex: 1, items: [
+            Block.ListItem(
+                blocks: .paragraph(content: [.text("outer")]),
                 .unorderedList(items: [
-                    makeItem(.paragraph(content: [.text("inner")]))
+                    Block.ListItem(blocks: .paragraph(content: [.text("inner")]))
                 ]),
             ),
-        ])]))
+        ])].canonicalBlocks())
     }
 
     @Test("Blockquote with multiple children")
     func blockquoteMultipleChildren() {
-        let blocks = reduce([
-            .startBlockQuote,
+        let blocks = [
+            ParserEvent.startBlockQuote,
             .startParagraph, .text("first"), .endParagraph,
             .startParagraph, .text("second"), .endParagraph,
             .endBlockQuote,
-        ])
-        #expect(canonicalBlocks(blocks) == canonicalBlocks([makeBlockquote(
+        ].reduceToBlocks()
+        #expect(blocks.canonicalBlocks() == [Block.makeBlockquote(
             .paragraph(content: [.text("first")]),
             .paragraph(content: [.text("second")])
-        )]))
+        )].canonicalBlocks())
     }
 }

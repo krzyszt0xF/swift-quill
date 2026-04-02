@@ -112,8 +112,8 @@ struct StaticStreamingParityTests {
 
     @Test("Static and streaming paths stay in parity", arguments: parityCases)
     func parity(_ testCase: ParityTestCase) async {
-        let staticBlocks = normalizedBlocks(MarkdownParser.live.parse(testCase.markdown))
-        let streamedBlocks = await streamAndReduce(testCase.markdown, chunkSizes: testCase.chunkSizes)
+        let staticBlocks = MarkdownParser.live.parse(testCase.markdown).normalizedBlocks()
+        let streamedBlocks = await MarkdownStreamController.streamAndReduce(testCase.markdown, chunkSizes: testCase.chunkSizes)
         #expect(blocksMatch(staticBlocks, streamedBlocks))
     }
 }
@@ -130,6 +130,6 @@ extension ParityTestCase: CustomTestStringConvertible {
 
 private extension StaticStreamingParityTests {
     func blocksMatch(_ lhs: [Block], _ rhs: [Block]) -> Bool {
-        canonicalBlocks(lhs) == canonicalBlocks(rhs)
+        lhs.canonicalBlocks() == rhs.canonicalBlocks()
     }
 }

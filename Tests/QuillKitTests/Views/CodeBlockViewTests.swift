@@ -75,7 +75,7 @@ struct CodeBlockViewTests {
         let view = CodeBlockView()
         view.configure(language: "swift", code: "let x = 1")
 
-        let languagePillLabel = findSubview(of: UILabel.self, in: view, matching: { $0.text == "swift" })
+        let languagePillLabel: UILabel? = view.firstSubview(where: { $0.text == "swift" })
         #expect(languagePillLabel != nil)
         #expect(languagePillLabel?.isHidden == false)
     }
@@ -85,10 +85,8 @@ struct CodeBlockViewTests {
         let view = CodeBlockView()
         view.configure(language: nil, code: "code")
 
-        let languagePillLabel = findSubview(
-            of: UILabel.self,
-            in: view,
-            matching: { $0.text == nil || $0.text?.isEmpty != false }
+        let languagePillLabel: UILabel? = view.firstSubview(
+            where: { $0.text == nil || $0.text?.isEmpty != false }
         )
         #expect(languagePillLabel?.isHidden == true)
     }
@@ -98,7 +96,7 @@ struct CodeBlockViewTests {
         let view = CodeBlockView()
         view.configure(language: "swift", code: "let x = 1")
 
-        let button = findSubview(of: UIButton.self, in: view)
+        let button: UIButton? = view.firstSubview()
         #expect(button != nil)
         #expect(view.currentCode == "let x = 1")
 
@@ -132,7 +130,7 @@ struct CodeBlockViewTests {
         let view = CodeBlockView()
         view.configure(language: "swift", code: "let x = 1")
 
-        let languageLabel = findSubview(of: UILabel.self, in: view, matching: { $0.text == "swift" })
+        let languageLabel: UILabel? = view.firstSubview(where: { $0.text == "swift" })
         #expect(languageLabel != nil)
         #expect(languageLabel?.isHidden == false)
 
@@ -157,7 +155,7 @@ struct CodeBlockViewTests {
 
         #expect(fittingSize.height > Self.minimumVisibleHeight)
 
-        let copyButton = findSubview(of: UIButton.self, in: view)
+        let copyButton: UIButton? = view.firstSubview()
         #expect(copyButton != nil)
     }
 
@@ -176,7 +174,7 @@ struct CodeBlockViewTests {
         view.setNeedsLayout()
         view.layoutIfNeeded()
 
-        let languagePillLabel = findSubview(of: UILabel.self, in: view, matching: { $0.text == "json" })
+        let languagePillLabel: UILabel? = view.firstSubview(where: { $0.text == "json" })
         let codeTextView = codeTextView(in: view)
 
         #expect(languagePillLabel != nil)
@@ -196,7 +194,7 @@ struct CodeBlockViewTests {
         view.setStreamingState(true)
         view.setStreamingState(false)
 
-        let button = findSubview(of: UIButton.self, in: view)
+        let button: UIButton? = view.firstSubview()
         #expect(button?.isEnabled == true)
     }
 
@@ -206,7 +204,7 @@ struct CodeBlockViewTests {
         view.configure(language: "swift", code: "let x = 1")
         view.setStreamingState(true)
 
-        let button = findSubview(of: UIButton.self, in: view)
+        let button: UIButton? = view.firstSubview()
         #expect(button?.isEnabled == false)
     }
 
@@ -313,10 +311,10 @@ struct CodeBlockViewTests {
 
 private extension CodeBlockViewTests {
     func codeScrollView(in view: CodeBlockView) -> UIScrollView? {
-        findSubview(of: UIScrollView.self, in: view, matching: { $0 !== view })
+        view.firstSubview(where: { $0 !== view })
     }
 
     func codeTextView(in view: CodeBlockView) -> UITextView? {
-        findSubview(of: UITextView.self, in: view, matching: { $0.isSelectable && $0.isEditable == false })
+        view.firstSubview(where: { $0.isSelectable && $0.isEditable == false })
     }
 }

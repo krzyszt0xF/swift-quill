@@ -91,7 +91,7 @@ struct QuillViewStreamingEdgeCaseTests {
         view.finish()
 
         let rendered = await eventually(timeout: .milliseconds(1200)) {
-            documentHasCodeBlockAttachment(view)
+            view.hasCodeBlockAttachment
         }
 
         #expect(rendered)
@@ -120,7 +120,7 @@ struct QuillViewStreamingEdgeCaseTests {
         view.finish()
 
         let renderedCodeBlock = await eventually(timeout: .milliseconds(1200)) {
-            documentHasCodeBlockAttachment(view)
+            view.hasCodeBlockAttachment
         }
 
         #expect(renderedCodeBlock)

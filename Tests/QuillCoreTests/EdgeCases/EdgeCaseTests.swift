@@ -8,14 +8,14 @@ struct EdgeCaseTests {
 
     @Test("Deeply nested list")
     func deeplyNestedList() throws {
-        let blocks = normalizedBlocks(MarkdownParser.live.parse("""
+        let blocks = MarkdownParser.live.parse("""
         - a
           - b
             - c
               - d
                 - e
                   - f
-        """))
+        """).normalizedBlocks()
         let rootBlock = try #require(blocks.first)
         let rootItems = unorderedListItems(from: rootBlock)
         let items = try #require(rootItems)
@@ -71,7 +71,7 @@ struct EdgeCaseTests {
         Final paragraph.
         """
 
-        let blocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
+        let blocks = MarkdownParser.live.parse(markdown).normalizedBlocks()
         #expect(blocks.count == 9)
 
         let firstBlock = try requireBlock(at: 0, from: blocks)
@@ -114,7 +114,7 @@ struct EdgeCaseTests {
     @Test("Long, long input")
     func veryLongInputProducesParagraphOutput() throws {
         let markdown = String(repeating: "word ", count: 10_000)
-        let blocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
+        let blocks = MarkdownParser.live.parse(markdown).normalizedBlocks()
         let firstBlock = try #require(blocks.first)
         try #require(isParagraph(firstBlock))
     }
@@ -122,20 +122,20 @@ struct EdgeCaseTests {
     @Test("Mixed unclosed elements")
     func mixedUnclosedElements() throws {
         let markdown = "# Heading\n**unclosed bold\n```\nunclosed fence"
-        let blocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
+        let blocks = MarkdownParser.live.parse(markdown).normalizedBlocks()
         let firstBlock = try #require(blocks.first)
         try #require(headingDetails(from: firstBlock) != nil)
     }
 
     @Test("Multiple thematic breaks")
     func multipleThematicBreaks() {
-        let blocks = normalizedBlocks(MarkdownParser.live.parse("---\n\n---\n\n---"))
+        let blocks = MarkdownParser.live.parse("---\n\n---\n\n---").normalizedBlocks()
         #expect(blocks == [.thematicBreak, .thematicBreak, .thematicBreak])
     }
 
     @Test("Unclosed code fence")
     func unclosedCodeFence() throws {
-        let blocks = normalizedBlocks(MarkdownParser.live.parse("```\nsome code without closing fence\n"))
+        let blocks = MarkdownParser.live.parse("```\nsome code without closing fence\n").normalizedBlocks()
         let firstBlock = try #require(blocks.first)
         try #require(codeBlockDetails(from: firstBlock) != nil)
     }
@@ -143,7 +143,7 @@ struct EdgeCaseTests {
     @Test("Unicode and emoji content")
     func unicodeAndEmoji() throws {
         let markdown = "# Emoji heading \u{1F389}\n\nParagraph with CJK: \u{4F60}\u{597D}\u{4E16}\u{754C}"
-        let blocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
+        let blocks = MarkdownParser.live.parse(markdown).normalizedBlocks()
         #expect(blocks.count == 2)
 
         let firstBlock = try requireBlock(at: 0, from: blocks)
@@ -169,7 +169,7 @@ struct EdgeCaseTests {
 
     @Test("Whitespace-only input")
     func whitespaceOnlyProducesNoMeaningfulBlocks() {
-        let blocks = normalizedBlocks(MarkdownParser.live.parse("   \n\n  \t  "))
+        let blocks = MarkdownParser.live.parse("   \n\n  \t  ").normalizedBlocks()
         #expect(blocks.isEmpty || blocks.allSatisfy(isParagraph))
     }
 }

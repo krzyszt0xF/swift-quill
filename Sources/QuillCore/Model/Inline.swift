@@ -8,5 +8,4 @@ package indirect enum Inline: Equatable, Sendable {
     case strikethrough([Inline])
     case strong([Inline])
     case text(String)
-
 }

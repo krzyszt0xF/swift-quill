@@ -18,12 +18,12 @@ struct BufferedStreamingModeTests {
 
         view.append(String(repeating: "a", count: 150))
         await drainScheduledWork()
-        #expect(documentHasContent(view) == false)
+        #expect(view.hasDocumentContent == false)
         #expect(timeController.recordedSleeps.isEmpty == false)
 
         view.append(String(repeating: "b", count: 220) + "\n\n")
         let renderedContent = await eventually(timeout: .milliseconds(200)) {
-            documentHasContent(view)
+            view.hasDocumentContent
         }
 
         #expect(renderedContent)
@@ -40,20 +40,20 @@ struct BufferedStreamingModeTests {
 
         view.append(String(repeating: "x", count: 60))
         await drainScheduledWork()
-        #expect(documentHasContent(view) == false)
+        #expect(view.hasDocumentContent == false)
 
         view.append(String(repeating: "y", count: 60))
         await drainScheduledWork()
-        #expect(documentHasContent(view) == false)
+        #expect(view.hasDocumentContent == false)
 
         view.append(String(repeating: "z", count: 60))
         await drainScheduledWork()
-        #expect(documentHasContent(view) == false)
+        #expect(view.hasDocumentContent == false)
         #expect(timeController.recordedSleeps.count >= 3)
 
         view.append(String(repeating: "k", count: 220) + "\n\n")
         let renderedContent = await eventually(timeout: .milliseconds(200)) {
-            documentHasContent(view)
+            view.hasDocumentContent
         }
 
         #expect(renderedContent)

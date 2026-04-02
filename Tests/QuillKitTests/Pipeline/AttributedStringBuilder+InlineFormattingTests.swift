@@ -152,7 +152,7 @@ struct AttributedStringBuilderInlineFormattingTests {
     @Test("List item link keeps link styling")
     func listItemLinkFormatting() {
         let items = [
-            makeItem(.paragraph(content: [.link(destination: "https://example.com", children: [.text("item")])])),
+            Block.ListItem(blocks: .paragraph(content: [.link(destination: "https://example.com", children: [.text("item")])])),
         ]
         let result = makePipelineDocument(.unorderedList(items: items))
         let linkIndex = (result.string as NSString).range(of: "item").location
@@ -168,7 +168,7 @@ struct AttributedStringBuilderInlineFormattingTests {
 
     @Test("Blockquote link keeps link styling and blockquote depth")
     func blockquoteLinkFormatting() {
-        let blockquote = makeBlockquote(
+        let blockquote = Block.makeBlockquote(
             .paragraph(content: [.link(destination: "https://example.com", children: [.text("quoted")])])
         )
         let result = makePipelineDocument(blockquote)

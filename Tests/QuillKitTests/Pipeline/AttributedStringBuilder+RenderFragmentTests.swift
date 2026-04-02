@@ -13,7 +13,7 @@ struct AttributedStringBuilderRenderFragmentTests {
             .paragraph(content: [.text("Hello")]),
             .paragraph(content: [.text("World")]),
         ]
-        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: blocks.makeNodes(), frozenCount: blocks.count)
 
         #expect(fragments.count == 2)
         #expect(fragments[0].attributedString.string.contains("Hello"))
@@ -27,7 +27,7 @@ struct AttributedStringBuilderRenderFragmentTests {
             .codeBlock(language: "swift", code: "let x = 1\n"),
             .paragraph(content: [.text("After")]),
         ]
-        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: blocks.makeNodes(), frozenCount: blocks.count)
 
         #expect(fragments.count == 3)
 
@@ -47,7 +47,7 @@ struct AttributedStringBuilderRenderFragmentTests {
             .paragraph(content: [.text("Before")]),
             .codeBlock(language: "swift", code: "let x = 1\n"),
         ]
-        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: 1)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: blocks.makeNodes(), frozenCount: 1)
 
         #expect(fragments.count == 2)
         #expect(fragments[1].attributedString.string.contains("let x = 1"))
@@ -81,7 +81,7 @@ struct AttributedStringBuilderRenderFragmentTests {
         let blocks: [Block] = [
             .table(columnAlignments: [nil, nil], header: header, rows: rows),
         ]
-        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: 0)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: blocks.makeNodes(), frozenCount: 0)
 
         #expect(fragments.count == 1)
 
@@ -96,9 +96,9 @@ struct AttributedStringBuilderRenderFragmentTests {
     @Test("Blockquote depth propagates in render fragments")
     func documentBlockquoteDepth() {
         let blocks: [Block] = [
-            makeBlockquote(makeBlockquote(.paragraph(content: [.text("deep")]))),
+            Block.makeBlockquote(Block.makeBlockquote(.paragraph(content: [.text("deep")]))),
         ]
-        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: blocks.makeNodes(), frozenCount: blocks.count)
 
         #expect(fragments.count == 1)
 
@@ -154,7 +154,7 @@ struct AttributedStringBuilderRenderFragmentTests {
             .paragraph(content: [.text("one")]),
             .paragraph(content: [.text("two")]),
         ]
-        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: blocks.makeNodes(), frozenCount: blocks.count)
         let document = AttributedStringBuilder.buildDocument(from: fragments)
 
         #expect(document.string.contains("one"))
@@ -194,7 +194,7 @@ struct AttributedStringBuilderRenderFragmentTests {
             .paragraph(content: [.text("b")]),
             .codeBlock(language: nil, code: "c"),
         ]
-        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: blocks.makeNodes(), frozenCount: blocks.count)
         #expect(fragments.allSatisfy { $0.ownerBlockID == $0.contentBlockID })
     }
 
@@ -204,7 +204,7 @@ struct AttributedStringBuilderRenderFragmentTests {
             .heading(level: 1, content: [.text("Title")]),
             .paragraph(content: [.text("Body")]),
         ]
-        let fragments = AttributedStringBuilder.buildRenderFragments(from: makeNodes(blocks), frozenCount: blocks.count)
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: blocks.makeNodes(), frozenCount: blocks.count)
         let document = AttributedStringBuilder.buildDocument(from: fragments)
 
         let titleRange = (document.string as NSString).range(of: "Title")
@@ -230,8 +230,8 @@ struct AttributedStringBuilderRenderFragmentTests {
 
     @Test("Frozen table produces attachment fragment")
     func frozenTableFragment() {
-        let nodes = makeNodes([
-            .table(
+        let nodes = [
+            Block.table(
                 columnAlignments: [.left],
                 header: Block.TableRow(cells: [
                     Block.TableCell(content: [.text("Name")]),
@@ -242,7 +242,7 @@ struct AttributedStringBuilderRenderFragmentTests {
                     ]),
                 ]
             ),
-        ])
+        ].makeNodes()
 
         let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 1)
         let attachment = fragments.first?.attributedString.attribute(.attachment, at: 0, effectiveRange: nil)
@@ -253,8 +253,8 @@ struct AttributedStringBuilderRenderFragmentTests {
 
     @Test("Unfrozen table produces fallback text fragment")
     func unfrozenTableFragment() {
-        let nodes = makeNodes([
-            .table(
+        let nodes = [
+            Block.table(
                 columnAlignments: [.left],
                 header: Block.TableRow(cells: [
                     Block.TableCell(content: [.text("Name")]),
@@ -265,7 +265,7 @@ struct AttributedStringBuilderRenderFragmentTests {
                     ]),
                 ]
             ),
-        ])
+        ].makeNodes()
 
         let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 0)
         let attachment = fragments.first?.attributedString.attribute(.attachment, at: 0, effectiveRange: nil)
@@ -276,21 +276,21 @@ struct AttributedStringBuilderRenderFragmentTests {
 
     @Test("Frozen ordered list renders nested code block attachment")
     func frozenOrderedListNestedCodeBlockAttachment() {
-        let nodes = makeNodes([
-            .orderedList(startIndex: 1, items: [
-                makeItem(
+        let nodes = [
+            Block.orderedList(startIndex: 1, items: [
+                Block.ListItem(blocks:
                     .paragraph(content: [.text("Code")]),
                     .codeBlock(language: "swift", code: "print(\"Hello\")\n")
                 ),
             ]),
-        ])
+        ].makeNodes()
 
         let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 1)
 
         #expect(fragments.count == 2)
         #expect(fragments[0].presentationRole == .indentedListText)
         #expect(fragments[1].presentationRole == .fullWidthEmbeddedBlock)
-        #expect(containsAttachment(CodeBlockAttachment.self, in: fragments[1].attributedString))
+        #expect(fragments[1].attributedString.containsAttachment(CodeBlockAttachment.self))
         let style = fragments[1].attributedString.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
         #expect(style?.headIndent == 0)
     }
@@ -307,21 +307,21 @@ struct AttributedStringBuilderRenderFragmentTests {
                 Block.TableCell(content: [.text("1")]),
             ]),
         ]
-        let nodes = makeNodes([
-            .unorderedList(items: [
-                makeItem(
+        let nodes = [
+            Block.unorderedList(items: [
+                Block.ListItem(blocks:
                     .paragraph(content: [.text("Table")]),
                     .table(columnAlignments: [.left, .right], header: header, rows: rows)
                 ),
             ]),
-        ])
+        ].makeNodes()
 
         let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 1)
 
         #expect(fragments.count == 2)
         #expect(fragments[0].presentationRole == .indentedListText)
         #expect(fragments[1].presentationRole == .fullWidthEmbeddedBlock)
-        #expect(containsAttachment(TableAttachment.self, in: fragments[1].attributedString))
+        #expect(fragments[1].attributedString.containsAttachment(TableAttachment.self))
         let style = fragments[1].attributedString.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
         #expect(style?.headIndent == 0)
     }
@@ -338,14 +338,14 @@ struct AttributedStringBuilderRenderFragmentTests {
                 Block.TableCell(content: [.text("1")]),
             ]),
         ]
-        let nodes = makeNodes([
-            .unorderedList(items: [
-                makeItem(
+        let nodes = [
+            Block.unorderedList(items: [
+                Block.ListItem(blocks:
                     .paragraph(content: [.text("Table")]),
                     .table(columnAlignments: [.left, .right], header: header, rows: rows)
                 ),
             ]),
-        ])
+        ].makeNodes()
 
         let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 0)
 
@@ -353,18 +353,18 @@ struct AttributedStringBuilderRenderFragmentTests {
         #expect(fragments[1].attributedString.string.contains("Name"))
         #expect(fragments[1].attributedString.string.contains("Quill"))
         #expect(fragments[1].attributedString.string.contains("|"))
-        #expect(containsAttachment(TableAttachment.self, in: fragments[1].attributedString) == false)
+        #expect(fragments[1].attributedString.containsAttachment(TableAttachment.self) == false)
     }
 
     @Test("List item without text emits standalone marker row above full-width code block")
     func listItemMarkerOnlyRow() {
-        let nodes = makeNodes([
-            .unorderedList(items: [
-                makeItem(
+        let nodes = [
+            Block.unorderedList(items: [
+                Block.ListItem(blocks:
                     .codeBlock(language: "swift", code: "print(\"Hello\")\n")
                 ),
             ]),
-        ])
+        ].makeNodes()
 
         let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 1)
 
@@ -381,18 +381,18 @@ struct AttributedStringBuilderRenderFragmentTests {
         let header = Block.TableRow(cells: [
             Block.TableCell(content: [.text("Name")]),
         ])
-        let nodes = makeNodes([
-            .unorderedList(items: [
-                makeItem(
+        let nodes = [
+            Block.unorderedList(items: [
+                Block.ListItem(
                     checkbox: .checked,
-                    .table(
+                    blocks: .table(
                         columnAlignments: [.left],
                         header: header,
                         rows: []
                     )
                 ),
             ]),
-        ])
+        ].makeNodes()
 
         let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 1)
 
@@ -423,7 +423,7 @@ struct AttributedStringBuilderRenderFragmentTests {
         let document = AttributedStringBuilder.buildDocument(from: fragments)
 
         let introRange = (document.string as NSString).range(of: "Intro")
-        let codeAttachmentIndex = firstAttachmentIndex(in: document)
+        let codeAttachmentIndex = document.firstAttachmentIndex
 
         let introOwnerID = document.attribute(.ownerBlockID, at: introRange.location, effectiveRange: nil) as? BlockIdentity
         let introContentID = document.attribute(.contentBlockID, at: introRange.location, effectiveRange: nil) as? BlockIdentity

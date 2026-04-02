@@ -10,8 +10,8 @@ struct AttributedStringBuilderListAndStructureTests {
     @Test("Unordered list has bullet markers")
     func unorderedListMarkers() {
         let items = [
-            makeItem(.paragraph(content: [.text("alpha")])),
-            makeItem(.paragraph(content: [.text("beta")])),
+            Block.ListItem(blocks: .paragraph(content: [.text("alpha")])),
+            Block.ListItem(blocks: .paragraph(content: [.text("beta")])),
         ]
         let result = makePipelineDocument(.unorderedList(items: items))
         #expect(result.string.contains("+"))
@@ -22,8 +22,8 @@ struct AttributedStringBuilderListAndStructureTests {
     @Test("Ordered list has numbered markers")
     func orderedListMarkers() {
         let items = [
-            makeItem(.paragraph(content: [.text("first")])),
-            makeItem(.paragraph(content: [.text("second")])),
+            Block.ListItem(blocks: .paragraph(content: [.text("first")])),
+            Block.ListItem(blocks: .paragraph(content: [.text("second")])),
         ]
         let result = makePipelineDocument(.orderedList(startIndex: 1, items: items))
         #expect(result.string.contains("1."))
@@ -33,10 +33,10 @@ struct AttributedStringBuilderListAndStructureTests {
     @Test("Nested list has greater indentation than parent")
     func nestedListIndentation() {
         let innerList = Block.unorderedList(items: [
-            makeItem(.paragraph(content: [.text("nested")]))
+            Block.ListItem(blocks: .paragraph(content: [.text("nested")]))
         ])
         let outerList = Block.unorderedList(items: [
-            makeItem(.paragraph(content: [.text("top")]), innerList)
+            Block.ListItem(blocks: .paragraph(content: [.text("top")]), innerList)
         ])
         let result = makePipelineDocument(outerList)
 
@@ -54,18 +54,18 @@ struct AttributedStringBuilderListAndStructureTests {
     func nestedOrderedListDocumentIndentation() {
         let blocks: [Block] = [
             .orderedList(startIndex: 1, items: [
-                makeItem(
+                Block.ListItem(blocks:
                     .paragraph(content: [.text("Parse markdown into a stable block tree")]),
                     .orderedList(startIndex: 1, items: [
-                        makeItem(.paragraph(content: [.text("Preserve nested ordered numbering")])),
-                        makeItem(.paragraph(content: [.text("Keep wrapped lines aligned under the marker when they span more than one visual row in the narrow stream pane")])),
+                        Block.ListItem(blocks: .paragraph(content: [.text("Preserve nested ordered numbering")])),
+                        Block.ListItem(blocks: .paragraph(content: [.text("Keep wrapped lines aligned under the marker when they span more than one visual row in the narrow stream pane")])),
                     ])
                 ),
             ]),
         ]
 
         let fragments = AttributedStringBuilder.buildRenderFragments(
-            from: makeNodes(blocks),
+            from: blocks.makeNodes(),
             frozenCount: blocks.count
         )
         let document = AttributedStringBuilder.buildDocument(from: fragments)
@@ -84,8 +84,8 @@ struct AttributedStringBuilderListAndStructureTests {
     @Test("Ordered list respects startIndex")
     func orderedListStartIndex() {
         let items = [
-            makeItem(.paragraph(content: [.text("a")])),
-            makeItem(.paragraph(content: [.text("b")])),
+            Block.ListItem(blocks: .paragraph(content: [.text("a")])),
+            Block.ListItem(blocks: .paragraph(content: [.text("b")])),
         ]
         let result = makePipelineDocument(.orderedList(startIndex: 3, items: items))
         #expect(result.string.contains("3."))
@@ -95,8 +95,8 @@ struct AttributedStringBuilderListAndStructureTests {
     @Test("Task list renders checkbox marker")
     func taskListMarker() {
         let items = [
-            makeItem(checkbox: .checked, .paragraph(content: [.text("done")])),
-            makeItem(checkbox: .unchecked, .paragraph(content: [.text("pending")])),
+            Block.ListItem(checkbox: .checked, blocks: .paragraph(content: [.text("done")])),
+            Block.ListItem(checkbox: .unchecked, blocks: .paragraph(content: [.text("pending")])),
         ]
         let result = makePipelineDocument(.unorderedList(items: items))
 
@@ -107,7 +107,7 @@ struct AttributedStringBuilderListAndStructureTests {
     @Test("Unfrozen ordered list preserves nested code block text")
     func orderedListNestedCodeBlock() {
         let items = [
-            makeItem(
+            Block.ListItem(blocks:
                 .paragraph(content: [.text("Intro")]),
                 .codeBlock(language: "swift", code: "print(\"Hello\")\n")
             ),
@@ -124,7 +124,7 @@ struct AttributedStringBuilderListAndStructureTests {
     @Test("Unfrozen unordered list preserves nested code block text")
     func unorderedListNestedCodeBlock() {
         let items = [
-            makeItem(
+            Block.ListItem(blocks:
                 .paragraph(content: [.text("Intro")]),
                 .codeBlock(language: nil, code: "code\n")
             ),
@@ -140,7 +140,7 @@ struct AttributedStringBuilderListAndStructureTests {
 
     @Test("Blockquote has greater indentation than plain text")
     func blockquoteIndentation() {
-        let blockquote = makeBlockquote(.paragraph(content: [.text("quoted")]))
+        let blockquote = Block.makeBlockquote(.paragraph(content: [.text("quoted")]))
         let plainParagraph = Block.paragraph(content: [.text("plain")])
         let result = makePipelineDocument(blockquote, plainParagraph)
 
@@ -160,8 +160,8 @@ struct AttributedStringBuilderListAndStructureTests {
 
     @Test("Nested blockquote has greater indent than single")
     func nestedBlockquoteIndentation() {
-        let nestedBlockquote = makeBlockquote(.paragraph(content: [.text("deep")]))
-        let outerBlockquote = makeBlockquote(.paragraph(content: [.text("shallow")]), nestedBlockquote)
+        let nestedBlockquote = Block.makeBlockquote(.paragraph(content: [.text("deep")]))
+        let outerBlockquote = Block.makeBlockquote(.paragraph(content: [.text("shallow")]), nestedBlockquote)
         let result = makePipelineDocument(outerBlockquote)
 
         let shallowRange = (result.string as NSString).range(of: "shallow")
@@ -175,7 +175,7 @@ struct AttributedStringBuilderListAndStructureTests {
 
     @Test("Blockquote carries blockquoteDepth custom attribute")
     func blockquoteDepthAttribute() {
-        let blockquote = makeBlockquote(.paragraph(content: [.text("quoted")]))
+        let blockquote = Block.makeBlockquote(.paragraph(content: [.text("quoted")]))
         let result = makePipelineDocument(blockquote)
 
         let quotedRange = (result.string as NSString).range(of: "quoted")
@@ -185,11 +185,11 @@ struct AttributedStringBuilderListAndStructureTests {
 
     @Test("Blockquote preserves nested list markers and indentation")
     func blockquoteNestedListMarkersAndIndentation() {
-        let quotedList = makeBlockquote(.unorderedList(items: [
-            makeItem(.paragraph(content: [.text("quoted item")]))
+        let quotedList = Block.makeBlockquote(.unorderedList(items: [
+            Block.ListItem(blocks: .paragraph(content: [.text("quoted item")]))
         ]))
         let plainList = Block.unorderedList(items: [
-            makeItem(.paragraph(content: [.text("plain item")]))
+            Block.ListItem(blocks: .paragraph(content: [.text("plain item")]))
         ])
         let result = makePipelineDocument(quotedList, plainList)
 
@@ -210,7 +210,7 @@ struct AttributedStringBuilderListAndStructureTests {
     @Test("Unordered list has structuralMarker on bullet+tab characters")
     func unorderedListStructuralMarker() {
         let items = [
-            makeItem(.paragraph(content: [.text("alpha")])),
+            Block.ListItem(blocks: .paragraph(content: [.text("alpha")])),
         ]
         let result = makePipelineDocument(.unorderedList(items: items))
 
@@ -231,7 +231,7 @@ struct AttributedStringBuilderListAndStructureTests {
     @Test("Ordered list has structuralMarker on number+dot+tab characters")
     func orderedListStructuralMarker() {
         let items = [
-            makeItem(.paragraph(content: [.text("first")])),
+            Block.ListItem(blocks: .paragraph(content: [.text("first")])),
         ]
         let result = makePipelineDocument(.orderedList(startIndex: 1, items: items))
 
@@ -251,7 +251,7 @@ struct AttributedStringBuilderListAndStructureTests {
     @Test("Task list has structuralMarker on checkbox marker characters")
     func taskListStructuralMarker() {
         let items = [
-            makeItem(checkbox: .checked, .paragraph(content: [.text("first")])),
+            Block.ListItem(checkbox: .checked, blocks: .paragraph(content: [.text("first")])),
         ]
         let result = makePipelineDocument(.unorderedList(items: items))
 
@@ -281,7 +281,7 @@ struct AttributedStringBuilderListAndStructureTests {
 
     @Test("Blockquote does NOT have structuralMarker")
     func blockquoteNoStructuralMarker() {
-        let blockquote = makeBlockquote(.paragraph(content: [.text("quoted")]))
+        let blockquote = Block.makeBlockquote(.paragraph(content: [.text("quoted")]))
         let result = makePipelineDocument(blockquote)
 
         var hasStructuralMarker = false
