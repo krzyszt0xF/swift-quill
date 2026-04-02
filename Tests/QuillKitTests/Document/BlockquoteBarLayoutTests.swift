@@ -1,8 +1,9 @@
 @testable import QuillKit
 import QuillCore
+import QuillSharedTestSupport
 import Testing
 
-@Suite("BlockquoteBarLayout")
+@Suite("BlockquoteBarLayout", .tags(.rendering))
 struct BlockquoteBarLayoutTests {
     @Test("Multi-paragraph blockquote becomes one continuous bar run")
     func continuousBarRun() {

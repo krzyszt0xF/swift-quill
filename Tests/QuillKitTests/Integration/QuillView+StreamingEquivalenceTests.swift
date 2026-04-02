@@ -4,7 +4,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("QuillView Streaming Equivalence")
+@Suite("QuillView Streaming Equivalence", .tags(.integration, .parity, .streaming))
 struct QuillViewStreamingEquivalenceTests {
     @Test("same markdown produces identical currentMarkdown across modes", arguments: StreamingMode.allCases)
     func modeEquivalence(mode: StreamingMode) async {

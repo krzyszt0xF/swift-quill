@@ -1,9 +1,10 @@
 @testable import QuillHighlight
 import QuillKit
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
-@Suite("SyntaxHighlighter")
+@Suite("SyntaxHighlighter", .tags(.rendering))
 struct SyntaxHighlighterTests {
     static let aliasCases: [SyntaxHighlighterAliasCase] = [
         .init(code: "const x = 1", language: "js", name: "JavaScript alias"),

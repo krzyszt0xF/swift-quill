@@ -1,7 +1,8 @@
 @testable import QuillCore
+import QuillSharedTestSupport
 import Testing
 
-@Suite("StreamBuffer Lists, Blockquotes, and Tables")
+@Suite("StreamBuffer Lists, Blockquotes, and Tables", .tags(.streaming))
 struct StreamBufferListBlockquoteAndTableTests {
     @Test("Unordered list item")
     func unorderedListItem() {

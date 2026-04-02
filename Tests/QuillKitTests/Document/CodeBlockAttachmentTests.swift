@@ -1,11 +1,12 @@
 @testable import QuillKit
 import QuillCore
 import Foundation
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("CodeBlockAttachment")
+@Suite("CodeBlockAttachment", .tags(.rendering))
 struct CodeBlockAttachmentTests {
     @Test("Attachment stores blockID, language, and code")
     func identityAndPayload() {

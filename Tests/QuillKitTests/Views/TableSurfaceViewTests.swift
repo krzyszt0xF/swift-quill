@@ -1,10 +1,11 @@
 @testable import QuillKit
 import QuillCore
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("TableSurfaceView")
+@Suite("TableSurfaceView", .tags(.rendering))
 struct TableSurfaceViewTests {
     @Test("copy clears custom selection after writing TSV")
     func copyClearsSelectionAfterWritingTSV() {

@@ -1,10 +1,11 @@
 import QuillCore
 import QuillCoreTestSupport
 @testable import QuillKit
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
-@Suite("AttributedStringBuilder Render Fragments")
+@Suite("AttributedStringBuilder Render Fragments", .tags(.rendering))
 struct AttributedStringBuilderRenderFragmentTests {
     @Test("Paragraph-only document produces one fragment per block")
     func documentParagraphOnly() {

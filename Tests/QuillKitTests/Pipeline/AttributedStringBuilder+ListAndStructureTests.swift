@@ -1,10 +1,11 @@
 import QuillCore
 import QuillCoreTestSupport
 @testable import QuillKit
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
-@Suite("AttributedStringBuilder List and Structure")
+@Suite("AttributedStringBuilder List and Structure", .tags(.rendering))
 struct AttributedStringBuilderListAndStructureTests {
     @Test("Unordered list has bullet markers")
     func unorderedListMarkers() {

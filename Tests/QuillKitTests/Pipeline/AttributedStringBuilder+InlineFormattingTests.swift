@@ -1,10 +1,11 @@
 import QuillCore
 import QuillCoreTestSupport
 @testable import QuillKit
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
-@Suite("AttributedStringBuilder Inline Formatting")
+@Suite("AttributedStringBuilder Inline Formatting", .tags(.rendering))
 struct AttributedStringBuilderInlineFormattingTests {
     @Test("H1 produces font size 28 bold")
     func headingH1Font() {

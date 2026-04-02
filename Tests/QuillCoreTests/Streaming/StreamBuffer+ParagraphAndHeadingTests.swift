@@ -1,7 +1,8 @@
 @testable import QuillCore
+import QuillSharedTestSupport
 import Testing
 
-@Suite("StreamBuffer Paragraphs and Headings")
+@Suite("StreamBuffer Paragraphs and Headings", .tags(.streaming))
 struct StreamBufferParagraphAndHeadingTests {
     @Test("Partial line accumulation across chunks")
     func partialLineAccumulation() {

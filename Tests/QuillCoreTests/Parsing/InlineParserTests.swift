@@ -1,7 +1,8 @@
 @testable import QuillCore
+import QuillSharedTestSupport
 import Testing
 
-@Suite("InlineParser")
+@Suite("InlineParser", .tags(.parsing))
 struct InlineParserTests {
 
     // MARK: - Plain Text

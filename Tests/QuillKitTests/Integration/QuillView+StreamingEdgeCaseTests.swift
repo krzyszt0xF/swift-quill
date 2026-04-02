@@ -4,7 +4,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("QuillView Streaming Edge Cases")
+@Suite("QuillView Streaming Edge Cases", .tags(.integration, .streaming))
 struct QuillViewStreamingEdgeCaseTests {
     @Test("chunk boundary inside markdown syntax produces correct result")
     func chunkBoundariesInsideSyntaxPreserveOutput() async {

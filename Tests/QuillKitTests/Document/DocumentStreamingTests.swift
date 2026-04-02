@@ -2,11 +2,12 @@
 import QuillCore
 import QuillCoreTestSupport
 import Foundation
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("DocumentStreaming")
+@Suite("DocumentStreaming", .tags(.rendering, .streaming))
 struct DocumentStreamingTests {
     @Test("Frozen prefix text is not mutated across updates")
     func frozenPrefixStability() {

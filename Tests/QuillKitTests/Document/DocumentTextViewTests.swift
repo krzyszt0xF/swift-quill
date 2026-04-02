@@ -1,10 +1,11 @@
 @testable import QuillKit
 import QuillCore
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("DocumentTextView")
+@Suite("DocumentTextView", .tags(.rendering))
 struct DocumentTextViewTests {
     @Test("Text drag interaction is disabled")
     func textDragInteractionIsDisabled() {

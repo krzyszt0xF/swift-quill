@@ -1,8 +1,9 @@
 import QuillCore
 import QuillCoreTestSupport
+import QuillSharedTestSupport
 import Testing
 
-@Suite("BlockReducer")
+@Suite("BlockReducer", .tags(.streaming))
 struct BlockReducerTests {
     // MARK: - Paragraphs
 

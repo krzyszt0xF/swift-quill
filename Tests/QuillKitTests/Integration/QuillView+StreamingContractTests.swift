@@ -4,7 +4,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("QuillView Streaming Contract")
+@Suite("QuillView Streaming Contract", .tags(.integration, .streaming))
 struct QuillViewStreamingContractTests {
     @Test("append + finish produces identical currentMarkdown to chunk concatenation")
     func streamedAndStaticMarkdownMatch() async {

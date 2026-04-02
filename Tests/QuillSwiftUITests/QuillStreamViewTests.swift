@@ -6,7 +6,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("QuillStreamView")
+@Suite("QuillStreamView", .tags(.integration, .streaming))
 struct QuillStreamViewTests {
     @Test("Already-rendered content is preserved after error")
     func contentRemainsAfterStreamError() async throws {

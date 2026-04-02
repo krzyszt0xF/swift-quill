@@ -1,9 +1,10 @@
 @testable import QuillKit
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("CodeBlockView")
+@Suite("CodeBlockView", .tags(.rendering))
 struct CodeBlockViewTests {
     private static let minimumVisibleHeight: CGFloat = 36
     private static let testWidth: CGFloat = 320

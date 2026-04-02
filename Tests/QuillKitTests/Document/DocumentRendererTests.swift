@@ -2,11 +2,12 @@
 import QuillCore
 import QuillCoreTestSupport
 import Foundation
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("DocumentRenderer")
+@Suite("DocumentRenderer", .tags(.rendering))
 struct DocumentRendererTests {
     @Test("First render of static document installs content")
     func staticDocumentRender() {

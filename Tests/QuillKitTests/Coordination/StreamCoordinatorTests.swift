@@ -3,7 +3,7 @@ import QuillSharedTestSupport
 @testable import QuillKit
 import Testing
 
-@Suite("StreamCoordinator")
+@Suite("StreamCoordinator", .tags(.rendering, .streaming))
 struct StreamCoordinatorTests {
     @Test("Buffered visual feed chunks preserve the original module text")
     func bufferedVisualFeedChunksPreserveModuleText() {

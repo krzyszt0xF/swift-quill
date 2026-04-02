@@ -1,8 +1,9 @@
 @testable import QuillCore
 import QuillCoreTestSupport
+import QuillSharedTestSupport
 import Testing
 
-@Suite("StreamController")
+@Suite("StreamController", .tags(.streaming))
 struct StreamControllerTests {
 
     // MARK: - Basic Streaming
