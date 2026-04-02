@@ -8,6 +8,13 @@ final class HeightCoordinator {
     private var heightUpdateTask: Task<Void, Never>?
     private var lastNotifiedHeight: CGFloat = 0
     private var previousWidth: CGFloat = 0
+    private let sleep: (Duration) async -> Void
+
+    init(sleep: @escaping (Duration) async -> Void = { duration in
+        try? await Task.sleep(for: duration)
+    }) {
+        self.sleep = sleep
+    }
 
     deinit {
         heightUpdateTask?.cancel()
@@ -35,7 +42,7 @@ final class HeightCoordinator {
 
         let coalescingInterval = max(0, configuration.heightMeasurementCoalescingInterval)
         heightUpdateTask?.cancel()
-        heightUpdateTask = Task { [weak self, weak hostView, weak documentTextView] in
+        heightUpdateTask = Task { [sleep, weak self, weak hostView, weak documentTextView] in
             guard
                 let self,
                 let hostView,
@@ -43,7 +50,7 @@ final class HeightCoordinator {
             else { return }
 
             if coalescingInterval > 0 {
-                try? await Task.sleep(for: .seconds(coalescingInterval))
+                await sleep(.seconds(coalescingInterval))
             }
 
             guard !Task.isCancelled else { return }

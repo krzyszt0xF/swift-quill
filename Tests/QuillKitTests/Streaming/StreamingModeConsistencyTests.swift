@@ -5,7 +5,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("Streaming Mode Consistency")
+@Suite("Streaming Mode Consistency", .tags(.integration, .streaming))
 struct StreamingModeConsistencyTests {
     @Test("Buffered and stable modes converge to identical final markdown")
     func bufferedMatchesStableAfterFinish() async throws {
@@ -37,7 +37,6 @@ struct StreamingModeConsistencyTests {
         for chunk in markdownChunks {
             bufferedView.append(chunk)
             stableView.append(chunk)
-            await wait(for: .milliseconds(12))
         }
 
         bufferedView.finish()
