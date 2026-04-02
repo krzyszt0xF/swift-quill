@@ -1,8 +1,15 @@
 @testable import QuillCore
+import QuillSharedTestSupport
 import Testing
 
-@Suite("StreamBuffer Code Fences and Thematic Breaks")
+@Suite("StreamBuffer Code Fences and Thematic Breaks", .tags(.streaming))
 struct StreamBufferCodeFenceAndThematicBreakTests {
+    static let thematicBreakCases: [ThematicBreakTestCase] = [
+        .init(input: "***\n", name: "Asterisks"),
+        .init(input: "---\n", name: "Dashes"),
+        .init(input: "___\n", name: "Underscores"),
+    ]
+
     @Test("Backtick code fence with language")
     func backtickFenceWithLanguage() {
         var buffer = StreamBuffer()
@@ -68,24 +75,10 @@ struct StreamBufferCodeFenceAndThematicBreakTests {
         #expect(events == [.endCodeBlock])
     }
 
-    @Test("Dashes thematic break")
-    func dashesThematicBreak() {
+    @Test("Thematic break variants", arguments: thematicBreakCases)
+    func thematicBreakVariants(_ testCase: ThematicBreakTestCase) {
         var buffer = StreamBuffer()
-        let events = buffer.append("---\n")
-        #expect(events == [.thematicBreak])
-    }
-
-    @Test("Asterisks thematic break")
-    func asterisksThematicBreak() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("***\n")
-        #expect(events == [.thematicBreak])
-    }
-
-    @Test("Underscores thematic break")
-    func underscoresThematicBreak() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("___\n")
+        let events = buffer.append(testCase.input)
         #expect(events == [.thematicBreak])
     }
 
@@ -174,4 +167,13 @@ struct StreamBufferCodeFenceAndThematicBreakTests {
             .endCodeBlock,
         ])
     }
+}
+
+struct ThematicBreakTestCase: Sendable {
+    let input: String
+    let name: String
+}
+
+extension ThematicBreakTestCase: CustomTestStringConvertible {
+    var testDescription: String { name }
 }

@@ -1,8 +1,9 @@
 import QuillCore
 import QuillCoreTestSupport
+import QuillSharedTestSupport
 import Testing
 
-@Suite("Block Tests")
+@Suite("Block Tests", .tags(.parsing))
 struct BlockTests {
     // MARK: - Headings
 
@@ -275,7 +276,7 @@ struct BlockTests {
     // MARK: - Multi-Block Document
 
     @Test("Multi-block document")
-    func multiBlockDocument() {
+    func multiBlockDocument() throws {
         let markdown = """
         # Welcome
 
@@ -292,32 +293,54 @@ struct BlockTests {
         let blocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         #expect(blocks.count == 4)
 
-        guard case let .heading(level, content) = blocks[0] else {
-            Issue.record("Expected heading, got \(blocks[0])")
-            return
-        }
-        
+        let firstBlock = try requireBlock(at: 0, from: blocks)
+        let secondBlock = try requireBlock(at: 1, from: blocks)
+        let thirdBlock = try requireBlock(at: 2, from: blocks)
+        let fourthBlock = try requireBlock(at: 3, from: blocks)
+        let heading = headingDetails(from: firstBlock)
+        let (level, content) = try #require(heading)
         #expect(level == 1)
         #expect(content == [.text("Welcome")])
 
-        guard case let .paragraph(pContent) = blocks[1] else {
-            Issue.record("Expected paragraph, got \(blocks[1])")
-            return
-        }
+        let paragraph = paragraphInlines(from: secondBlock)
+        let pContent = try #require(paragraph)
         #expect(pContent == [.text("This is a paragraph.")])
 
-        guard case let .codeBlock(lang, code) = blocks[2] else {
-            Issue.record("Expected codeBlock, got \(blocks[2])")
-            return
-        }
+        let codeBlock = codeBlockDetails(from: thirdBlock)
+        let (lang, code) = try #require(codeBlock)
         #expect(lang == "swift")
         #expect(code == "let x = 42\n")
 
-        guard case let .unorderedList(items) = blocks[3] else {
-            Issue.record("Expected unorderedList, got \(blocks[3])")
-            return
-        }
+        let listItems = unorderedListItems(from: fourthBlock)
+        let items = try #require(listItems)
         #expect(items.count == 2)
+    }
+}
+
+private extension BlockTests {
+    func codeBlockDetails(from block: Block) -> (String?, String)? {
+        guard case let .codeBlock(language, code) = block else { return nil }
+        return (language, code)
+    }
+
+    func headingDetails(from block: Block) -> (Int, [Inline])? {
+        guard case let .heading(level, content) = block else { return nil }
+        return (level, content)
+    }
+
+    func paragraphInlines(from block: Block) -> [Inline]? {
+        guard case let .paragraph(content) = block else { return nil }
+        return content
+    }
+
+    func requireBlock(at index: Int, from blocks: [Block]) throws -> Block {
+        let block = blocks.indices.contains(index) ? blocks[index] : nil
+        return try #require(block)
+    }
+
+    func unorderedListItems(from block: Block) -> [Block.ListItem]? {
+        guard case let .unorderedList(items) = block else { return nil }
+        return items
     }
 }
 

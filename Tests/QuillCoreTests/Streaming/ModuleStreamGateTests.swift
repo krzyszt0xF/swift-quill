@@ -1,10 +1,11 @@
 @testable import QuillCore
+import QuillSharedTestSupport
 import Testing
 
-@Suite("ModuleStreamGate")
+@Suite("ModuleStreamGate", .tags(.streaming))
 struct ModuleStreamGateTests {
     @Test("Commits modules at heading boundaries")
-    func headingBoundaryCommit() {
+    func headingBoundaryCommit() throws {
         var gate = ModuleStreamGate(
             configuration: .init(minModuleLength: 10, maxBufferingDelay: 1.5)
         )
@@ -20,14 +21,14 @@ struct ModuleStreamGateTests {
 
         let result = gate.append(markdown, now: 0)
         #expect(result.committedChunks.count == 2)
-        guard result.committedChunks.count == 2 else { return }
+        try #require(result.committedChunks.count == 2)
         #expect(result.committedChunks[0].contains("# First"))
         #expect(result.committedChunks[1].contains("# Second"))
         #expect(result.hasPendingText == false)
     }
 
     @Test("Commits long paragraph fallback after double newline")
-    func paragraphFallbackCommit() {
+    func paragraphFallbackCommit() throws {
         var gate = ModuleStreamGate(
             configuration: .init(minModuleLength: 12, maxBufferingDelay: 1.5)
         )
@@ -39,7 +40,7 @@ struct ModuleStreamGateTests {
 
         let result = gate.append(text, now: 0)
         #expect(result.committedChunks.count == 1)
-        guard let firstCommitted = result.committedChunks.first else { return }
+        let firstCommitted = try #require(result.committedChunks.first)
         #expect(firstCommitted.contains("long paragraph"))
         #expect(result.hasPendingText == false)
     }
@@ -114,7 +115,7 @@ struct ModuleStreamGateTests {
     }
 
     @Test("Overdue commit prefers double newline boundary when available")
-    func overdueCommitPrefersDoubleNewlineBoundary() {
+    func overdueCommitPrefersDoubleNewlineBoundary() throws {
         var gate = ModuleStreamGate(
             configuration: .init(minModuleLength: 30, maxBufferingDelay: 1.5)
         )
@@ -133,7 +134,7 @@ struct ModuleStreamGateTests {
 
         let committed = gate.commitIfOverdue(now: 1.6)
         #expect(committed.count == 1)
-        guard committed.count == 1 else { return }
+        try #require(committed.count == 1)
         #expect(committed[0].contains("beta section"))
         #expect(committed[0].contains("gamma section") == false)
     }

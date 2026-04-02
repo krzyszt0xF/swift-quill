@@ -1,37 +1,33 @@
 import QuillCore
 import QuillCoreTestSupport
+import QuillSharedTestSupport
 import Testing
 
-@Suite("Edge Case Tests")
+@Suite("Edge Case Tests", .tags(.parsing))
 struct EdgeCaseTests {
 
     @Test("Deeply nested list")
-    func deeplyNestedList() {
-        let markdown = """
+    func deeplyNestedList() throws {
+        let blocks = normalizedBlocks(MarkdownParser.live.parse("""
         - a
           - b
             - c
               - d
                 - e
                   - f
-        """
-        let blocks = MarkdownParser.live.parse(markdown)
-        #expect(!blocks.isEmpty)
-
-        guard case let .unorderedList(items) = blocks.first?.block else {
-            Issue.record("Expected unorderedList, got \(String(describing: blocks.first))")
-            return
-        }
+        """))
+        let rootBlock = try #require(blocks.first)
+        let rootItems = unorderedListItems(from: rootBlock)
+        let items = try #require(rootItems)
         #expect(items.count == 1)
 
         var depth = 1
         var currentItems = items
         while true {
-            guard currentItems.count == 1,
-                  let nestedItems = currentItems[0].children.compactMap({ node -> [Block.ListItem]? in
-                      if case let .unorderedList(items) = node.block { return items }
-                      return nil
-                  }).first
+            guard
+                currentItems.count == 1,
+                let firstItem = currentItems.first,
+                let nestedItems = firstItem.children.compactMap({ unorderedListItems(from: $0.block) }).first
             else { break }
 
             currentItems = nestedItems
@@ -47,7 +43,7 @@ struct EdgeCaseTests {
     }
 
     @Test("Full document integration")
-    func fullDocumentIntegration() {
+    func fullDocumentIntegration() throws {
         let markdown = """
         # Project README
 
@@ -78,78 +74,57 @@ struct EdgeCaseTests {
         let blocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         #expect(blocks.count == 9)
 
-        guard case let .heading(h1Level, _) = blocks[0] else {
-            Issue.record("Expected heading at [0], got \(blocks[0])")
-            return
-        }
+        let firstBlock = try requireBlock(at: 0, from: blocks)
+        let secondBlock = try requireBlock(at: 1, from: blocks)
+        let thirdBlock = try requireBlock(at: 2, from: blocks)
+        let fourthBlock = try requireBlock(at: 3, from: blocks)
+        let fifthBlock = try requireBlock(at: 4, from: blocks)
+        let sixthBlock = try requireBlock(at: 5, from: blocks)
+        let seventhBlock = try requireBlock(at: 6, from: blocks)
+        let eighthBlock = try requireBlock(at: 7, from: blocks)
+        let ninthBlock = try requireBlock(at: 8, from: blocks)
+
+        let firstHeading = headingDetails(from: firstBlock)
+        let (h1Level, _) = try #require(firstHeading)
         #expect(h1Level == 1)
 
-        guard case .paragraph = blocks[1] else {
-            Issue.record("Expected paragraph at [1], got \(blocks[1])")
-            return
-        }
+        try #require(isParagraph(secondBlock))
 
-        guard case let .heading(h2Level, _) = blocks[2] else {
-            Issue.record("Expected heading at [2], got \(blocks[2])")
-            return
-        }
+        let secondHeading = headingDetails(from: thirdBlock)
+        let (h2Level, _) = try #require(secondHeading)
         #expect(h2Level == 2)
 
-        guard case let .unorderedList(items) = blocks[3] else {
-            Issue.record("Expected unorderedList at [3], got \(blocks[3])")
-            return
-        }
+        let listItems = unorderedListItems(from: fourthBlock)
+        let items = try #require(listItems)
         #expect(items.count == 3)
 
-        guard case .blockquote = blocks[4] else {
-            Issue.record("Expected blockquote at [4], got \(blocks[4])")
-            return
-        }
+        try #require(isBlockquote(fifthBlock))
 
-        guard case let .codeBlock(language, _) = blocks[5] else {
-            Issue.record("Expected codeBlock at [5], got \(blocks[5])")
-            return
-        }
+        let codeBlock = codeBlockDetails(from: sixthBlock)
+        let (language, _) = try #require(codeBlock)
         #expect(language == "python")
 
-        guard case .thematicBreak = blocks[6] else {
-            Issue.record("Expected thematicBreak at [6], got \(blocks[6])")
-            return
-        }
+        try #require(isThematicBreak(seventhBlock))
 
-        guard case .table = blocks[7] else {
-            Issue.record("Expected table at [7], got \(blocks[7])")
-            return
-        }
+        try #require(isTable(eighthBlock))
 
-        guard case .paragraph = blocks[8] else {
-            Issue.record("Expected paragraph at [8], got \(blocks[8])")
-            return
-        }
+        try #require(isParagraph(ninthBlock))
     }
 
     @Test("Long, long input")
-    func veryLongInputProducesParagraphOutput() {
+    func veryLongInputProducesParagraphOutput() throws {
         let markdown = String(repeating: "word ", count: 10_000)
         let blocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
-        #expect(!blocks.isEmpty)
-
-        guard case .paragraph = blocks.first else {
-            Issue.record("Expected paragraph for long input, got \(String(describing: blocks.first))")
-            return
-        }
+        let firstBlock = try #require(blocks.first)
+        try #require(isParagraph(firstBlock))
     }
 
     @Test("Mixed unclosed elements")
-    func mixedUnclosedElements() {
+    func mixedUnclosedElements() throws {
         let markdown = "# Heading\n**unclosed bold\n```\nunclosed fence"
         let blocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
-        #expect(!blocks.isEmpty)
-
-        guard case .heading = blocks.first else {
-            Issue.record("Expected heading as first block, got \(String(describing: blocks.first))")
-            return
-        }
+        let firstBlock = try #require(blocks.first)
+        try #require(headingDetails(from: firstBlock) != nil)
     }
 
     @Test("Multiple thematic breaks")
@@ -159,26 +134,22 @@ struct EdgeCaseTests {
     }
 
     @Test("Unclosed code fence")
-    func unclosedCodeFence() {
+    func unclosedCodeFence() throws {
         let blocks = normalizedBlocks(MarkdownParser.live.parse("```\nsome code without closing fence\n"))
-        #expect(!blocks.isEmpty)
-
-        guard case .codeBlock = blocks.first else {
-            Issue.record("Expected codeBlock, got \(String(describing: blocks.first))")
-            return
-        }
+        let firstBlock = try #require(blocks.first)
+        try #require(codeBlockDetails(from: firstBlock) != nil)
     }
 
     @Test("Unicode and emoji content")
-    func unicodeAndEmoji() {
+    func unicodeAndEmoji() throws {
         let markdown = "# Emoji heading \u{1F389}\n\nParagraph with CJK: \u{4F60}\u{597D}\u{4E16}\u{754C}"
         let blocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
         #expect(blocks.count == 2)
 
-        guard case let .heading(level, content) = blocks[0] else {
-            Issue.record("Expected heading, got \(blocks[0])")
-            return
-        }
+        let firstBlock = try requireBlock(at: 0, from: blocks)
+        let secondBlock = try requireBlock(at: 1, from: blocks)
+        let heading = headingDetails(from: firstBlock)
+        let (level, content) = try #require(heading)
         #expect(level == 1)
 
         let headingText = content.compactMap { inline -> String? in
@@ -187,11 +158,9 @@ struct EdgeCaseTests {
         }.joined()
         #expect(headingText.contains("\u{1F389}"))
 
-        guard case let .paragraph(paragraphContent) = blocks[1] else {
-            Issue.record("Expected paragraph, got \(blocks[1])")
-            return
-        }
-        let paragraphText = paragraphContent.compactMap { inline -> String? in
+        let paragraph = paragraphInlines(from: secondBlock)
+        let paragraphInlines = try #require(paragraph)
+        let paragraphText = paragraphInlines.compactMap { inline -> String? in
             if case let .text(stringValue) = inline { return stringValue }
             return nil
         }.joined()
@@ -201,11 +170,53 @@ struct EdgeCaseTests {
     @Test("Whitespace-only input")
     func whitespaceOnlyProducesNoMeaningfulBlocks() {
         let blocks = normalizedBlocks(MarkdownParser.live.parse("   \n\n  \t  "))
-        let producedOnlyParagraphs = blocks.allSatisfy {
-            if case .paragraph = $0 { return true }
-            return false
-        }
+        #expect(blocks.isEmpty || blocks.allSatisfy(isParagraph))
+    }
+}
 
-        #expect(producedOnlyParagraphs || blocks.isEmpty)
+private extension EdgeCaseTests {
+    func codeBlockDetails(from block: Block) -> (String?, String)? {
+        guard case let .codeBlock(language, code) = block else { return nil }
+        return (language, code)
+    }
+
+    func headingDetails(from block: Block) -> (Int, [Inline])? {
+        guard case let .heading(level, content) = block else { return nil }
+        return (level, content)
+    }
+
+    func isBlockquote(_ block: Block) -> Bool {
+        if case .blockquote = block { return true }
+        return false
+    }
+
+    func isParagraph(_ block: Block) -> Bool {
+        if case .paragraph = block { return true }
+        return false
+    }
+
+    func isTable(_ block: Block) -> Bool {
+        if case .table = block { return true }
+        return false
+    }
+
+    func isThematicBreak(_ block: Block) -> Bool {
+        if case .thematicBreak = block { return true }
+        return false
+    }
+
+    func paragraphInlines(from block: Block) -> [Inline]? {
+        guard case let .paragraph(content) = block else { return nil }
+        return content
+    }
+
+    func requireBlock(at index: Int, from blocks: [Block]) throws -> Block {
+        let block = blocks.indices.contains(index) ? blocks[index] : nil
+        return try #require(block)
+    }
+
+    func unorderedListItems(from block: Block) -> [Block.ListItem]? {
+        guard case let .unorderedList(items) = block else { return nil }
+        return items
     }
 }
