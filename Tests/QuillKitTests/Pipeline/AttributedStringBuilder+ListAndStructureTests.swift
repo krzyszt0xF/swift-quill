@@ -6,7 +6,7 @@ import Testing
 import UIKit
 
 @Suite("AttributedStringBuilder List and Structure", .tags(.rendering))
-struct AttributedStringBuilderListAndStructureTests {
+struct AttributedStringBuilderListTests {
     @Test("Unordered list has bullet markers")
     func unorderedListMarkers() {
         let items = [
@@ -57,8 +57,13 @@ struct AttributedStringBuilderListAndStructureTests {
                 Block.ListItem(blocks:
                     .paragraph(content: [.text("Parse markdown into a stable block tree")]),
                     .orderedList(startIndex: 1, items: [
-                        Block.ListItem(blocks: .paragraph(content: [.text("Preserve nested ordered numbering")])),
-                        Block.ListItem(blocks: .paragraph(content: [.text("Keep wrapped lines aligned under the marker when they span more than one visual row in the narrow stream pane")])),
+                        Block.ListItem(blocks: .paragraph(content: [
+                            .text("Preserve nested ordered numbering")
+                        ])),
+                        Block.ListItem(blocks: .paragraph(content: [
+                            .text("Keep wrapped lines aligned under the marker when they span more than one visual row")
+                        ])
+                        ),
                     ])
                 ),
             ]),
@@ -73,8 +78,14 @@ struct AttributedStringBuilderListAndStructureTests {
         let parentRange = (document.string as NSString).range(of: "Parse markdown into a stable block tree")
         let childRange = (document.string as NSString).range(of: "Preserve nested ordered numbering")
 
-        let parentStyle = document.attribute(.paragraphStyle, at: parentRange.location, effectiveRange: nil) as? NSParagraphStyle
-        let childStyle = document.attribute(.paragraphStyle, at: childRange.location, effectiveRange: nil) as? NSParagraphStyle
+        let parentStyle = document.attribute(
+            .paragraphStyle,
+            at: parentRange.location,
+            effectiveRange: nil) as? NSParagraphStyle
+        let childStyle = document.attribute(
+            .paragraphStyle,
+            at: childRange.location,
+            effectiveRange: nil) as? NSParagraphStyle
 
         #expect((childStyle?.headIndent ?? 0) > (parentStyle?.headIndent ?? 0))
         #expect((parentStyle?.headIndent ?? 0) > (parentStyle?.firstLineHeadIndent ?? 0))
@@ -167,8 +178,14 @@ struct AttributedStringBuilderListAndStructureTests {
         let shallowRange = (result.string as NSString).range(of: "shallow")
         let deepRange = (result.string as NSString).range(of: "deep")
 
-        let shallowIndent = (result.attribute(.paragraphStyle, at: shallowRange.location, effectiveRange: nil) as? NSParagraphStyle)?.headIndent ?? 0
-        let deepIndent = (result.attribute(.paragraphStyle, at: deepRange.location, effectiveRange: nil) as? NSParagraphStyle)?.headIndent ?? 0
+        let shallowStyle = result.attribute(
+            .paragraphStyle, at: shallowRange.location, effectiveRange: nil
+        ) as? NSParagraphStyle
+        let deepStyle = result.attribute(
+            .paragraphStyle, at: deepRange.location, effectiveRange: nil
+        ) as? NSParagraphStyle
+        let shallowIndent = shallowStyle?.headIndent ?? 0
+        let deepIndent = deepStyle?.headIndent ?? 0
 
         #expect(deepIndent > shallowIndent)
     }
@@ -220,7 +237,8 @@ struct AttributedStringBuilderListAndStructureTests {
         #expect(hasMarker == true)
 
         var markerAttributeRange = NSRange()
-        result.attribute(.structuralMarker, at: 0, longestEffectiveRange: &markerAttributeRange, in: NSRange(location: 0, length: result.length))
+        let fullRange = NSRange(location: 0, length: result.length)
+        result.attribute(.structuralMarker, at: 0, longestEffectiveRange: &markerAttributeRange, in: fullRange)
         #expect(markerAttributeRange.length == markerRange.length)
 
         let textStart = markerString.count
@@ -240,7 +258,8 @@ struct AttributedStringBuilderListAndStructureTests {
         #expect(hasMarker == true)
 
         var markerAttributeRange = NSRange()
-        result.attribute(.structuralMarker, at: 0, longestEffectiveRange: &markerAttributeRange, in: NSRange(location: 0, length: result.length))
+        let fullRange = NSRange(location: 0, length: result.length)
+        result.attribute(.structuralMarker, at: 0, longestEffectiveRange: &markerAttributeRange, in: fullRange)
         #expect(markerAttributeRange.length == markerString.count)
 
         let textStart = markerString.count
@@ -260,7 +279,8 @@ struct AttributedStringBuilderListAndStructureTests {
         #expect(hasMarker == true)
 
         var markerAttributeRange = NSRange()
-        result.attribute(.structuralMarker, at: 0, longestEffectiveRange: &markerAttributeRange, in: NSRange(location: 0, length: result.length))
+        let fullRange = NSRange(location: 0, length: result.length)
+        result.attribute(.structuralMarker, at: 0, longestEffectiveRange: &markerAttributeRange, in: fullRange)
         #expect(markerAttributeRange.length == markerString.count)
 
         let textStart = markerString.count

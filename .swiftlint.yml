@@ -1,0 +1,80 @@
+excluded:
+  - .build
+  - .swiftpm
+  - DerivedData
+
+opt_in_rules:
+  - closure_spacing
+  - contains_over_filter_count
+  - empty_count
+  - empty_string
+  - explicit_init
+  - fatal_error_message
+  - first_where
+  - force_unwrapping
+  - joined_default_parameter
+  - last_where
+  - modifier_order
+  - redundant_nil_coalescing
+  - sorted_enum_cases
+  - toggle_bool
+  - unavailable_function
+  - unneeded_parentheses_in_closure_argument
+
+analyzer_rules:
+  - unused_import
+
+disabled_rules:
+  - cyclomatic_complexity
+  - function_parameter_count
+  - trailing_comma
+
+# --- Safety rules: error severity ---
+
+force_cast:
+  severity: error
+
+force_try:
+  severity: error
+
+force_unwrapping:
+  severity: error
+
+# --- Line and body length ---
+
+line_length:
+  warning: 120
+  error: 160
+
+file_length:
+  warning: 500
+  error: 1000
+
+type_body_length:
+  warning: 400
+  error: 800
+
+function_body_length:
+  warning: 70
+  error: 120
+
+# --- Naming ---
+
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+  excluded:
+    - id
+    - i
+    - j
+    - x
+    - y
+
+# --- Nesting ---
+
+nesting:
+  type_level:
+    warning: 2
+  function_level:
+    warning: 3

@@ -27,7 +27,7 @@ final class CodeBlockView: UIView {
         layer.borderColor = UIColor.separator.withAlphaComponent(0.14).cgColor
         layer.borderWidth = 1
         layer.cornerRadius = 20
-        
+
         setupHeaderView()
         setupCopyButton()
         setupLanguageLabel()
@@ -118,9 +118,9 @@ private extension CodeBlockView {
         copyRevertTask?.cancel()
         copyRevertTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(1))
-            
+
             guard !Task.isCancelled, let self else { return }
-            
+
             self.copyButton.setImage(UIImage(systemName: "doc.on.doc"), for: .normal)
             self.copyButton.tintColor = .label
         }
@@ -154,7 +154,7 @@ private extension CodeBlockView {
             codeWidthConstraint,
         ])
     }
-    
+
     func setupCopyButton() {
         copyButton.tintColor = .label
         copyButton.setImage(UIImage(systemName: "doc.on.doc"), for: .normal)
@@ -164,7 +164,7 @@ private extension CodeBlockView {
         copyButton.addTarget(self, action: #selector(copyTapped), for: .touchUpInside)
 
         headerView.addSubview(copyButton)
-        
+
         copyButton.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             copyButton.topAnchor.constraint(equalTo: headerView.topAnchor),
@@ -196,7 +196,7 @@ private extension CodeBlockView {
         NSLayoutConstraint.activate([
             languageLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor),
             languageLabel.topAnchor.constraint(equalTo: headerView.topAnchor),
-            languageLabel.trailingAnchor.constraint(lessThanOrEqualTo: copyButton.leadingAnchor,constant: -12),
+            languageLabel.trailingAnchor.constraint(lessThanOrEqualTo: copyButton.leadingAnchor, constant: -12),
             languageLabel.bottomAnchor.constraint(equalTo: headerView.bottomAnchor)
         ])
     }
@@ -231,7 +231,7 @@ private extension CodeBlockView {
             static let vertical: CGFloat = 12
             static let horizontal: CGFloat = 12
         }
-        
+
         static let copyButtonSize: CGFloat = 20
         static let headerToCodeSpacing: CGFloat = 12
         static let minimumVisibleCodeHeight: CGFloat = 18

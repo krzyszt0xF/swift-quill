@@ -289,7 +289,7 @@ struct BlockTests {
         - Item one
         - Item two
         """
-        
+
         let blocks = MarkdownParser.live.parse(markdown).normalizedBlocks()
         #expect(blocks.count == 4)
 

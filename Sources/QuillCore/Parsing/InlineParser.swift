@@ -107,7 +107,7 @@ extension InlineParser.Parser {
         }
 
         appendText(textBuffer, to: &inlines)
-        
+
         return InlineParser.ParseResult(
             didReachDelimiter: false,
             inlines: inlines
@@ -127,13 +127,13 @@ private extension InlineParser.Parser {
 
         let code = String(source[position..<closingIndex])
         position = source.index(after: closingIndex)
-        
+
         return .code(code)
     }
 
     func appendText(_ text: String, to inlines: inout [Inline]) {
         guard !text.isEmpty else { return }
-        
+
         inlines.append(.text(text))
     }
 }

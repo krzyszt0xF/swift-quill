@@ -335,8 +335,12 @@ private extension ModuleStreamGate {
     func rawText(from start: Int, to end: Int) -> String {
         guard start >= 0, start < end, end <= accumulatedText.count else { return "" }
         guard
-            let startIndex = accumulatedText.index(accumulatedText.startIndex, offsetBy: start, limitedBy: accumulatedText.endIndex),
-            let endIndex = accumulatedText.index(accumulatedText.startIndex, offsetBy: end, limitedBy: accumulatedText.endIndex),
+            let startIndex = accumulatedText.index(
+                accumulatedText.startIndex, offsetBy: start, limitedBy: accumulatedText.endIndex
+            ),
+            let endIndex = accumulatedText.index(
+                accumulatedText.startIndex, offsetBy: end, limitedBy: accumulatedText.endIndex
+            ),
             startIndex < endIndex
         else {
             return ""

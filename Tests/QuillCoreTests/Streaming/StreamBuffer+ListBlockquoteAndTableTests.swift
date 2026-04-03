@@ -181,7 +181,7 @@ struct StreamBufferListBlockquoteAndTableTests {
             .endParagraph,
             .startList(ordered: false), .startListItem, .startParagraph, .text("first"),
             .endParagraph, .endListItem, .startListItem, .startParagraph, .text("second"),
-            .endParagraph, .endListItem, .endList, .endBlockQuote, .endBlockQuote,
+            .endParagraph, .endListItem, .endList, .endBlockQuote, .endBlockQuote
         ])
     }
 
@@ -196,7 +196,7 @@ struct StreamBufferListBlockquoteAndTableTests {
         let completionEvents = buffer.append("st\n\n")
         #expect(completionEvents == [
             .startList(ordered: false), .startListItem, .startParagraph, .text("first"),
-            .endParagraph, .endListItem, .endList, .endBlockQuote, .endBlockQuote,
+            .endParagraph, .endListItem, .endList, .endBlockQuote, .endBlockQuote
         ])
     }
 
@@ -222,9 +222,20 @@ struct StreamBufferListBlockquoteAndTableTests {
         """)
 
         #expect(events == [
-            .startList(ordered: true), .startListItem, .startParagraph, .text("Parse markdown into a stable block tree"),
-            .endParagraph, .startList(ordered: true), .startListItem, .startParagraph, .text("Preserve nested ordered numbering"),
-            .endParagraph, .endListItem, .startListItem, .startParagraph, .text("Keep wrapped lines aligned under the marker when they span more than one visual row in the narrow stream pane"),
+            .startList(ordered: true),
+            .startListItem,
+            .startParagraph,
+            .text("Parse markdown into a stable block tree"),
+            .endParagraph,
+            .startList(ordered: true),
+            .startListItem,
+            .startParagraph,
+            .text("Preserve nested ordered numbering"),
+            .endParagraph,
+            .endListItem,
+            .startListItem,
+            .startParagraph,
+            .text("Keep wrapped lines aligned under the marker when they span more than one visual row in the narrow stream pane"),
         ])
 
         let finalEvents = buffer.finalize()
@@ -246,7 +257,7 @@ struct StreamBufferListBlockquoteAndTableTests {
         #expect(events == [
             .startTable, .tableAlignments([nil, nil]), .tableRow(["A", "B"]),
             .tableRow(["1", "2"]),
-            .endTable,
+            .endTable
         ])
     }
 

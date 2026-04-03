@@ -273,8 +273,11 @@ private extension ListFragmentRenderer {
     ) -> RenderFragment {
         let attributedString = NSMutableAttributedString(attributedString: fragment.attributedString)
         let range = NSRange(location: 0, length: attributedString.length)
-        let paragraphStyle = (attributedString.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?
-            .mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
+        let existingStyle = attributedString.attribute(
+            .paragraphStyle, at: 0, effectiveRange: nil
+        ) as? NSParagraphStyle
+        let paragraphStyle = existingStyle?.mutableCopy() as? NSMutableParagraphStyle
+            ?? NSMutableParagraphStyle()
         paragraphStyle.paragraphSpacingBefore = paragraphSpacingBefore
         attributedString.addAttribute(.paragraphStyle, value: paragraphStyle, range: range)
 

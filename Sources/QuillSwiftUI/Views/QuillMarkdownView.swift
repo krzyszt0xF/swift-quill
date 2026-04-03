@@ -21,17 +21,17 @@ public struct QuillMarkdownView: UIViewRepresentable {
             to: view,
             syntaxHighlighter: context.environment.quillSyntaxHighlighter
         )
-        
+
         return view
     }
-    
+
     public func sizeThatFits(
         _ proposal: ProposedViewSize,
         uiView: QuillView,
         context: Context) -> CGSize? {
             uiView.calculateFittedSize(for: proposal)
         }
-    
+
     public func updateUIView(_ uiView: QuillView, context: Context) {
         applyConfiguration(
             to: uiView,

@@ -61,7 +61,11 @@ struct StaticStreamingParityTests {
              ```
 
         """, chunkSizes: [3, 4, 5, 2, 7, 6]),
-        .init(name: "Paragraph transitions", markdown: "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.\n\n", chunkSizes: [4, 9, 6, 11]),
+        .init(
+            name: "Paragraph transitions",
+            markdown: "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.\n\n",
+            chunkSizes: [4, 9, 6, 11]
+        ),
         .init(name: "Prompt nested ordered list under single-character streaming", markdown: """
         1. Parse markdown into a stable block tree
            1. Preserve nested ordered numbering

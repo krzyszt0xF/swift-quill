@@ -80,7 +80,8 @@ enum EmbeddedBlockRenderer {
         let headerCells = header.cells.map { InlineContentRenderer.plainText(from: $0.content) }
 
         lines.append("| " + headerCells.joined(separator: " | ") + " |")
-        lines.append("| " + headerCells.map { String(repeating: "-", count: max($0.count, 3)) }.joined(separator: " | ") + " |")
+        let separators = headerCells.map { String(repeating: "-", count: max($0.count, 3)) }
+        lines.append("| " + separators.joined(separator: " | ") + " |")
 
         for row in rows {
             let cells = row.cells.map { InlineContentRenderer.plainText(from: $0.content) }

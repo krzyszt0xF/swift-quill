@@ -208,6 +208,6 @@ private func extractFirstParagraphContent(from markdown: String) -> [Inline]? {
     guard case let .paragraph(content) = blocks.first?.block else {
         return nil
     }
-    
+
     return content
 }

@@ -134,7 +134,10 @@ private extension HighlightCoordinator {
             }
         }
 
-        func storeResult(_ result: HighlightedCodeSnapshot, for blockID: BlockIdentity) -> (any CodeBlockHighlightSink)? {
+        func storeResult(
+            _ result: HighlightedCodeSnapshot,
+            for blockID: BlockIdentity
+        ) -> (any CodeBlockHighlightSink)? {
             lock.withLock {
                 pendingResults[blockID] = result
                 return sinks[blockID]?.sink

@@ -25,7 +25,7 @@ extension StreamBuffer {
         return events
     }
 
-    var shouldCloseOpenContentForBlockquoteDepthChange: Bool {
+    var shouldCloseContentForDepthChange: Bool {
         switch state.blockState {
         case .codeFence, .idle:
             return false
@@ -38,7 +38,7 @@ extension StreamBuffer {
         guard depth != state.blockquoteDepth else { return [] }
 
         var events: [ParserEvent] = []
-        if shouldCloseOpenContentForBlockquoteDepthChange {
+        if shouldCloseContentForDepthChange {
             events.append(contentsOf: closeOpenContent())
             if depth < state.blockquoteDepth {
                 events.append(contentsOf: closeOpenLists())

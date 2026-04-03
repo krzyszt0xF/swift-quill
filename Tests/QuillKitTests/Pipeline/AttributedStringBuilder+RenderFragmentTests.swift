@@ -6,7 +6,7 @@ import Testing
 import UIKit
 
 @Suite("AttributedStringBuilder Render Fragments", .tags(.rendering))
-struct AttributedStringBuilderRenderFragmentTests {
+struct AttributedStringBuilderFragmentTests {
     @Test("Paragraph-only document produces one fragment per block")
     func documentParagraphOnly() {
         let blocks: [Block] = [

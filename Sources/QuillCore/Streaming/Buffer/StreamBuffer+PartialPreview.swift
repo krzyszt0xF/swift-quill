@@ -33,7 +33,7 @@ extension StreamBuffer {
         state.partialLine.isEmpty == false
             && StreamLineClassifier.parseBlockquotePrefix(state.partialLine) == nil
             && isPotentialNestedListMarkerPreview == false
-            && shouldSuppressPartialPreviewForListEmbeddedBlock == false
+            && shouldSuppressListEmbeddedPreview == false
     }
 
     var isPotentialNestedListMarkerPreview: Bool {
@@ -63,7 +63,7 @@ extension StreamBuffer {
         state.partialPreview = nil
     }
 
-    var shouldSuppressPartialPreviewForListEmbeddedBlock: Bool {
+    var shouldSuppressListEmbeddedPreview: Bool {
         guard state.blockState != .table else { return false }
 
         guard

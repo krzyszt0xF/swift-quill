@@ -130,8 +130,12 @@ private extension BlockquoteBackgroundView {
                   ),
                   offset >= 0,
                   offset < attributedString.length,
-                  let ownerBlockID = attributedString.attribute(.ownerBlockID, at: offset, effectiveRange: nil) as? BlockIdentity,
-                  let blockquoteDepth = attributedString.attribute(.blockquoteDepth, at: offset, effectiveRange: nil) as? Int,
+                  let ownerBlockID = attributedString.attribute(
+                      .ownerBlockID, at: offset, effectiveRange: nil
+                  ) as? BlockIdentity,
+                  let blockquoteDepth = attributedString.attribute(
+                      .blockquoteDepth, at: offset, effectiveRange: nil
+                  ) as? Int,
                   blockquoteDepth > 0
             else { return true }
 

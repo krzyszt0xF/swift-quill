@@ -1,4 +1,6 @@
 package enum BlockReducer {
+    // Exhaustive switch over ParserEvent — not reducible without scattering the dispatch table
+    // swiftlint:disable:next function_body_length
     package static func apply(_ event: ParserEvent, to state: inout ReducerState) {
         while state.blocks.count > state.frozenCount {
             state.blocks.removeLast()
@@ -60,9 +62,6 @@ package enum BlockReducer {
         case .startListItem:
             state.contextStack.append(state.currentContext)
             state.currentContext = .listItem(blocks: [], checkbox: nil)
-        case let .startTaskListItem(checkbox):
-            state.contextStack.append(state.currentContext)
-            state.currentContext = .listItem(blocks: [], checkbox: checkbox)
         case .startParagraph:
             state.contextStack.append(state.currentContext)
             state.currentContext = .paragraph(id: state.identityGenerator.makeIdentity())
@@ -77,6 +76,9 @@ package enum BlockReducer {
                 alignments: [],
                 rows: []
             )
+        case let .startTaskListItem(checkbox):
+            state.contextStack.append(state.currentContext)
+            state.currentContext = .listItem(blocks: [], checkbox: checkbox)
         case let .tableAlignments(alignments):
             handleTableAlignments(alignments, state: &state)
         case let .tableRow(cells):
@@ -316,10 +318,10 @@ private extension BlockReducer {
 
     static func handleEndListItem(state: inout ReducerState) {
         guard case let .listItem(blocks, checkbox) = state.currentContext else { return }
-        
+
         state.currentContext = state.contextStack.removeLast()
         guard case .list(let id, let ordered, var items) = state.currentContext else { return }
-        
+
         items.append(Block.ListItem(checkbox: checkbox, children: blocks))
         state.currentContext = .list(id: id, ordered: ordered, items: items)
     }
@@ -340,7 +342,7 @@ private extension BlockReducer {
 
     static func handleEndTable(state: inout ReducerState) {
         guard case let .table(id, alignments, rows) = state.currentContext else { return }
-        
+
         state.currentContext = state.contextStack.removeLast()
         guard let headerCells = rows.first else {
             emitBlock(
@@ -409,7 +411,7 @@ private extension BlockReducer {
 
     static func closeInlineFrame(state: inout ReducerState) {
         guard let frame = state.inlineStack.popLast() else { return }
-        
+
         let children = state.currentInlines
         state.currentInlines = frame.savedInlines
         state.currentInlines.append(wrapInline(frame.kind, children: children))

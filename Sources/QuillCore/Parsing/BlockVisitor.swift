@@ -21,7 +21,7 @@ struct BlockVisitor: MarkupVisitor {
         }
         return blocks
     }
-    
+
     mutating func visitBlockQuote(_ blockQuote: BlockQuote) -> [BlockNode] {
         var children: [BlockNode] = []
         for child in blockQuote.children {
@@ -29,7 +29,7 @@ struct BlockVisitor: MarkupVisitor {
         }
         return [makeBlockNode(.blockquote(children: children))]
     }
-    
+
     mutating func visitCodeBlock(_ codeBlock: CodeBlock) -> [BlockNode] {
         [makeBlockNode(.codeBlock(language: codeBlock.language, code: codeBlock.code))]
     }
@@ -37,7 +37,7 @@ struct BlockVisitor: MarkupVisitor {
     mutating func visitHeading(_ heading: Heading) -> [BlockNode] {
         [makeBlockNode(.heading(level: heading.level, content: convertInlines(heading)))]
     }
-    
+
     mutating func visitOrderedList(_ orderedList: OrderedList) -> [BlockNode] {
         var items: [Block.ListItem] = []
         for item in orderedList.listItems {
@@ -45,18 +45,18 @@ struct BlockVisitor: MarkupVisitor {
             for child in item.children {
                 children.append(contentsOf: visit(child))
             }
-            
+
             let checkbox = Block.Checkbox(from: item.checkbox)
             items.append(Block.ListItem(checkbox: checkbox, children: children))
         }
-        
+
         return [makeBlockNode(.orderedList(startIndex: orderedList.startIndex, items: items))]
     }
 
     mutating func visitParagraph(_ paragraph: Paragraph) -> [BlockNode] {
         [makeBlockNode(.paragraph(content: convertInlines(paragraph)))]
     }
-    
+
     mutating func visitTable(_ table: Table) -> [BlockNode] {
         let columnAlignments = table.columnAlignments.map { alignment -> Block.ColumnAlignment? in
             switch alignment {
@@ -80,20 +80,20 @@ struct BlockVisitor: MarkupVisitor {
     mutating func visitThematicBreak(_ thematicBreak: ThematicBreak) -> [BlockNode] {
         [makeBlockNode(.thematicBreak)]
     }
-    
+
     mutating func visitUnorderedList(_ unorderedList: UnorderedList) -> [BlockNode] {
         var items: [Block.ListItem] = []
-        
+
         for item in unorderedList.listItems {
             var children: [BlockNode] = []
             for child in item.children {
                 children.append(contentsOf: visit(child))
             }
-            
+
             let checkbox = Block.Checkbox(from: item.checkbox)
             items.append(Block.ListItem(checkbox: checkbox, children: children))
         }
-        
+
         return [makeBlockNode(.unorderedList(items: items))]
     }
 
@@ -112,7 +112,7 @@ private extension BlockVisitor {
         for cell in tableHead.cells {
             cells.append(Block.TableCell(content: convertInlines(cell)))
         }
-        
+
         return Block.TableRow(cells: cells)
     }
 
@@ -121,7 +121,7 @@ private extension BlockVisitor {
         for cell in tableRow.cells {
             cells.append(Block.TableCell(content: convertInlines(cell)))
         }
-        
+
         return Block.TableRow(cells: cells)
     }
 
@@ -129,50 +129,50 @@ private extension BlockVisitor {
         switch markup {
         case let code as InlineCode:
             return [.code(code.code)]
-            
+
         case let emphasis as Emphasis:
             return [.emphasis(convertInlines(emphasis))]
-            
+
         case let html as InlineHTML:
             return [.inlineHTML(html.rawHTML)]
-            
+
         case let image as Markdown.Image:
             return [.image(
                 source: image.source,
                 title: image.title,
                 alt: convertInlines(image))]
-            
+
         case _ as LineBreak:
             return [.lineBreak]
-            
+
         case let link as Link:
             return [.link(
                 destination: link.destination ?? "",
                 children: convertInlines(link))]
-            
+
         case _ as SoftBreak:
             return [.text(" ")]
-            
+
         case let strikethrough as Strikethrough:
             return [.strikethrough(convertInlines(strikethrough))]
-            
+
         case let strong as Strong:
             return [.strong(convertInlines(strong))]
-            
+
         case let text as Text:
             return [.text(text.string)]
-        
+
         default:
             return convertInlines(markup)
         }
     }
-    
+
     func convertInlines(_ container: some Markup) -> [Inline] {
         var inlines: [Inline] = []
         for child in container.children {
             inlines.append(contentsOf: convertInline(child))
         }
-        
+
         return inlines
     }
 }
@@ -182,7 +182,7 @@ private extension Block.Checkbox {
         guard let checkbox else {
             return nil
         }
-        
+
         switch checkbox {
         case .checked:
             self = .checked

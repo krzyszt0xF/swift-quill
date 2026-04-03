@@ -3,7 +3,7 @@ import QuillSharedTestSupport
 import Testing
 
 @Suite("StreamBuffer Code Fences and Thematic Breaks", .tags(.streaming))
-struct StreamBufferCodeFenceAndThematicBreakTests {
+struct StreamBufferCodeFenceThematicBreakTests {
     static let thematicBreakCases: [ThematicBreakTestCase] = [
         .init(input: "***\n", name: "Asterisks"),
         .init(input: "---\n", name: "Dashes"),

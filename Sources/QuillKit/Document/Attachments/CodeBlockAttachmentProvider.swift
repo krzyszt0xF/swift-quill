@@ -22,7 +22,7 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
 
         let content = CodeBlockContent(from: attachment)
         let store = attachment.highlightStore
-        
+
         assert(Thread.isMainThread)
         view = MainActor.assumeIsolated {
             Self.makeBlockView(from: content, highlightStore: store)
@@ -54,19 +54,22 @@ private extension CodeBlockAttachmentProvider {
     enum Layout {
         static let fallbackSize = CGSize(width: 320, height: 80)
     }
-    
+
     @MainActor
-    static func makeBlockView(from content: CodeBlockContent, highlightStore: CodeBlockHighlightStore?) -> CodeBlockView {
+    static func makeBlockView(
+        from content: CodeBlockContent,
+        highlightStore: CodeBlockHighlightStore?
+    ) -> CodeBlockView {
         let view = CodeBlockView()
         view.configure(language: content.language, code: content.code)
-        
+
         let highlighted = highlightStore?.highlightedResult(for: content.blockID)
         if let highlighted {
             view.apply(highlightedCode: highlighted)
         }
-        
+
         highlightStore?.registerSink(view, for: content.blockID)
-        
+
         return view
     }
 }

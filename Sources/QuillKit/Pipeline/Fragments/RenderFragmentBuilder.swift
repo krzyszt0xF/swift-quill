@@ -100,6 +100,7 @@ private extension RenderFragmentBuilder {
         return .indentedListBlock
     }
 
+    // swiftlint:disable:next function_body_length
     static func makeRenderFragment(
         for node: BlockNode,
         ownerBlockID: BlockIdentity,

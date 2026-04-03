@@ -93,7 +93,10 @@ extension StreamBuffer {
             state.listStack = [ListContext(indent: marker.indent, ordered: marker.ordered)]
             state.hasOpenListParagraph = true
             state.blockState = .paragraph
-            return [.endParagraph, .startList(ordered: marker.ordered), item.startEvent, .startParagraph, .text(item.content)]
+            return [
+                .endParagraph, .startList(ordered: marker.ordered),
+                item.startEvent, .startParagraph, .text(item.content)
+            ]
         }
 
         return [.text(StreamLineClassifier.makeContinuationText(from: trimmed))]

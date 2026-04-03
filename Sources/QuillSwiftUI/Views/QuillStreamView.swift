@@ -24,7 +24,7 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
                 onError: onError,
                 preset: preset)
         }
-    
+
     private init(
         chunks: S,
         linkTapHandler: ((URL) -> Void)?,
@@ -53,7 +53,7 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
         )
         coordinator.setOnStreamFinished(onFinished)
         coordinator.subscribe(to: chunks, onError: onError)
-        
+
         return coordinator.quillView
     }
 
@@ -148,32 +148,32 @@ public extension QuillStreamView {
         func subscribe(to chunks: S, onError: (@Sendable (Error) -> Void)?) {
             cancel()
             generation += 1
-            
+
             let currentGeneration = generation
             quillView.reset()
 
             subscriptionTask = Task { [weak self] in
                 guard let self else { return }
-                
+
                 do {
                     for try await chunk in chunks {
                         guard !Task.isCancelled,
                               self.generation == currentGeneration
                         else { break }
-                        
+
                         self.quillView.append(chunk)
                     }
-                    
+
                     guard !Task.isCancelled,
                           self.generation == currentGeneration
                     else { return }
-                    
+
                     self.quillView.finish()
                 } catch {
                     guard !Task.isCancelled,
                           self.generation == currentGeneration
                     else { return }
-                    
+
                     self.quillView.cancelStreaming()
                     onError?(error)
                 }

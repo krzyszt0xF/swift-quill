@@ -6,7 +6,7 @@ import Testing
 import UIKit
 
 @Suite("AttributedStringBuilder Inline Formatting", .tags(.rendering))
-struct AttributedStringBuilderInlineFormattingTests {
+struct AttributedStringBuilderInlineTests {
     @Test("H1 produces font size 28 bold")
     func headingH1Font() {
         let result = makePipelineDocument(.heading(level: 1, content: [.text("Title")]))
@@ -122,7 +122,9 @@ struct AttributedStringBuilderInlineFormattingTests {
 
     @Test("Bold link keeps bold trait and link styling")
     func boldLinkFormatting() {
-        let result = makePipelineDocument(.paragraph(content: [.strong([.link(destination: "https://example.com", children: [.text("click")])])]))
+        let result = makePipelineDocument(.paragraph(content: [
+            .strong([.link(destination: "https://example.com", children: [.text("click")])])
+        ]))
 
         let resultFont = attributedStringBuilderFont(in: result)
         let linkForegroundColor = result.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
@@ -135,7 +137,9 @@ struct AttributedStringBuilderInlineFormattingTests {
 
     @Test("Heading link keeps heading font and link styling")
     func headingLinkFormatting() {
-        let result = makePipelineDocument(.heading(level: 2, content: [.link(destination: "https://example.com", children: [.text("Heading")])]))
+        let result = makePipelineDocument(.heading(level: 2, content: [
+            .link(destination: "https://example.com", children: [.text("Heading")])
+        ]))
 
         let resultFont = attributedStringBuilderFont(in: result)
         let linkForegroundColor = result.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
