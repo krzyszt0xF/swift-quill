@@ -6,7 +6,9 @@ final class TableSurfaceView: UIView {
     private lazy var editMenuInteraction = UIEditMenuInteraction(delegate: self)
     private let scrollView = UIScrollView()
 
-    private var currentViewportWidth: CGFloat = 0
+    private var contentVersion = 0
+    private var currentLayoutCacheKey: LayoutCacheKey?
+    private var layoutCache: [LayoutCacheKey: TableSurfaceLayout] = [:]
     private var content = TableSurfaceContent(
         columnAlignments: [],
         header: TableSurfaceRowContent(cells: []),
@@ -71,8 +73,10 @@ final class TableSurfaceView: UIView {
 
     func configure(content: TableSurfaceContent) {
         self.content = content
+        contentVersion += 1
+        currentLayoutCacheKey = nil
         selection = nil
-        currentViewportWidth = 0
+        layoutCache.removeAll(keepingCapacity: true)
         setNeedsLayout()
     }
 
@@ -102,15 +106,31 @@ final class TableSurfaceView: UIView {
 }
 
 private extension TableSurfaceView {
+    struct LayoutCacheKey: Hashable {
+        let contentVersion: Int
+        let viewportWidth: Int
+    }
+
     func rebuildLayoutIfNeeded() {
         let viewportWidth = max(bounds.width, 320)
-        guard abs(viewportWidth - currentViewportWidth) > 0.5 else { return }
+        let cacheKey = LayoutCacheKey(
+            contentVersion: contentVersion,
+            viewportWidth: Int(viewportWidth.rounded())
+        )
+        guard cacheKey != currentLayoutCacheKey else { return }
 
-        currentViewportWidth = viewportWidth
-        canvasView.layoutModel = TableSurfaceLayoutBuilder.makeLayout(
+        currentLayoutCacheKey = cacheKey
+        if let cachedLayout = layoutCache[cacheKey] {
+            canvasView.layoutModel = cachedLayout
+            return
+        }
+
+        let layout = TableSurfaceLayoutBuilder.makeLayout(
             content: content,
             viewportWidth: viewportWidth
         )
+        layoutCache[cacheKey] = layout
+        canvasView.layoutModel = layout
     }
 
     func setupScrollView() {

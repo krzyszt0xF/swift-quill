@@ -61,6 +61,24 @@ struct CodeBlockViewTests {
         #expect(fittingSize.height > Self.minimumVisibleHeight)
     }
 
+    @Test("Configure invalidates measured height when code changes")
+    func configureInvalidatesMeasuredHeight() {
+        let view = CodeBlockView()
+        view.configure(language: "swift", code: "let x = 1")
+        let initialHeight = view.intrinsicContentSize.height
+
+        view.configure(
+            language: "swift",
+            code: """
+            let x = 1
+            let y = 2
+            let z = 3
+            """
+        )
+
+        #expect(view.intrinsicContentSize.height > initialHeight)
+    }
+
     @Test("Configure preserves trailing newline")
     func configurePreservesTrailingNewline() {
         let view = CodeBlockView()
@@ -249,6 +267,30 @@ struct CodeBlockViewTests {
 
         let textView = try #require(codeTextView(in: view))
         #expect(textView.attributedText?.string == "let value = 123\n")
+    }
+
+    @Test("Highlighted code preserves measured height")
+    func highlightedCodePreservesMeasuredHeight() {
+        let view = CodeBlockView()
+        view.configure(
+            language: "swift",
+            code: """
+            let value = 123
+            let nextValue = 456
+            """
+        )
+        let initialHeight = view.intrinsicContentSize.height
+
+        let highlighted = NSAttributedString(
+            string: """
+            let value = 123
+            let nextValue = 456
+            """,
+            attributes: [.foregroundColor: UIColor.red]
+        )
+        view.apply(highlightedCode: HighlightedCodeSnapshot(highlighted))
+
+        #expect(view.intrinsicContentSize.height == initialHeight)
     }
 
     @Test("Selected fragment exposes copy action")

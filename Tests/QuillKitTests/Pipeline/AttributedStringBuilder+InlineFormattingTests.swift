@@ -70,6 +70,19 @@ struct AttributedStringBuilderInlineTests {
         #expect(backgroundColor != nil)
     }
 
+    @Test("Code inside strong emphasis keeps monospace and inherited traits")
+    func inlineCodeInheritsTraits() {
+        let result = makePipelineDocument(.paragraph(content: [
+            .strong([.emphasis([.code("let x")])]),
+        ]))
+        let resultFont = attributedStringBuilderFont(in: result)
+        let symbolicTraits = resultFont?.fontDescriptor.symbolicTraits ?? []
+
+        #expect(symbolicTraits.contains(.traitBold))
+        #expect(symbolicTraits.contains(.traitItalic))
+        #expect(symbolicTraits.contains(.traitMonoSpace))
+    }
+
     @Test("Link applies systemBlue foreground")
     func linkFormatting() {
         let result = makePipelineDocument(.paragraph(content: [.link(destination: "https://example.com", children: [.text("click")])]))
