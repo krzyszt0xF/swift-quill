@@ -4,6 +4,7 @@ import UIKit
 @MainActor
 final class DocumentTextView: UITextView {
     var onLinkSelection: ((URL) -> Void)?
+    private(set) var contentRevision = 0
     private let blockquoteBackgroundView = BlockquoteBackgroundView()
 
     var contentStorage: NSTextContentStorage? {
@@ -17,8 +18,10 @@ final class DocumentTextView: UITextView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        guard blockquoteBackgroundView.frame != bounds else { return }
+
         blockquoteBackgroundView.frame = bounds
-        blockquoteBackgroundView.setNeedsDisplay()
+        blockquoteBackgroundView.invalidateBarRuns()
     }
 
     init() {
@@ -63,13 +66,33 @@ extension DocumentTextView: UITextViewDelegate {
             return defaultAction
         }
 
-        return UIAction { [weak self] _ in
-            _ = self?.handleLinkSelection(url)
+        let handler = makeLinkSelectionActionHandler(for: url)
+        return UIAction { action in
+            handler(action)
         }
     }
 }
 
 extension DocumentTextView {
+    var blockquoteBarRunComputationCount: Int {
+        blockquoteBackgroundView.barRunComputationCount
+    }
+
+    func handleDocumentContentChange() {
+        contentRevision += 1
+        blockquoteBackgroundView.invalidateBarRuns()
+    }
+
+    func makeLinkSelectionActionHandler(for url: URL) -> UIActionHandler {
+        { [weak self] _ in
+            _ = self?.handleLinkSelection(url)
+        }
+    }
+
+    func updateBlockquoteBarRunsIfNeeded() {
+        blockquoteBackgroundView.updateBarRunsIfNeeded()
+    }
+
     @discardableResult
     func handleLinkSelection(_ url: URL) -> Bool {
         onLinkSelection?(url)
@@ -79,14 +102,15 @@ extension DocumentTextView {
 
 private final class BlockquoteBackgroundView: UIView {
     weak var textView: DocumentTextView?
+    private(set) var barRunComputationCount = 0
+    private var cachedBarRuns: [BlockquoteBarLayout.BarRun] = []
+    private var needsBarRunUpdate = true
 
     override func draw(_ rect: CGRect) {
-        guard let textView,
+        updateBarRunsIfNeeded()
+        guard !cachedBarRuns.isEmpty,
               let context = UIGraphicsGetCurrentContext()
         else { return }
-
-        let barRuns = makeBarRuns(for: textView)
-        guard !barRuns.isEmpty else { return }
 
         context.saveGState()
         defer { context.restoreGState() }
@@ -94,7 +118,7 @@ private final class BlockquoteBackgroundView: UIView {
         context.clip(to: rect)
         context.setFillColor(BlockquoteStyle.barColor.cgColor)
 
-        for barRun in barRuns {
+        for barRun in cachedBarRuns {
             let xOrigin = BlockquoteStyle.barLeadingInset + CGFloat(barRun.level - 1) * BlockquoteStyle.levelSpacing
             let barRect = CGRect(
                 x: xOrigin,
@@ -113,6 +137,11 @@ private final class BlockquoteBackgroundView: UIView {
 }
 
 private extension BlockquoteBackgroundView {
+    func invalidateBarRuns() {
+        needsBarRunUpdate = true
+        setNeedsDisplay()
+    }
+
     func makeBarRuns(for textView: DocumentTextView) -> [BlockquoteBarLayout.BarRun] {
         guard let textLayoutManager = textView.textLayoutManager,
               let contentStorage = textView.contentStorage,
@@ -152,6 +181,20 @@ private extension BlockquoteBackgroundView {
         }
 
         return BlockquoteBarLayout.makeRuns(from: fragments)
+    }
+
+    func updateBarRunsIfNeeded() {
+        guard needsBarRunUpdate else { return }
+
+        guard let textView else {
+            cachedBarRuns = []
+            needsBarRunUpdate = false
+            return
+        }
+
+        cachedBarRuns = makeBarRuns(for: textView)
+        barRunComputationCount += 1
+        needsBarRunUpdate = false
     }
 
     func makeOffset(

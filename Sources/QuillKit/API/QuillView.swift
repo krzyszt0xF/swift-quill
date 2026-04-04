@@ -22,7 +22,10 @@ public final class QuillView: UIView {
     }
 
     public var markdown: String? {
-        didSet { renderStatic() }
+        didSet {
+            guard markdown != oldValue else { return }
+            renderStatic()
+        }
     }
 
     public var streamingMode: StreamingMode = .smoothedTail {
@@ -132,12 +135,12 @@ private extension QuillView {
 
         let blocks = markdownParser.parse(markdown)
         streamCoordinator.renderStatic(blocks: blocks)
-        scheduleHeightUpdate()
     }
 
     func scheduleHeightUpdate() {
         heightCoordinator.scheduleHeightUpdate(
             hostView: self,
+            contentRevision: streamCoordinator.hostView.contentRevision,
             documentTextView: streamCoordinator.hostView,
             configuration: configuration.layout
         )

@@ -85,8 +85,8 @@ struct QuillMarkdownViewTests {
     func emptyMarkdownPreservesEmptyState() {
         let view = QuillView()
         view.markdown = ""
-        #expect(view.markdown.isEmpty)
-        #expect(view.currentMarkdown.isEmpty)
+        #expect(view.markdown?.isEmpty == true)
+        #expect(view.currentMarkdown?.isEmpty == true)
     }
 
     @Test("onQuillLinkTap stores handler and applies it to QuillView")

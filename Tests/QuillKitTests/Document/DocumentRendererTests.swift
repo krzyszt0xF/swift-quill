@@ -76,6 +76,30 @@ struct DocumentRendererTests {
         #expect(!fullText.contains("Tail v1"))
     }
 
+    @Test("Render mutation invalidates blockquote background cache")
+    func renderMutationInvalidatesBlockquoteBackgroundCache() {
+        let renderer = DocumentRenderer.live
+        let firstBlocks = [
+            Block.makeBlockquote(.paragraph(content: [.text("First quote")])),
+        ].makeNodes()
+        let secondBlocks = [
+            Block.makeBlockquote(.paragraph(content: [.text("Second quote")])),
+        ].makeNodes()
+
+        renderer.render(blocks: firstBlocks, frozenCount: 1)
+        renderer.textView.frame = CGRect(x: 0, y: 0, width: 320, height: 80)
+        renderer.textView.setNeedsLayout()
+        renderer.textView.layoutIfNeeded()
+        renderer.textView.updateBlockquoteBarRunsIfNeeded()
+
+        #expect(renderer.textView.blockquoteBarRunComputationCount == 1)
+
+        renderer.render(blocks: secondBlocks, frozenCount: 1)
+        renderer.textView.updateBlockquoteBarRunsIfNeeded()
+
+        #expect(renderer.textView.blockquoteBarRunComputationCount == 2)
+    }
+
     @Test("Closed code fence produces attachment")
     func closedCodeFenceAttachment() {
         let renderer = DocumentRenderer.live

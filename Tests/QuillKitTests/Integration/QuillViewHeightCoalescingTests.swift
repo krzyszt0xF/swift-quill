@@ -7,11 +7,11 @@ import UIKit
 @MainActor
 @Suite("QuillView Height Coalescing", .tags(.integration, .rendering))
 struct QuillViewHeightCoalescingTests {
-    private static let coalescingWindowLowerBound: TimeInterval = 0.045
-
-    @Test("Rapid updates coalesce into one height notification per scheduler window")
-    func rapidUpdatesCoalesceHeightCallbacks() async throws {
-        let timeController = TestTimeController()
+    @Test("Rapid updates coalesce into one height notification per burst")
+    func rapidUpdatesCoalesceHeightCallbacks() async {
+        let heightSleepController = ControlledSleepController()
+        let schedulerTimeController = TestTimeController()
+        var measuredHeight: CGFloat = 0
         let configuration = RenderConfiguration(
             streamingMode: .smoothedTail,
             performanceProfile: .balanced,
@@ -21,53 +21,167 @@ struct QuillViewHeightCoalescingTests {
         )
         let view = makeHeightCoalescingQuillView(
             configuration: configuration,
-            timeController: timeController
+            heightSleepController: heightSleepController,
+            schedulerTimeController: schedulerTimeController,
+            measuredHeight: { measuredHeight }
         )
-        var callbackTimes: [TimeInterval] = []
+        await primeInitialMeasurement(
+            for: view,
+            heightSleepController: heightSleepController
+        )
+        var callbackCount = 0
         view.onHeightChange = { _, _ in
-            callbackTimes.append(timeController.now())
+            callbackCount += 1
         }
 
         for lineCount in 1...6 {
+            measuredHeight = CGFloat(lineCount) * 40
             let markdown = Array(repeating: "line", count: lineCount).joined(separator: "\n\n")
             view.markdown = markdown
         }
+        view.layoutIfNeeded()
+
+        let firstBurstScheduled = await eventually(timeout: .milliseconds(100)) {
+            heightSleepController.requestCount == 2
+        }
+        #expect(firstBurstScheduled)
+
+        heightSleepController.resumeNext()
+        let firstBurstCompleted = await eventually(timeout: .milliseconds(100)) {
+            heightSleepController.completedSleepCount == 2
+        }
+        #expect(firstBurstCompleted)
 
         let firstNotificationArrived = await eventually(timeout: .milliseconds(100)) {
-            callbackTimes.count == 1
+            callbackCount == 1
         }
         #expect(firstNotificationArrived)
 
+        measuredHeight = 480
         view.markdown = Array(repeating: "expanded", count: 12).joined(separator: "\n\n")
+        view.layoutIfNeeded()
+
+        let secondBurstScheduled = await eventually(timeout: .milliseconds(100)) {
+            heightSleepController.requestCount == 3
+        }
+        #expect(secondBurstScheduled)
+
+        heightSleepController.resumeNext()
+        let secondBurstCompleted = await eventually(timeout: .milliseconds(100)) {
+            heightSleepController.completedSleepCount == 3
+        }
+        #expect(secondBurstCompleted)
+
         let secondNotificationArrived = await eventually(timeout: .milliseconds(100)) {
-            callbackTimes.count == 2
+            callbackCount == 2
         }
         #expect(secondNotificationArrived)
+    }
 
-        let firstCallback = try #require(callbackTimes.first)
-        let secondCallback = try #require(callbackTimes.last)
-        let callbackDelta = secondCallback - firstCallback
-        #expect(callbackDelta >= Self.coalescingWindowLowerBound)
+    @Test("Reapplying identical markdown does not emit a second height callback")
+    func identicalMarkdownSkipsRedundantHeightCallback() async {
+        let heightSleepController = ControlledSleepController()
+        let schedulerTimeController = TestTimeController()
+        var measuredHeight: CGFloat = 0
+        let configuration = RenderConfiguration(
+            streamingMode: .smoothedTail,
+            performanceProfile: .balanced,
+            tailReveal: .balanced,
+            layout: .init(heightMeasurementCoalescingInterval: 0.05),
+            bufferedStream: .default
+        )
+        let view = makeHeightCoalescingQuillView(
+            configuration: configuration,
+            heightSleepController: heightSleepController,
+            schedulerTimeController: schedulerTimeController,
+            measuredHeight: { measuredHeight }
+        )
+        await primeInitialMeasurement(
+            for: view,
+            heightSleepController: heightSleepController
+        )
+        var callbackCount = 0
+        view.onHeightChange = { _, _ in
+            callbackCount += 1
+        }
+
+        measuredHeight = 160
+        let markdown = Array(repeating: "line", count: 4).joined(separator: "\n\n")
+        view.markdown = markdown
+        view.layoutIfNeeded()
+
+        let firstRenderScheduled = await eventually(timeout: .milliseconds(100)) {
+            heightSleepController.requestCount == 2
+        }
+        #expect(firstRenderScheduled)
+
+        heightSleepController.resumeNext()
+        let firstRenderCompleted = await eventually(timeout: .milliseconds(100)) {
+            heightSleepController.completedSleepCount == 2
+        }
+        #expect(firstRenderCompleted)
+
+        let firstNotificationArrived = await eventually(timeout: .milliseconds(100)) {
+            callbackCount == 1
+        }
+        #expect(firstNotificationArrived)
+
+        let initialSleepCount = heightSleepController.requestCount
+        let initialContentRevision = view.firstDocumentTextView()?.contentRevision
+
+        measuredHeight = 320
+        view.markdown = markdown
+        view.layoutIfNeeded()
+        await Task.yield()
+
+        #expect(heightSleepController.requestCount == initialSleepCount)
+        #expect(view.firstDocumentTextView()?.contentRevision == initialContentRevision)
+        #expect(callbackCount == 1)
     }
 }
 
 private extension QuillViewHeightCoalescingTests {
+    func primeInitialMeasurement(
+        for view: QuillView,
+        heightSleepController: ControlledSleepController
+    ) async {
+        view.layoutIfNeeded()
+
+        let initialMeasurementScheduled = await eventually(timeout: .milliseconds(100)) {
+            heightSleepController.requestCount == 1
+        }
+        #expect(initialMeasurementScheduled)
+
+        heightSleepController.resumeNext()
+        let initialMeasurementFinished = await eventually(timeout: .milliseconds(100)) {
+            heightSleepController.completedSleepCount == 1
+        }
+        #expect(initialMeasurementFinished)
+    }
+
     func makeHeightCoalescingQuillView(
         configuration: RenderConfiguration,
-        timeController: TestTimeController
+        heightSleepController: ControlledSleepController,
+        schedulerTimeController: TestTimeController,
+        measuredHeight: @escaping () -> CGFloat
     ) -> QuillView {
         let renderer = makeDocumentRenderer()
         let scheduler = BufferedStreamCommitScheduler(
             moduleStreamGate: .init(),
-            now: { timeController.now() },
+            now: { schedulerTimeController.now() },
             sleep: { duration in
-                await timeController.sleep(for: duration)
+                await schedulerTimeController.sleep(for: duration)
             }
         )
         let dependencies = QuillView.Dependencies(
-            heightCoordinator: HeightCoordinator(sleep: { duration in
-                await timeController.sleep(for: duration)
-            }),
+            heightCoordinator: HeightCoordinator(
+                sleep: { duration in
+                    await heightSleepController.sleep(for: duration)
+                },
+                measureHeight: { _ in
+                    measuredHeight()
+                }
+            ),
             markdownParser: .live,
             streamCoordinator: StreamCoordinator(
                 renderer: renderer,
@@ -83,7 +197,6 @@ private extension QuillViewHeightCoalescingTests {
             configuration: configuration,
             dependencies: dependencies
         )
-        view.layoutIfNeeded()
         return view
     }
 }

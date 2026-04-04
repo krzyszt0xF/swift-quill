@@ -49,6 +49,7 @@ extension DocumentRenderer {
                 with: presentedBatch
             )
         }
+        textView.handleDocumentContentChange()
 
         return true
     }
@@ -119,6 +120,7 @@ extension DocumentRenderer {
                 with: replacement
             )
         }
+        textView.handleDocumentContentChange()
 
         return true
     }

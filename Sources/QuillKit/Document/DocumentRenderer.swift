@@ -83,6 +83,7 @@ final class DocumentRenderer {
                 with: ""
             )
         }
+        textView.handleDocumentContentChange()
     }
 
     func set(highlighter: (any SyntaxHighlighting)?) {
