@@ -22,7 +22,10 @@ public final class QuillView: UIView {
     }
 
     public var markdown: String? {
-        didSet { renderStatic() }
+        didSet {
+            guard markdown != oldValue else { return }
+            renderStatic()
+        }
     }
 
     public var streamingMode: StreamingMode = .smoothedTail {
@@ -47,7 +50,7 @@ public final class QuillView: UIView {
         applyPreset()
     }
 
-    public override init(frame: CGRect) {
+    override public init(frame: CGRect) {
         let dependencies = Dependencies.live
         heightCoordinator = dependencies.heightCoordinator
         markdownParser = dependencies.markdownParser
@@ -106,7 +109,7 @@ public final class QuillView: UIView {
         heightCoordinator.resetLastNotifiedHeight()
     }
 
-    public override func layoutSubviews() {
+    override public func layoutSubviews() {
         super.layoutSubviews()
 
         guard heightCoordinator.handleWidthChange(newWidth: bounds.width) else { return }
@@ -132,12 +135,12 @@ private extension QuillView {
 
         let blocks = markdownParser.parse(markdown)
         streamCoordinator.renderStatic(blocks: blocks)
-        scheduleHeightUpdate()
     }
 
     func scheduleHeightUpdate() {
         heightCoordinator.scheduleHeightUpdate(
             hostView: self,
+            contentRevision: streamCoordinator.hostView.contentRevision,
             documentTextView: streamCoordinator.hostView,
             configuration: configuration.layout
         )

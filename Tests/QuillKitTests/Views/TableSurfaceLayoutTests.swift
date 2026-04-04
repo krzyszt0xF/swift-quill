@@ -1,9 +1,10 @@
 @testable import QuillKit
 import QuillCore
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
-@Suite("TableSurfaceLayout")
+@Suite("TableSurfaceLayout", .tags(.rendering))
 struct TableSurfaceLayoutTests {
     @Test("Long token wraps inside a constrained column")
     func longTokenWraps() throws {

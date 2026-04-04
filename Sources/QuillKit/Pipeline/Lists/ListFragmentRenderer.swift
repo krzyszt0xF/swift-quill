@@ -79,10 +79,8 @@ private extension ListFragmentRenderer {
         )
 
         return RenderFragment(
-            attributedString: AttributedStringAttributeFormatter.makeAttributedStringWithBlockquoteDepth(
-                attributedString,
-                nestingContext: nestingContext
-            ),
+            attributedString: attributedString,
+            blockquoteDepth: fragment.blockquoteDepth,
             contentBlockID: fragment.contentBlockID,
             ownerBlockID: fragment.ownerBlockID,
             presentationRole: fragment.presentationRole
@@ -114,10 +112,8 @@ private extension ListFragmentRenderer {
         )
 
         return RenderFragment(
-            attributedString: AttributedStringAttributeFormatter.makeAttributedStringWithBlockquoteDepth(
-                markerString,
-                nestingContext: nestingContext
-            ),
+            attributedString: markerString,
+            blockquoteDepth: fragment.blockquoteDepth,
             contentBlockID: fragment.contentBlockID,
             ownerBlockID: fragment.ownerBlockID,
             presentationRole: fragment.presentationRole
@@ -125,7 +121,6 @@ private extension ListFragmentRenderer {
     }
 
     static func makeListItemChildRenderUnit(
-        bodyFont: UIFont,
         child: BlockNode,
         ownerBlockID: BlockIdentity,
         nestingContext: NestingContext,
@@ -137,7 +132,7 @@ private extension ListFragmentRenderer {
                 canCarryMarker: true,
                 fragments: [makeTextListRenderFragment(
                     attributedString: NSMutableAttributedString(
-                        attributedString: BlockAttributedStringRenderer.makeHeadingAttributedString(
+                        attributedString: TextBlockAttributedStringRenderer.makeHeadingAttributedString(
                             content: content,
                             level: level,
                             nestingContext: nestingContext
@@ -154,7 +149,7 @@ private extension ListFragmentRenderer {
                 canCarryMarker: true,
                 fragments: [makeTextListRenderFragment(
                     attributedString: NSMutableAttributedString(
-                        attributedString: BlockAttributedStringRenderer.makeHTMLBlockAttributedString(
+                        attributedString: TextBlockAttributedStringRenderer.makeHTMLBlockAttributedString(
                             nestingContext: nestingContext,
                             rawHTML: rawHTML
                         )
@@ -170,7 +165,10 @@ private extension ListFragmentRenderer {
                 canCarryMarker: true,
                 fragments: [makeTextListRenderFragment(
                     attributedString: NSMutableAttributedString(
-                        attributedString: InlineContentRenderer.attributedString(for: content, baseFont: bodyFont)
+                        attributedString: TextBlockAttributedStringRenderer.makeParagraphAttributedString(
+                            content: content,
+                            nestingContext: nestingContext
+                        )
                     ),
                     contentBlockID: child.id,
                     nestingContext: nestingContext,
@@ -202,7 +200,6 @@ private extension ListFragmentRenderer {
         let childContext = nestingContext.incrementingListLevel()
         let childUnits = item.children.map { child in
             makeListItemChildRenderUnit(
-                bodyFont: bodyFont,
                 child: child,
                 ownerBlockID: ownerBlockID,
                 nestingContext: childContext,
@@ -272,13 +269,17 @@ private extension ListFragmentRenderer {
     ) -> RenderFragment {
         let attributedString = NSMutableAttributedString(attributedString: fragment.attributedString)
         let range = NSRange(location: 0, length: attributedString.length)
-        let paragraphStyle = (attributedString.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?
-            .mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
+        let existingStyle = attributedString.attribute(
+            .paragraphStyle, at: 0, effectiveRange: nil
+        ) as? NSParagraphStyle
+        let paragraphStyle = existingStyle?.mutableCopy() as? NSMutableParagraphStyle
+            ?? NSMutableParagraphStyle()
         paragraphStyle.paragraphSpacingBefore = paragraphSpacingBefore
         attributedString.addAttribute(.paragraphStyle, value: paragraphStyle, range: range)
 
         return RenderFragment(
             attributedString: attributedString,
+            blockquoteDepth: fragment.blockquoteDepth,
             contentBlockID: fragment.contentBlockID,
             ownerBlockID: fragment.ownerBlockID,
             presentationRole: fragment.presentationRole
@@ -304,10 +305,8 @@ private extension ListFragmentRenderer {
         ])
 
         return RenderFragment(
-            attributedString: AttributedStringAttributeFormatter.makeAttributedStringWithBlockquoteDepth(
-                attributedString,
-                nestingContext: nestingContext
-            ),
+            attributedString: attributedString,
+            blockquoteDepth: nestingContext.blockquoteDepth,
             contentBlockID: ownerBlockID,
             ownerBlockID: ownerBlockID,
             presentationRole: .standaloneListMarker
@@ -321,11 +320,9 @@ private extension ListFragmentRenderer {
         ownerBlockID: BlockIdentity,
         presentationRole: RenderFragment.PresentationRole
     ) -> RenderFragment {
-        RenderFragment(
-            attributedString: AttributedStringAttributeFormatter.makeAttributedStringWithBlockquoteDepth(
-                attributedString,
-                nestingContext: nestingContext
-            ),
+        return RenderFragment(
+            attributedString: attributedString,
+            blockquoteDepth: nestingContext.blockquoteDepth,
             contentBlockID: contentBlockID,
             ownerBlockID: ownerBlockID,
             presentationRole: presentationRole

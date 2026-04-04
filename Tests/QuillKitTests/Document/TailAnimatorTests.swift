@@ -1,10 +1,11 @@
 @testable import QuillKit
 import Foundation
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("TailAnimator")
+@Suite("TailAnimator", .tags(.rendering, .streaming))
 struct TailAnimatorTests {
     @Test("Advance presentation leaves frozen prefix untouched")
     func advancePresentationDoesNotTouchFrozenPrefix() throws {

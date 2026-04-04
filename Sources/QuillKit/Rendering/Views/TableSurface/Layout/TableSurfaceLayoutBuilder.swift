@@ -151,7 +151,7 @@ private extension TableSurfaceLayoutBuilder {
         rows: [TableSurfaceRowContent]
     ) -> [CGFloat] {
         (0..<columnCount).map { columnIndex in
-            let widest = rows.enumerated().map { _, row -> CGFloat in
+            let widest = rows.map { row -> CGFloat in
                 guard columnIndex < row.cells.count else { return Layout.minimumColumnWidth }
                 let attributedText = makeAlignedText(
                     attributedText: row.cells[columnIndex].attributedText,

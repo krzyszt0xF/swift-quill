@@ -1,26 +1,38 @@
 @testable import QuillKit
 @testable import QuillSwiftUI
+import QuillSharedTestSupport
 import SwiftUI
 import Testing
 import UIKit
 
 @MainActor
-@Suite("QuillMarkdownView")
+@Suite("QuillMarkdownView", .tags(.rendering))
 struct QuillMarkdownViewTests {
-    @Test("fittedSize returns nil when proposed width is zero")
-    func fittedSizeReturnsNilForZeroWidth() {
-        let view = QuillView()
-        let proposal = ProposedViewSize(width: 0, height: nil)
+    /*(Sendable)*/ nonisolated static let fallbackWidthCases: [FallbackWidthTestCase] = [
+        .init(name: "Infinite width", proposedWidth: .infinity, viewWidth: 280),
+        .init(name: "NaN width", proposedWidth: .nan, viewWidth: nil),
+        .init(name: "Negative width", proposedWidth: -10, viewWidth: nil),
+        .init(name: "Zero width", proposedWidth: 0, viewWidth: nil),
+    ]
+
+    @Test("fittedSize falls back to runtime width for invalid proposals", arguments: fallbackWidthCases)
+    func fittedSizeFallsBackForInvalidWidth(_ testCase: FallbackWidthTestCase) {
+        let viewWidth = CGFloat(testCase.viewWidth ?? 0)
+        let view = QuillView(frame: CGRect(x: 0, y: 0, width: viewWidth, height: 0))
+        let proposal = ProposedViewSize(width: CGFloat(testCase.proposedWidth), height: nil)
         let result = view.calculateFittedSize(for: proposal)
-        #expect(result == nil)
+        let expectedWidth = expectedFallbackWidth(for: view)
+
+        #expect(result?.width == expectedWidth)
+        #expect(result?.width.isFinite == true)
     }
 
-    @Test("fittedSize returns nil when proposed width is negative")
-    func fittedSizeReturnsNilForNegativeWidth() {
+    @Test("fittedSize returns height >= 1 for empty content")
+    func fittedSizeReturnsMinimumHeight() throws {
         let view = QuillView()
-        let proposal = ProposedViewSize(width: -10, height: nil)
-        let result = view.calculateFittedSize(for: proposal)
-        #expect(result == nil)
+        let proposal = ProposedViewSize(width: 320, height: nil)
+        let result = try #require(view.calculateFittedSize(for: proposal))
+        #expect(result.height >= 1)
     }
 
     @Test("fittedSize returns proposed width as output width")
@@ -31,36 +43,14 @@ struct QuillMarkdownViewTests {
         #expect(result?.width == 320)
     }
 
-    @Test("fittedSize returns height >= 1 for empty content")
-    func fittedSizeReturnsMinimumHeight() {
-        let view = QuillView()
-        let proposal = ProposedViewSize(width: 320, height: nil)
-        let result = view.calculateFittedSize(for: proposal)
-        #expect(result != nil)
-        if let result { #expect(result.height >= 1) }
-    }
+    @Test("fittedSize prefers bounds width when it exceeds screen width")
+    func fittedSizePrefersLargerBoundsWidth() {
+        let screenWidth = UIScreen.main.bounds.width
+        let view = QuillView(frame: CGRect(x: 0, y: 0, width: screenWidth + 64, height: 0))
+        let result = view.calculateFittedSize(for: ProposedViewSize(width: .infinity, height: nil))
 
-    @Test("fittedSize falls back to bounds width when proposed width is infinite")
-    func fittedSizeFallsBackForInfiniteWidth() {
-        let view = QuillView(frame: CGRect(x: 0, y: 0, width: 280, height: 0))
-        let proposal = ProposedViewSize(width: .infinity, height: nil)
-        let result = view.calculateFittedSize(for: proposal)
-
-        #expect(result?.width == 280)
+        #expect(result?.width == screenWidth + 64)
         #expect(result?.width.isFinite == true)
-    }
-
-    @Test("fittedSize falls back to a finite width when proposed width is nan")
-    func fittedSizeFallsBackForNaNWidth() {
-        let view = QuillView()
-        let proposal = ProposedViewSize(width: .nan, height: nil)
-        let result = view.calculateFittedSize(for: proposal)
-
-        #expect(result != nil)
-        #expect(result?.width.isFinite == true)
-        if let result {
-            #expect(result.width > 0)
-        }
     }
 
     @Test("QuillView.markdown setter triggers static render")
@@ -95,8 +85,8 @@ struct QuillMarkdownViewTests {
     func emptyMarkdownPreservesEmptyState() {
         let view = QuillView()
         view.markdown = ""
-        #expect(view.markdown == "")
-        #expect(view.currentMarkdown == "")
+        #expect(view.markdown?.isEmpty == true)
+        #expect(view.currentMarkdown?.isEmpty == true)
     }
 
     @Test("onQuillLinkTap stores handler and applies it to QuillView")
@@ -112,5 +102,22 @@ struct QuillMarkdownViewTests {
 
         #expect(markdownView.linkTapHandler != nil)
         #expect(tappedURL == URL(string: "https://example.com"))
+    }
+}
+
+struct FallbackWidthTestCase: Sendable {
+    let name: String
+    let proposedWidth: Double
+    let viewWidth: Double?
+}
+
+extension FallbackWidthTestCase: CustomTestStringConvertible {
+    var testDescription: String { name }
+}
+
+private extension QuillMarkdownViewTests {
+    func expectedFallbackWidth(for view: QuillView) -> CGFloat {
+        let screenWidth = view.window?.screen.bounds.width ?? UIScreen.main.bounds.width
+        return max(view.bounds.width, screenWidth)
     }
 }

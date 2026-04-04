@@ -4,7 +4,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("QuillView Lifecycle")
+@Suite("QuillView Lifecycle", .tags(.integration, .streaming))
 struct QuillViewLifecycleTests {
     private static let timingTolerance: TimeInterval = 0.0001
 
@@ -44,7 +44,7 @@ struct QuillViewLifecycleTests {
         #expect(view.currentMarkdown == "First chunk continued\n\n")
 
         let renderedContent = await eventually {
-            documentHasContent(view)
+            view.hasDocumentContent
         }
         #expect(renderedContent)
     }
@@ -100,7 +100,7 @@ struct QuillViewLifecycleTests {
         #expect(view.currentMarkdown == "First paragraph\n\nSecond paragraph\n\n")
 
         let renderedContent = await eventually {
-            documentHasContent(view)
+            view.hasDocumentContent
         }
         #expect(renderedContent)
     }
@@ -135,7 +135,7 @@ struct QuillViewLifecycleTests {
 
         view.reset()
         #expect(view.currentMarkdown == nil)
-        #expect(documentHasContent(view) == false)
+        #expect(view.hasDocumentContent == false)
     }
 
     @Test("static markdown assignment syncs currentMarkdown")
@@ -159,14 +159,14 @@ struct QuillViewLifecycleTests {
         view.append("First paragraph with a [link](https://example.com) and enough extra text to keep streaming active for a moment.\n\n")
 
         let streamingRendered = await eventually {
-            documentHasContent(view)
+            view.hasDocumentContent
         }
         #expect(streamingRendered)
 
         view.markdown = "# Static Title\n\nStatic body."
 
         let staticRendered = await eventually {
-            documentHasContent(view)
+            view.hasDocumentContent
         }
         #expect(staticRendered)
     }

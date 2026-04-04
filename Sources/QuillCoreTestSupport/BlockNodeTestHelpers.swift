@@ -1,42 +1,44 @@
 import QuillCore
 
-package func makeNodes(_ blocks: Block...) -> [BlockNode] {
-    makeNodes(blocks)
+package extension Array where Element == Block {
+    func canonicalBlocks() -> [Block] {
+        makeNodes().normalizedBlocks()
+    }
+
+    func makeNodes() -> [BlockNode] {
+        var nextRawValue: UInt64 = 0
+        return map { makeNode(from: $0, nextRawValue: &nextRawValue) }
+    }
 }
 
-package func makeBlockquote(_ blocks: Block...) -> Block {
-    .blockquote(children: makeNodes(blocks))
+package extension Array where Element == BlockNode {
+    func normalizedBlocks() -> [Block] {
+        map { normalizedBlock(from: $0.block) }
+    }
 }
 
-package func makeBlockquote(_ blocks: [Block]) -> Block {
-    .blockquote(children: makeNodes(blocks))
+package extension Block {
+    static func makeBlockquote(_ blocks: Block...) -> Block {
+        .blockquote(children: blocks.makeNodes())
+    }
+
+    static func makeBlockquote(_ blocks: [Block]) -> Block {
+        .blockquote(children: blocks.makeNodes())
+    }
+
+    static func makeNodes(_ blocks: Block...) -> [BlockNode] {
+        blocks.makeNodes()
+    }
 }
 
-package func makeItem(
-    checkbox: Block.Checkbox? = nil,
-    _ blocks: Block...
-) -> Block.ListItem {
-    Block.ListItem(checkbox: checkbox, children: makeNodes(blocks))
-}
+package extension Block.ListItem {
+    init(checkbox: Block.Checkbox? = nil, blocks: Block...) {
+        self.init(checkbox: checkbox, children: blocks.makeNodes())
+    }
 
-package func makeItem(
-    checkbox: Block.Checkbox? = nil,
-    _ blocks: [Block]
-) -> Block.ListItem {
-    Block.ListItem(checkbox: checkbox, children: makeNodes(blocks))
-}
-
-package func makeNodes(_ blocks: [Block]) -> [BlockNode] {
-    var nextRawValue: UInt64 = 0
-    return blocks.map { makeNode(from: $0, nextRawValue: &nextRawValue) }
-}
-
-package func normalizedBlocks(_ nodes: [BlockNode]) -> [Block] {
-    nodes.map { normalizedBlock(from: $0.block) }
-}
-
-package func canonicalBlocks(_ blocks: [Block]) -> [Block] {
-    normalizedBlocks(makeNodes(blocks))
+    init(checkbox: Block.Checkbox? = nil, blocks: [Block]) {
+        self.init(checkbox: checkbox, children: blocks.makeNodes())
+    }
 }
 
 private func makeItem(from item: Block.ListItem, nextRawValue: inout UInt64) -> Block.ListItem {

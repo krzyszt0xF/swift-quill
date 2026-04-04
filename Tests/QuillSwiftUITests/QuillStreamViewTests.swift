@@ -6,7 +6,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("QuillStreamView")
+@Suite("QuillStreamView", .tags(.integration, .streaming))
 struct QuillStreamViewTests {
     @Test("Already-rendered content is preserved after error")
     func contentRemainsAfterStreamError() async throws {
@@ -182,8 +182,10 @@ struct QuillStreamViewTests {
         coordinator.quillView.bounds.size.width = 260
 
         let result = coordinator.quillView.calculateFittedSize(for: ProposedViewSize(width: .infinity, height: nil))
+        let screenWidth = coordinator.quillView.window?.screen.bounds.width ?? UIScreen.main.bounds.width
+        let expectedWidth = max(coordinator.quillView.bounds.width, screenWidth)
 
-        #expect(result?.width == 260)
+        #expect(result?.width == expectedWidth)
         #expect(result?.width.isFinite == true)
     }
 }

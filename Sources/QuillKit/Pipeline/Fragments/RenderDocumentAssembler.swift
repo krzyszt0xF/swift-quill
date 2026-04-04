@@ -11,11 +11,30 @@ enum RenderDocumentAssembler {
                 result.append(NSAttributedString(string: "\n"))
             }
 
-            let fragmentString = NSMutableAttributedString(attributedString: fragment.attributedString)
-            let fullRange = NSRange(location: 0, length: fragmentString.length)
-            fragmentString.addAttribute(.contentBlockID, value: fragment.contentBlockID, range: fullRange)
-            fragmentString.addAttribute(.ownerBlockID, value: fragment.ownerBlockID, range: fullRange)
-            result.append(fragmentString)
+            let fragmentStart = result.length
+            result.append(fragment.attributedString)
+
+            let fragmentRange = NSRange(
+                location: fragmentStart,
+                length: result.length - fragmentStart
+            )
+            result.addAttribute(
+                .contentBlockID,
+                value: fragment.contentBlockID,
+                range: fragmentRange
+            )
+            result.addAttribute(
+                .ownerBlockID,
+                value: fragment.ownerBlockID,
+                range: fragmentRange
+            )
+            if fragment.blockquoteDepth > 0 {
+                result.addAttribute(
+                    .blockquoteDepth,
+                    value: fragment.blockquoteDepth,
+                    range: fragmentRange
+                )
+            }
         }
 
         return result

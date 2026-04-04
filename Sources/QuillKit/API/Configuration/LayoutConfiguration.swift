@@ -19,13 +19,13 @@ extension LayoutConfiguration {
             heightMeasurementCoalescingInterval: 0.016,
             heightNotificationMinimumDelta: 8)
     }
-    
+
     static var snappy: Self {
         Self(
             heightMeasurementCoalescingInterval: 0.010,
             heightNotificationMinimumDelta: 4)
     }
-    
+
     static var longForm: Self {
         Self(
             heightMeasurementCoalescingInterval: 0.020,

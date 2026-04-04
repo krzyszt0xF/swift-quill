@@ -1,3 +1,17 @@
+package indirect enum Block: Equatable, Sendable {
+    case blockquote(children: [BlockNode])
+    case codeBlock(language: String?, code: String)
+    case heading(level: Int, content: [Inline])
+    case htmlBlock(rawHTML: String)
+    case orderedList(startIndex: UInt, items: [ListItem])
+    case paragraph(content: [Inline])
+    case table(columnAlignments: [ColumnAlignment?],
+               header: TableRow,
+               rows: [TableRow])
+    case thematicBreak
+    case unorderedList(items: [ListItem])
+}
+
 package struct BlockIdentity: Hashable, Sendable {
     package let rawValue: UInt64
 
@@ -28,20 +42,6 @@ package struct BlockIdentityGenerator: Sendable {
         nextRawValue += 1
         return identity
     }
-}
-
-package indirect enum Block: Equatable, Sendable {
-    case blockquote(children: [BlockNode])
-    case codeBlock(language: String?, code: String)
-    case heading(level: Int, content: [Inline])
-    case htmlBlock(rawHTML: String)
-    case orderedList(startIndex: UInt, items: [ListItem])
-    case paragraph(content: [Inline])
-    case table(columnAlignments: [ColumnAlignment?],
-               header: TableRow,
-               rows: [TableRow])
-    case thematicBreak
-    case unorderedList(items: [ListItem])
 }
 
 package extension Block {

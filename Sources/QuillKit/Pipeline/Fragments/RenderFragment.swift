@@ -3,6 +3,7 @@ import UIKit
 
 struct RenderFragment {
     let attributedString: NSAttributedString
+    let blockquoteDepth: Int
     let contentBlockID: BlockIdentity
     let ownerBlockID: BlockIdentity
     let presentationRole: PresentationRole

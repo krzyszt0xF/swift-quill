@@ -62,7 +62,7 @@ let package = Package(
         ),
         .testTarget(
             name: "QuillHighlightTests",
-            dependencies: ["QuillHighlight", "QuillKit"]
+            dependencies: ["QuillHighlight", "QuillKit", "QuillSharedTestSupport"]
         ),
     ]
 )

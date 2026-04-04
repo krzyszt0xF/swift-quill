@@ -27,7 +27,7 @@ enum InlineLinkParser {
 
         let sourceURL = String(parser.source[destinationStart..<destinationEnd])
         parser.position = parser.source.index(after: destinationEnd)
-        
+
         return [.image(source: sourceURL, title: nil, alt: alt)]
     }
 
@@ -59,7 +59,7 @@ enum InlineLinkParser {
 
         let destination = String(parser.source[destinationStart..<destinationEnd])
         parser.position = parser.source.index(after: destinationEnd)
-        
+
         return [.link(destination: destination, children: children)]
     }
 }

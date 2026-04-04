@@ -4,7 +4,7 @@ enum InlineRenderNormalizer {
             let rawText = makeRawInlineText(from: inlines),
             !rawText.isEmpty
         else { return inlines }
-        
+
         return InlineParser.parse(rawText)
     }
 }
@@ -14,10 +14,10 @@ private extension InlineRenderNormalizer {
         var result = ""
         for inline in inlines {
             guard case let .text(content) = inline else { return nil }
-            
+
             result += content
         }
-        
+
         return result
     }
 }

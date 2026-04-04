@@ -15,6 +15,7 @@ package struct ModuleStreamGateConfiguration: Equatable, Sendable {
 
 package struct ModuleStreamGate: Sendable {
     private var accumulatedText = ""
+    private var structureIndex = BufferStructureIndex()
     private var configuration: ModuleStreamGateConfiguration
     private var lastSafePosition = 0
     private var pendingSince: TimeInterval?
@@ -29,6 +30,7 @@ package struct ModuleStreamGate: Sendable {
 
     package mutating func reset() {
         accumulatedText = ""
+        structureIndex = .init()
         lastSafePosition = 0
         pendingSince = nil
     }
@@ -47,11 +49,12 @@ package struct ModuleStreamGate: Sendable {
             return AppendResult(
                 committedChunks: [],
                 hasPendingText: hasPendingText,
-                hasPendingStructure: detectPendingStructure(in: accumulatedText) != nil
+                hasPendingStructure: structureIndex.pendingStructure != nil
             )
         }
 
         accumulatedText += chunk
+        rebuildStructureIndex()
         if pendingSince == nil, hasPendingText {
             pendingSince = now
         }
@@ -76,7 +79,7 @@ package struct ModuleStreamGate: Sendable {
         }
 
         guard
-            detectPendingStructure(in: accumulatedText) == nil,
+            structureIndex.pendingStructure == nil,
             let boundary = makeTimeoutCommitBoundary(from: lastSafePosition)
         else { return [] }
 
@@ -92,6 +95,7 @@ package struct ModuleStreamGate: Sendable {
     package mutating func flushRemaining() -> String {
         let remaining = rawText(from: lastSafePosition, to: accumulatedText.count)
         accumulatedText = ""
+        structureIndex = .init()
         lastSafePosition = 0
         pendingSince = nil
 
@@ -116,6 +120,87 @@ package struct ModuleStreamGate: Sendable {
 }
 
 private extension ModuleStreamGate {
+    struct BufferStructureIndex: Sendable {
+        var h1Positions: [Int] = []
+        var h2Positions: [Int] = []
+        var newlineBoundaries: [Int] = []
+        var paragraphBoundaries: [Int] = []
+        var pendingStructure: PendingStructureType?
+
+        init() {}
+
+        init(from text: String) {
+            guard !text.isEmpty else { return }
+
+            let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+            var currentPosition = 0
+            var isInsideFence = false
+            var lastNonEmptyTrimmedLine: String?
+
+            for (index, line) in lines.enumerated() {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+                if trimmed.isEmpty == false {
+                    lastNonEmptyTrimmedLine = trimmed
+                }
+
+                if !isInsideFence {
+                    if trimmed.hasPrefix("# "), !trimmed.hasPrefix("## ") {
+                        h1Positions.append(currentPosition)
+                    } else if trimmed.hasPrefix("## "), !trimmed.hasPrefix("### ") {
+                        h2Positions.append(currentPosition)
+                    }
+                }
+
+                if Self.isFenceDelimiter(trimmed) {
+                    isInsideFence.toggle()
+                }
+
+                guard index < lines.count - 1 else {
+                    currentPosition += line.count
+                    continue
+                }
+
+                currentPosition += line.count + 1
+                newlineBoundaries.append(currentPosition)
+                if line.isEmpty {
+                    paragraphBoundaries.append(currentPosition)
+                }
+            }
+
+            if Self.hasTrailingFenceStart(in: text) || isInsideFence {
+                pendingStructure = .codeBlock
+                return
+            }
+
+            guard
+                let lastNonEmptyTrimmedLine,
+                text.hasSuffix("\n\n") == false,
+                lastNonEmptyTrimmedLine.hasPrefix("|"),
+                lastNonEmptyTrimmedLine.contains("|")
+            else { return }
+
+            pendingStructure = .table
+        }
+
+        private static func hasTrailingFenceStart(in text: String) -> Bool {
+            let suffix = text.suffix(5)
+            guard suffix.contains("`") else { return false }
+
+            let candidate = String(suffix)
+            guard candidate.hasSuffix("`"), candidate.hasSuffix("```") == false else {
+                return false
+            }
+
+            let backtickCount = candidate.reversed().prefix(while: { $0 == "`" }).count
+            return backtickCount == 1 || backtickCount == 2
+        }
+
+        private static func isFenceDelimiter(_ trimmedLine: String) -> Bool {
+            trimmedLine.hasPrefix("```") || trimmedLine.hasPrefix("~~~")
+        }
+    }
+
     enum PendingStructureType {
         case codeBlock
         case table
@@ -123,7 +208,7 @@ private extension ModuleStreamGate {
 
     mutating func commitCompleteModules() -> AppendResult {
         let startPosition = lastSafePosition
-        if detectPendingStructure(in: accumulatedText) != nil {
+        if structureIndex.pendingStructure != nil {
             return AppendResult(
                 committedChunks: [],
                 hasPendingText: hasPendingText,
@@ -173,6 +258,7 @@ private extension ModuleStreamGate {
 
         if lastSafePosition >= accumulatedText.count {
             accumulatedText = ""
+            structureIndex = .init()
             lastSafePosition = 0
             return
         }
@@ -183,82 +269,25 @@ private extension ModuleStreamGate {
             limitedBy: accumulatedText.endIndex
         ) else {
             accumulatedText = ""
+            structureIndex = .init()
             lastSafePosition = 0
             return
         }
 
         accumulatedText = String(accumulatedText[splitIndex...])
+        rebuildStructureIndex()
         lastSafePosition = 0
     }
 
-    func detectPendingStructure(in text: String) -> PendingStructureType? {
-        let trimmedEnd = text.suffix(10)
-        if trimmedEnd.contains("`") {
-            let backtickSuffix = String(text.suffix(5))
-            if backtickSuffix.hasSuffix("`"), !backtickSuffix.hasSuffix("```") {
-                let backtickCount = backtickSuffix.reversed().prefix(while: { $0 == "`" }).count
-                if backtickCount == 1 || backtickCount == 2 {
-                    return .codeBlock
-                }
-            }
-        }
-
-        var isInsideFence = false
-        for line in text.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
-                isInsideFence.toggle()
-            }
-        }
-
-        if isInsideFence {
-            return .codeBlock
-        }
-
-        if let lastNonEmpty = text.components(separatedBy: .newlines).last(where: {
-            $0.trimmingCharacters(in: .whitespaces).isEmpty == false
-        }) {
-            let trimmed = lastNonEmpty.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("|"),
-               trimmed.contains("|"),
-               text.hasSuffix("\n\n") == false {
-                return .table
-            }
-        }
-
-        return nil
-    }
-
     func findModuleBoundaries(from startPosition: Int) -> [Int] {
-        let lines = accumulatedText.components(separatedBy: "\n")
-        var currentPosition = 0
-        var h1Positions: [Int] = []
-        var h2Positions: [Int] = []
-        var isInsideCodeBlock = false
-
-        for (index, line) in lines.enumerated() {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-
-            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
-                isInsideCodeBlock.toggle()
-            }
-
-            if !isInsideCodeBlock, currentPosition >= startPosition {
-                if trimmed.hasPrefix("# "), !trimmed.hasPrefix("## ") {
-                    h1Positions.append(currentPosition)
-                } else if trimmed.hasPrefix("## "), !trimmed.hasPrefix("### ") {
-                    h2Positions.append(currentPosition)
-                }
-            }
-
-            currentPosition += line.count + (index < lines.count - 1 ? 1 : 0)
-        }
-
+        let filteredH1Positions = structureIndex.h1Positions.filter { $0 >= startPosition }
+        let filteredH2Positions = structureIndex.h2Positions.filter { $0 >= startPosition }
         let headingPositions: [Int]
-        if h1Positions.count >= 2 {
-            headingPositions = h1Positions
-        } else if h2Positions.count >= 2 {
-            headingPositions = h2Positions
+
+        if filteredH1Positions.count >= 2 {
+            headingPositions = filteredH1Positions
+        } else if filteredH2Positions.count >= 2 {
+            headingPositions = filteredH2Positions
         } else {
             headingPositions = []
         }
@@ -271,15 +300,9 @@ private extension ModuleStreamGate {
                     boundaries.append(boundary)
                 }
             }
+        }
 
-            if let paragraphBoundary = lastParagraphBoundary(from: startPosition) {
-                boundaries.append(paragraphBoundary)
-            }
-        } else if headingPositions.count == 1 {
-            if let paragraphBoundary = lastParagraphBoundary(from: startPosition) {
-                boundaries.append(paragraphBoundary)
-            }
-        } else if let paragraphBoundary = lastParagraphBoundary(from: startPosition) {
+        if let paragraphBoundary = lastParagraphBoundary(from: startPosition) {
             boundaries.append(paragraphBoundary)
         }
 
@@ -287,45 +310,35 @@ private extension ModuleStreamGate {
     }
 
     func lastParagraphBoundary(from startPosition: Int) -> Int? {
-        guard startPosition < accumulatedText.count else { return nil }
+        guard accumulatedText.count - startPosition >= configuration.minModuleLength * 2 else {
+            return nil
+        }
 
-        let remaining = rawText(from: startPosition, to: accumulatedText.count)
-        guard
-            remaining.count >= configuration.minModuleLength * 2,
-            let range = remaining.range(of: "\n\n", options: .backwards)
-        else { return nil }
-
-        let distance = remaining.distance(from: remaining.startIndex, to: range.upperBound)
-        let boundary = startPosition + distance
-        guard boundary > startPosition else { return nil }
-
-        return boundary
+        return structureIndex.paragraphBoundaries.last { $0 > startPosition }
     }
 
     func makeTimeoutCommitBoundary(from startPosition: Int) -> Int? {
         guard startPosition < accumulatedText.count else { return nil }
 
-        let remainingText = rawText(from: startPosition, to: accumulatedText.count)
+        let remainingLength = accumulatedText.count - startPosition
         let minimumSafeTimeoutLength = configuration.minModuleLength * 2
         let singleNewlineThreshold = configuration.minModuleLength * 4
         let fullFlushThreshold = configuration.minModuleLength * 8
 
-        guard remainingText.count >= minimumSafeTimeoutLength else {
+        guard remainingLength >= minimumSafeTimeoutLength else {
             return nil
         }
 
-        if let range = remainingText.range(of: "\n\n", options: .backwards) {
-            let distance = remainingText.distance(from: remainingText.startIndex, to: range.upperBound)
-            return startPosition + distance
+        if let boundary = structureIndex.paragraphBoundaries.last(where: { $0 > startPosition }) {
+            return boundary
         }
 
-        if remainingText.count >= singleNewlineThreshold,
-           let range = remainingText.range(of: "\n", options: .backwards) {
-            let distance = remainingText.distance(from: remainingText.startIndex, to: range.upperBound)
-            return startPosition + distance
+        if remainingLength >= singleNewlineThreshold,
+           let boundary = structureIndex.newlineBoundaries.last(where: { $0 > startPosition }) {
+            return boundary
         }
 
-        if remainingText.count >= fullFlushThreshold {
+        if remainingLength >= fullFlushThreshold {
             return accumulatedText.count
         }
 
@@ -335,13 +348,21 @@ private extension ModuleStreamGate {
     func rawText(from start: Int, to end: Int) -> String {
         guard start >= 0, start < end, end <= accumulatedText.count else { return "" }
         guard
-            let startIndex = accumulatedText.index(accumulatedText.startIndex, offsetBy: start, limitedBy: accumulatedText.endIndex),
-            let endIndex = accumulatedText.index(accumulatedText.startIndex, offsetBy: end, limitedBy: accumulatedText.endIndex),
+            let startIndex = accumulatedText.index(
+                accumulatedText.startIndex, offsetBy: start, limitedBy: accumulatedText.endIndex
+            ),
+            let endIndex = accumulatedText.index(
+                accumulatedText.startIndex, offsetBy: end, limitedBy: accumulatedText.endIndex
+            ),
             startIndex < endIndex
         else {
             return ""
         }
 
         return String(accumulatedText[startIndex..<endIndex])
+    }
+
+    mutating func rebuildStructureIndex() {
+        structureIndex = BufferStructureIndex(from: accumulatedText)
     }
 }

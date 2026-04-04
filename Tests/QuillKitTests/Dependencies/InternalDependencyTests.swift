@@ -1,10 +1,11 @@
 @testable import QuillCore
 @testable import QuillKit
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("Internal Dependencies")
+@Suite("Internal Dependencies", .tags(.streaming))
 struct InternalDependencyTests {
     @Test("StreamCoordinator uses injected stream controller factory")
     func streamCoordinatorUsesInjectedStreamControllerFactory() {

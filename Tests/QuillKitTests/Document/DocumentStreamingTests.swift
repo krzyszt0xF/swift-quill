@@ -2,33 +2,34 @@
 import QuillCore
 import QuillCoreTestSupport
 import Foundation
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("DocumentStreaming")
+@Suite("DocumentStreaming", .tags(.rendering, .streaming))
 struct DocumentStreamingTests {
     @Test("Frozen prefix text is not mutated across updates")
     func frozenPrefixStability() {
         let renderer = DocumentRenderer.live
 
         renderer.render(
-            blocks: makeNodes([
+            blocks: [
                 .heading(level: 1, content: [.text("Title")]),
                 .paragraph(content: [.text("Body")]),
                 .paragraph(content: [.text("Streaming...")]),
-            ]),
+            ].makeNodes(),
             frozenCount: 2
         )
 
         let prefixBefore = extractFrozenText(from: renderer)
 
         renderer.render(
-            blocks: makeNodes([
+            blocks: [
                 .heading(level: 1, content: [.text("Title")]),
                 .paragraph(content: [.text("Body")]),
                 .paragraph(content: [.text("Streaming more content now")]),
-            ]),
+            ].makeNodes(),
             frozenCount: 2
         )
 
@@ -44,22 +45,22 @@ struct DocumentStreamingTests {
         let renderer = DocumentRenderer.live
 
         renderer.render(
-            blocks: makeNodes([
+            blocks: [
                 .paragraph(content: [.text("Frozen A")]),
                 .paragraph(content: [.text("Frozen B")]),
                 .paragraph(content: [.text("Tail v1")]),
-            ]),
+            ].makeNodes(),
             frozenCount: 2
         )
 
         let frozenPrefix = extractFrozenText(from: renderer)
 
         renderer.render(
-            blocks: makeNodes([
+            blocks: [
                 .paragraph(content: [.text("Frozen A")]),
                 .paragraph(content: [.text("Frozen B")]),
                 .paragraph(content: [.text("Tail v2 with more text")]),
-            ]),
+            ].makeNodes(),
             frozenCount: 2
         )
 
@@ -80,15 +81,15 @@ struct DocumentStreamingTests {
             .codeBlock(language: "swift", code: "print(\"hello\")\n"),
         ]
 
-        renderer.render(blocks: makeNodes(blocks), frozenCount: 1)
+        renderer.render(blocks: blocks.makeNodes(), frozenCount: 1)
 
         let textBeforeClose = renderer.textView.contentStorage?.attributedString
-        #expect(!containsAttachment(CodeBlockAttachment.self, in: textBeforeClose))
+        #expect(textBeforeClose?.containsAttachment(CodeBlockAttachment.self) != true)
 
-        renderer.render(blocks: makeNodes(blocks), frozenCount: 2)
+        renderer.render(blocks: blocks.makeNodes(), frozenCount: 2)
 
         let textAfterClose = renderer.textView.contentStorage?.attributedString
-        #expect(containsAttachment(CodeBlockAttachment.self, in: textAfterClose))
+        #expect(textAfterClose?.containsAttachment(CodeBlockAttachment.self) == true)
     }
 
     @Test("Table block becomes attachment surface on freeze")
@@ -112,16 +113,16 @@ struct DocumentStreamingTests {
             ),
         ]
 
-        renderer.render(blocks: makeNodes(blocks), frozenCount: 1)
+        renderer.render(blocks: blocks.makeNodes(), frozenCount: 1)
 
         let textBeforeFreeze = renderer.textView.contentStorage?.attributedString
         #expect(textBeforeFreeze?.string.contains("|") == true)
-        #expect(!containsAttachment(TableAttachment.self, in: textBeforeFreeze))
+        #expect(textBeforeFreeze?.containsAttachment(TableAttachment.self) != true)
 
-        renderer.render(blocks: makeNodes(blocks), frozenCount: 2)
+        renderer.render(blocks: blocks.makeNodes(), frozenCount: 2)
 
         let textAfterFreeze = renderer.textView.contentStorage?.attributedString
-        #expect(containsAttachment(TableAttachment.self, in: textAfterFreeze))
+        #expect(textAfterFreeze?.containsAttachment(TableAttachment.self) == true)
     }
 }
 

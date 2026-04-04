@@ -3,8 +3,6 @@ import SwiftUI
 
 /// Streaming markdown view backed by QuillView and driven by an AsyncSequence.
 public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable where S.Element == String {
-    @Environment(\.quillSyntaxHighlighter) private var syntaxHighlighter
-
     let chunks: S
     let linkTapHandler: ((URL) -> Void)?
     let mode: StreamingMode
@@ -26,7 +24,7 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
                 onError: onError,
                 preset: preset)
         }
-    
+
     private init(
         chunks: S,
         linkTapHandler: ((URL) -> Void)?,
@@ -49,10 +47,13 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
 
     public func makeUIView(context: Context) -> QuillView {
         let coordinator = context.coordinator
-        applyConfiguration(to: coordinator.quillView)
+        applyConfiguration(
+            to: coordinator.quillView,
+            syntaxHighlighter: context.environment.quillSyntaxHighlighter
+        )
         coordinator.setOnStreamFinished(onFinished)
         coordinator.subscribe(to: chunks, onError: onError)
-        
+
         return coordinator.quillView
     }
 
@@ -65,7 +66,10 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
     }
 
     public func updateUIView(_ uiView: QuillView, context: Context) {
-        applyConfiguration(to: context.coordinator.quillView)
+        applyConfiguration(
+            to: context.coordinator.quillView,
+            syntaxHighlighter: context.environment.quillSyntaxHighlighter
+        )
         context.coordinator.setOnStreamFinished(onFinished)
     }
 
@@ -75,7 +79,7 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
 }
 
 public extension QuillStreamView {
-    public func onQuillLinkTap(_ handler: @escaping (URL) -> Void) -> Self {
+    func onQuillLinkTap(_ handler: @escaping (URL) -> Void) -> Self {
         Self(
             chunks: chunks,
             linkTapHandler: handler,
@@ -86,7 +90,7 @@ public extension QuillStreamView {
         )
     }
 
-    public func onQuillStreamFinished(_ handler: @escaping @MainActor () -> Void) -> Self {
+    func onQuillStreamFinished(_ handler: @escaping @MainActor () -> Void) -> Self {
         Self(
             chunks: chunks,
             linkTapHandler: linkTapHandler,
@@ -99,7 +103,10 @@ public extension QuillStreamView {
 }
 
 extension QuillStreamView {
-    func applyConfiguration(to view: QuillView) {
+    func applyConfiguration(
+        to view: QuillView,
+        syntaxHighlighter: (any SyntaxHighlighting)? = nil
+    ) {
         view.onLinkSelection = linkTapHandler
         view.syntaxHighlighter = syntaxHighlighter
 
@@ -141,32 +148,32 @@ public extension QuillStreamView {
         func subscribe(to chunks: S, onError: (@Sendable (Error) -> Void)?) {
             cancel()
             generation += 1
-            
+
             let currentGeneration = generation
             quillView.reset()
 
             subscriptionTask = Task { [weak self] in
                 guard let self else { return }
-                
+
                 do {
                     for try await chunk in chunks {
                         guard !Task.isCancelled,
                               self.generation == currentGeneration
                         else { break }
-                        
+
                         self.quillView.append(chunk)
                     }
-                    
+
                     guard !Task.isCancelled,
                           self.generation == currentGeneration
                     else { return }
-                    
+
                     self.quillView.finish()
                 } catch {
                     guard !Task.isCancelled,
                           self.generation == currentGeneration
                     else { return }
-                    
+
                     self.quillView.cancelStreaming()
                     onError?(error)
                 }

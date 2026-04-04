@@ -1,8 +1,9 @@
 import QuillCore
 import QuillCoreTestSupport
+import QuillSharedTestSupport
 import Testing
 
-@Suite("Block Tests")
+@Suite("Block Tests", .tags(.parsing))
 struct BlockTests {
     // MARK: - Headings
 
@@ -26,8 +27,8 @@ struct BlockTests {
 
     @Test("Headings", arguments: headingCases)
     func headings(_ testCase: BlockTestCase) {
-        let blocks = normalizedBlocks(MarkdownParser.live.parse(testCase.markdown))
-        #expect(canonicalBlocks(blocks) == canonicalBlocks(testCase.expected))
+        let blocks = MarkdownParser.live.parse(testCase.markdown).normalizedBlocks()
+        #expect(blocks.canonicalBlocks() == testCase.expected.canonicalBlocks())
     }
 
     // MARK: - Paragraphs
@@ -53,8 +54,8 @@ struct BlockTests {
 
     @Test("Paragraphs", arguments: paragraphCases)
     func paragraphs(_ testCase: BlockTestCase) {
-        let blocks = normalizedBlocks(MarkdownParser.live.parse(testCase.markdown))
-        #expect(canonicalBlocks(blocks) == canonicalBlocks(testCase.expected))
+        let blocks = MarkdownParser.live.parse(testCase.markdown).normalizedBlocks()
+        #expect(blocks.canonicalBlocks() == testCase.expected.canonicalBlocks())
     }
 
     // MARK: - Code Blocks
@@ -79,8 +80,8 @@ struct BlockTests {
 
     @Test("Code blocks", arguments: codeBlockCases)
     func codeBlocks(_ testCase: BlockTestCase) {
-        let blocks = normalizedBlocks(MarkdownParser.live.parse(testCase.markdown))
-        #expect(canonicalBlocks(blocks) == canonicalBlocks(testCase.expected))
+        let blocks = MarkdownParser.live.parse(testCase.markdown).normalizedBlocks()
+        #expect(blocks.canonicalBlocks() == testCase.expected.canonicalBlocks())
     }
 
     // MARK: - Blockquotes
@@ -89,22 +90,22 @@ struct BlockTests {
         BlockTestCase(
             name: "Simple quote",
             markdown: "> Hello world",
-            expected: [makeBlockquote(.paragraph(content: [.text("Hello world")]))]
+            expected: [Block.makeBlockquote(.paragraph(content: [.text("Hello world")]))]
         ),
         BlockTestCase(
             name: "Nested quote",
             markdown: "> Outer\n>> Inner",
-            expected: [makeBlockquote(
+            expected: [Block.makeBlockquote(
                 .paragraph(content: [.text("Outer")]),
-                makeBlockquote(.paragraph(content: [.text("Inner")]))
+                Block.makeBlockquote(.paragraph(content: [.text("Inner")]))
             )]
         ),
     ]
 
     @Test("Blockquotes", arguments: blockquoteCases)
     func blockquotes(_ testCase: BlockTestCase) {
-        let blocks = normalizedBlocks(MarkdownParser.live.parse(testCase.markdown))
-        #expect(canonicalBlocks(blocks) == canonicalBlocks(testCase.expected))
+        let blocks = MarkdownParser.live.parse(testCase.markdown).normalizedBlocks()
+        #expect(blocks.canonicalBlocks() == testCase.expected.canonicalBlocks())
     }
 
     // MARK: - Ordered Lists
@@ -114,26 +115,26 @@ struct BlockTests {
             name: "Basic start=1",
             markdown: "1. First\n2. Second",
             expected: [.orderedList(startIndex: 1, items: [
-                makeItem(.paragraph(content: [.text("First")])),
-                makeItem(.paragraph(content: [.text("Second")])),
+                Block.ListItem(blocks: .paragraph(content: [.text("First")])),
+                Block.ListItem(blocks: .paragraph(content: [.text("Second")])),
             ])]
         ),
         BlockTestCase(
             name: "Custom start index",
             markdown: "3. Third\n4. Fourth",
             expected: [.orderedList(startIndex: 3, items: [
-                makeItem(.paragraph(content: [.text("Third")])),
-                makeItem(.paragraph(content: [.text("Fourth")])),
+                Block.ListItem(blocks: .paragraph(content: [.text("Third")])),
+                Block.ListItem(blocks: .paragraph(content: [.text("Fourth")])),
             ])]
         ),
         BlockTestCase(
             name: "Nested list inside item",
             markdown: "1. Outer\n   - Inner bullet",
             expected: [.orderedList(startIndex: 1, items: [
-                makeItem(
-                    .paragraph(content: [.text("Outer")]),
+                Block.ListItem(
+                    blocks: .paragraph(content: [.text("Outer")]),
                     .unorderedList(items: [
-                        makeItem(.paragraph(content: [.text("Inner bullet")]))
+                        Block.ListItem(blocks: .paragraph(content: [.text("Inner bullet")]))
                     ]),
                 ),
             ])]
@@ -142,8 +143,8 @@ struct BlockTests {
 
     @Test("Ordered lists", arguments: orderedListCases)
     func orderedLists(_ testCase: BlockTestCase) {
-        let blocks = normalizedBlocks(MarkdownParser.live.parse(testCase.markdown))
-        #expect(canonicalBlocks(blocks) == canonicalBlocks(testCase.expected))
+        let blocks = MarkdownParser.live.parse(testCase.markdown).normalizedBlocks()
+        #expect(blocks.canonicalBlocks() == testCase.expected.canonicalBlocks())
     }
 
     // MARK: - Unordered Lists
@@ -153,24 +154,24 @@ struct BlockTests {
             name: "Basic bullets",
             markdown: "- Apple\n- Banana",
             expected: [.unorderedList(items: [
-                makeItem(.paragraph(content: [.text("Apple")])),
-                makeItem(.paragraph(content: [.text("Banana")])),
+                Block.ListItem(blocks: .paragraph(content: [.text("Apple")])),
+                Block.ListItem(blocks: .paragraph(content: [.text("Banana")])),
             ])]
         ),
         BlockTestCase(
             name: "Task list items",
             markdown: "- [x] Done\n- [ ] Todo",
             expected: [.unorderedList(items: [
-                makeItem(checkbox: .checked, .paragraph(content: [.text("Done")])),
-                makeItem(checkbox: .unchecked, .paragraph(content: [.text("Todo")])),
+                Block.ListItem(checkbox: .checked, blocks: .paragraph(content: [.text("Done")])),
+                Block.ListItem(checkbox: .unchecked, blocks: .paragraph(content: [.text("Todo")])),
             ])]
         ),
         BlockTestCase(
             name: "List with code block inside item",
             markdown: "- Item\n\n  ```\n  code\n  ```",
             expected: [.unorderedList(items: [
-                makeItem(
-                    .paragraph(content: [.text("Item")]),
+                Block.ListItem(
+                    blocks: .paragraph(content: [.text("Item")]),
                     .codeBlock(language: nil, code: "code\n"),
                 ),
             ])]
@@ -179,8 +180,8 @@ struct BlockTests {
 
     @Test("Unordered lists", arguments: unorderedListCases)
     func unorderedLists(_ testCase: BlockTestCase) {
-        let blocks = normalizedBlocks(MarkdownParser.live.parse(testCase.markdown))
-        #expect(canonicalBlocks(blocks) == canonicalBlocks(testCase.expected))
+        let blocks = MarkdownParser.live.parse(testCase.markdown).normalizedBlocks()
+        #expect(blocks.canonicalBlocks() == testCase.expected.canonicalBlocks())
     }
 
     // MARK: - Thematic Breaks
@@ -205,8 +206,8 @@ struct BlockTests {
 
     @Test("Thematic breaks", arguments: thematicBreakCases)
     func thematicBreaks(_ testCase: BlockTestCase) {
-        let blocks = normalizedBlocks(MarkdownParser.live.parse(testCase.markdown))
-        #expect(canonicalBlocks(blocks) == canonicalBlocks(testCase.expected))
+        let blocks = MarkdownParser.live.parse(testCase.markdown).normalizedBlocks()
+        #expect(blocks.canonicalBlocks() == testCase.expected.canonicalBlocks())
     }
 
     // MARK: - Tables
@@ -252,8 +253,8 @@ struct BlockTests {
 
     @Test("Tables", arguments: tableCases)
     func tables(_ testCase: BlockTestCase) {
-        let blocks = normalizedBlocks(MarkdownParser.live.parse(testCase.markdown))
-        #expect(canonicalBlocks(blocks) == canonicalBlocks(testCase.expected))
+        let blocks = MarkdownParser.live.parse(testCase.markdown).normalizedBlocks()
+        #expect(blocks.canonicalBlocks() == testCase.expected.canonicalBlocks())
     }
 
     // MARK: - HTML Blocks
@@ -268,14 +269,14 @@ struct BlockTests {
 
     @Test("HTML blocks", arguments: htmlBlockCases)
     func htmlBlocks(_ testCase: BlockTestCase) {
-        let blocks = normalizedBlocks(MarkdownParser.live.parse(testCase.markdown))
-        #expect(canonicalBlocks(blocks) == canonicalBlocks(testCase.expected))
+        let blocks = MarkdownParser.live.parse(testCase.markdown).normalizedBlocks()
+        #expect(blocks.canonicalBlocks() == testCase.expected.canonicalBlocks())
     }
 
     // MARK: - Multi-Block Document
 
     @Test("Multi-block document")
-    func multiBlockDocument() {
+    func multiBlockDocument() throws {
         let markdown = """
         # Welcome
 
@@ -288,36 +289,58 @@ struct BlockTests {
         - Item one
         - Item two
         """
-        
-        let blocks = normalizedBlocks(MarkdownParser.live.parse(markdown))
+
+        let blocks = MarkdownParser.live.parse(markdown).normalizedBlocks()
         #expect(blocks.count == 4)
 
-        guard case let .heading(level, content) = blocks[0] else {
-            Issue.record("Expected heading, got \(blocks[0])")
-            return
-        }
-        
+        let firstBlock = try requireBlock(at: 0, from: blocks)
+        let secondBlock = try requireBlock(at: 1, from: blocks)
+        let thirdBlock = try requireBlock(at: 2, from: blocks)
+        let fourthBlock = try requireBlock(at: 3, from: blocks)
+        let heading = headingDetails(from: firstBlock)
+        let (level, content) = try #require(heading)
         #expect(level == 1)
         #expect(content == [.text("Welcome")])
 
-        guard case let .paragraph(pContent) = blocks[1] else {
-            Issue.record("Expected paragraph, got \(blocks[1])")
-            return
-        }
+        let paragraph = paragraphInlines(from: secondBlock)
+        let pContent = try #require(paragraph)
         #expect(pContent == [.text("This is a paragraph.")])
 
-        guard case let .codeBlock(lang, code) = blocks[2] else {
-            Issue.record("Expected codeBlock, got \(blocks[2])")
-            return
-        }
+        let codeBlock = codeBlockDetails(from: thirdBlock)
+        let (lang, code) = try #require(codeBlock)
         #expect(lang == "swift")
         #expect(code == "let x = 42\n")
 
-        guard case let .unorderedList(items) = blocks[3] else {
-            Issue.record("Expected unorderedList, got \(blocks[3])")
-            return
-        }
+        let listItems = unorderedListItems(from: fourthBlock)
+        let items = try #require(listItems)
         #expect(items.count == 2)
+    }
+}
+
+private extension BlockTests {
+    func codeBlockDetails(from block: Block) -> (String?, String)? {
+        guard case let .codeBlock(language, code) = block else { return nil }
+        return (language, code)
+    }
+
+    func headingDetails(from block: Block) -> (Int, [Inline])? {
+        guard case let .heading(level, content) = block else { return nil }
+        return (level, content)
+    }
+
+    func paragraphInlines(from block: Block) -> [Inline]? {
+        guard case let .paragraph(content) = block else { return nil }
+        return content
+    }
+
+    func requireBlock(at index: Int, from blocks: [Block]) throws -> Block {
+        let block = blocks.indices.contains(index) ? blocks[index] : nil
+        return try #require(block)
+    }
+
+    func unorderedListItems(from block: Block) -> [Block.ListItem]? {
+        guard case let .unorderedList(items) = block else { return nil }
+        return items
     }
 }
 

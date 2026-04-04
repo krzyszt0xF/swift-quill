@@ -1,0 +1,20 @@
+parent_config: ../.swiftlint.yml
+
+disabled_rules:
+  - force_unwrapping
+
+line_length:
+  warning: 140
+  error: 200
+
+file_length:
+  warning: 800
+  error: 1500
+
+function_body_length:
+  warning: 80
+  error: 150
+
+type_body_length:
+  warning: 600
+  error: 1200

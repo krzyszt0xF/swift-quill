@@ -1,9 +1,10 @@
 @testable import QuillKit
 import QuillCore
 import Foundation
+import QuillSharedTestSupport
 import Testing
 
-@Suite("DocumentBlockIndexer")
+@Suite("DocumentBlockIndexer", .tags(.rendering))
 struct DocumentBlockIndexerTests {
     @Test("Empty indexer has no block spans")
     func emptyIndexer() {
@@ -167,6 +168,7 @@ private extension DocumentBlockIndexerTests {
     ) -> RenderFragment {
         RenderFragment(
             attributedString: NSAttributedString(string: text),
+            blockquoteDepth: 0,
             contentBlockID: BlockIdentity(rawValue: contentBlockID ?? ownerBlockID),
             ownerBlockID: BlockIdentity(rawValue: ownerBlockID),
             presentationRole: .regularBlock

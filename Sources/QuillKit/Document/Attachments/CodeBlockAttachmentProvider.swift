@@ -1,6 +1,5 @@
 import UIKit
 
-@MainActor
 final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
     override init(
         textAttachment: NSTextAttachment,
@@ -21,17 +20,13 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
     override func loadView() {
         guard let attachment = textAttachment as? CodeBlockAttachment else { return }
 
-        let view = CodeBlockView()
-        view.configure(language: attachment.language, code: attachment.code)
+        let content = CodeBlockContent(from: attachment)
+        let store = attachment.highlightStore
 
-        let highlighted = attachment.highlightStore?.highlightedResult(for: attachment.blockID)
-
-        if let highlighted {
-            view.apply(highlightedCode: highlighted)
+        assert(Thread.isMainThread)
+        view = MainActor.assumeIsolated {
+            Self.makeBlockView(from: content, highlightStore: store)
         }
-
-        attachment.highlightStore?.registerSink(view, for: attachment.blockID)
-        self.view = view
     }
 
     override func attachmentBounds(
@@ -50,13 +45,36 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
             return CGRect(origin: .zero, size: Layout.fallbackSize)
         }
 
-        let height = CodeBlockView.measureHeight(of: attachment.code, in: attachment.language)
-        return CGRect(origin: .zero, size: CGSize(width: width, height: height))
+        let code = attachment.code
+        let language = attachment.language
+        assert(Thread.isMainThread)
+        return MainActor.assumeIsolated {
+            let height = CodeBlockView.measureHeight(of: code, in: language)
+            return CGRect(origin: .zero, size: CGSize(width: width, height: height))
+        }
     }
 }
 
 private extension CodeBlockAttachmentProvider {
     enum Layout {
         static let fallbackSize = CGSize(width: 320, height: 80)
+    }
+
+    @MainActor
+    static func makeBlockView(
+        from content: CodeBlockContent,
+        highlightStore: CodeBlockHighlightStore?
+    ) -> CodeBlockView {
+        let view = CodeBlockView()
+        view.configure(language: content.language, code: content.code)
+
+        let highlighted = highlightStore?.highlightedResult(for: content.blockID)
+        if let highlighted {
+            view.apply(highlightedCode: highlighted)
+        }
+
+        highlightStore?.registerSink(view, for: content.blockID)
+
+        return view
     }
 }

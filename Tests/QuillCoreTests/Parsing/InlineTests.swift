@@ -1,7 +1,8 @@
 import QuillCore
+import QuillSharedTestSupport
 import Testing
 
-@Suite("Inline Tests")
+@Suite("Inline Tests", .tags(.parsing))
 struct InlineTests {
 
     // MARK: - Text
@@ -207,6 +208,6 @@ private func extractFirstParagraphContent(from markdown: String) -> [Inline]? {
     guard case let .paragraph(content) = blocks.first?.block else {
         return nil
     }
-    
+
     return content
 }

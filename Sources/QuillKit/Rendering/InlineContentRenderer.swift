@@ -2,29 +2,65 @@ import QuillCore
 import UIKit
 
 enum InlineContentRenderer {
-    static func attributedString(for inline: Inline, baseFont: UIFont) -> NSAttributedString {
+    static func attributedString(for inlines: [Inline], baseFont: UIFont) -> NSAttributedString {
+        attributedString(
+            for: inlines,
+            context: FontContext(baseFont: baseFont)
+        )
+    }
+
+    static func plainText(from inlines: [Inline]) -> String {
+        inlines.map { plainText(from: $0) }.joined()
+    }
+}
+
+private extension InlineContentRenderer {
+    struct FontContext {
+        let baseFont: UIFont
+        var traits: UIFontDescriptor.SymbolicTraits = []
+
+        func adding(trait: UIFontDescriptor.SymbolicTraits) -> FontContext {
+            FontContext(
+                baseFont: baseFont,
+                traits: traits.union(trait)
+            )
+        }
+
+        var bodyFont: UIFont {
+            traits.isEmpty ? baseFont : baseFont.withTraits(traits)
+        }
+
+        var monospaceFont: UIFont {
+            let monospaceFont = UIFont.monospacedSystemFont(
+                ofSize: baseFont.pointSize - 1,
+                weight: .regular
+            )
+            return traits.isEmpty ? monospaceFont : monospaceFont.withTraits(traits)
+        }
+    }
+
+    static let linkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+
+    static func attributedString(
+        for inline: Inline,
+        context: FontContext
+    ) -> NSAttributedString {
         switch inline {
         case let .code(text):
-            let monoFont = UIFont.monospacedSystemFont(ofSize: baseFont.pointSize - 1, weight: .regular)
             return NSAttributedString(string: text, attributes: [
-                .font: monoFont,
+                .font: context.monospaceFont,
                 .backgroundColor: UIColor.systemGray6,
                 .foregroundColor: UIColor.label,
             ])
         case let .emphasis(children):
-            let result = NSMutableAttributedString()
-            for child in children {
-                result.append(attributedString(for: child, baseFont: baseFont))
-            }
-            result.enumerateAttribute(.font, in: NSRange(location: 0, length: result.length)) { value, range, _ in
-                let current = (value as? UIFont) ?? baseFont
-                result.addAttribute(.font, value: current.withTraits(.traitItalic), range: range)
-            }
-            return result
+            return attributedString(
+                for: children,
+                context: context.adding(trait: .traitItalic)
+            )
         case let .image(_, _, alt):
             let text = alt.isEmpty ? "image" : plainText(from: alt)
             return NSAttributedString(string: "[\(text)]", attributes: [
-                .font: baseFont,
+                .font: context.bodyFont,
                 .foregroundColor: UIColor.secondaryLabel,
             ])
         case .inlineHTML:
@@ -32,26 +68,18 @@ enum InlineContentRenderer {
         case .lineBreak:
             return NSAttributedString(string: "\n")
         case let .link(destination, children):
-            let result = NSMutableAttributedString()
-            for child in children {
-                result.append(attributedString(for: child, baseFont: baseFont))
-            }
-            let fullRange = NSRange(location: 0, length: result.length)
-            result.addAttribute(.foregroundColor, value: UIColor.systemBlue, range: fullRange)
-            result.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: fullRange)
-
-            let trimmedDestination = destination.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmedDestination.isEmpty == false,
-               let url = URL(string: trimmedDestination) {
-                result.addAttribute(.link, value: url, range: fullRange)
-            }
-
-            return result
+            return makeLinkAttributedString(
+                destination: destination,
+                children: children,
+                context: context
+            )
         case let .strikethrough(children):
-            let result = NSMutableAttributedString()
-            for child in children {
-                result.append(attributedString(for: child, baseFont: baseFont))
-            }
+            let result = NSMutableAttributedString(
+                attributedString: attributedString(
+                    for: children,
+                    context: context
+                )
+            )
             result.addAttribute(
                 .strikethroughStyle,
                 value: NSUnderlineStyle.single.rawValue,
@@ -59,66 +87,71 @@ enum InlineContentRenderer {
             )
             return result
         case let .strong(children):
-            let result = NSMutableAttributedString()
-            for child in children {
-                result.append(attributedString(for: child, baseFont: baseFont))
-            }
-            result.enumerateAttribute(.font, in: NSRange(location: 0, length: result.length)) { value, range, _ in
-                let current = (value as? UIFont) ?? baseFont
-                result.addAttribute(.font, value: current.withTraits(.traitBold), range: range)
-            }
-            return result
+            return attributedString(
+                for: children,
+                context: context.adding(trait: .traitBold)
+            )
         case let .text(string):
-            return makeTextAttributedString(string: string, baseFont: baseFont)
+            return makeTextAttributedString(
+                string: string,
+                context: context
+            )
         }
     }
 
-    static func attributedString(for inlines: [Inline], baseFont: UIFont) -> NSAttributedString {
+    static func attributedString(
+        for inlines: [Inline],
+        context: FontContext
+    ) -> NSAttributedString {
         let result = NSMutableAttributedString()
 
         for inline in inlines {
-            result.append(attributedString(for: inline, baseFont: baseFont))
+            result.append(attributedString(for: inline, context: context))
         }
 
         return result
     }
 
-    static func plainText(from inlines: [Inline]) -> String {
-        inlines.map { plainText(from: $0) }.joined()
-    }
+    static func makeLinkAttributedString(
+        destination: String,
+        children: [Inline],
+        context: FontContext
+    ) -> NSAttributedString {
+        let result = NSMutableAttributedString(
+            attributedString: attributedString(
+                for: children,
+                context: context
+            )
+        )
+        let fullRange = NSRange(location: 0, length: result.length)
+        result.addAttribute(.foregroundColor, value: UIColor.systemBlue, range: fullRange)
+        result.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: fullRange)
 
-    static func plainText(from inline: Inline) -> String {
-        switch inline {
-        case let .code(text):
-            return text
-        case let .emphasis(children):
-            return plainText(from: children)
-        case let .image(_, _, alt):
-            return plainText(from: alt)
-        case .inlineHTML:
-            return ""
-        case .lineBreak:
-            return " "
-        case let .link(_, children):
-            return plainText(from: children)
-        case let .strikethrough(children):
-            return plainText(from: children)
-        case let .strong(children):
-            return plainText(from: children)
-        case let .text(string):
-            return string
+        let trimmedDestination = destination.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedDestination.isEmpty == false,
+           let url = URL(string: trimmedDestination) {
+            result.addAttribute(.link, value: url, range: fullRange)
         }
+
+        return result
     }
-}
 
-private extension InlineContentRenderer {
-    static let linkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
-
-    static func makeTextAttributedString(string: String, baseFont: UIFont) -> NSAttributedString {
+    static func makeTextAttributedString(
+        string: String,
+        context: FontContext
+    ) -> NSAttributedString {
         let result = NSMutableAttributedString(string: string, attributes: [
-            .font: baseFont,
+            .font: context.bodyFont,
             .foregroundColor: UIColor.label,
         ])
+        guard
+            string.contains("://") ||
+                string.contains("www.") ||
+                string.contains("@")
+        else {
+            return result
+        }
+
         let fullRange = NSRange(location: 0, length: result.length)
 
         linkDetector?.enumerateMatches(in: string, options: [], range: fullRange) { match, _, _ in
@@ -133,6 +166,26 @@ private extension InlineContentRenderer {
         }
 
         return result
+    }
+    
+    static func plainText(from inline: Inline) -> String {
+        switch inline {
+        case let .emphasis(children),
+            let .link(_, children),
+            let .strikethrough(children),
+            let .strong(children):
+            return plainText(from: children)
+        case let .image(_, _, alt):
+            return plainText(from: alt)
+        case .inlineHTML:
+            return ""
+        case .lineBreak:
+            return " "
+        case let .code(text):
+            return text
+        case let .text(string):
+            return string
+        }
     }
 }
 

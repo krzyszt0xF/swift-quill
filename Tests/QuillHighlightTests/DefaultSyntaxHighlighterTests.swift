@@ -1,10 +1,16 @@
 @testable import QuillHighlight
 import QuillKit
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
-@Suite("SyntaxHighlighter")
+@Suite("SyntaxHighlighter", .tags(.rendering))
 struct SyntaxHighlighterTests {
+    static let aliasCases: [SyntaxHighlighterAliasCase] = [
+        .init(code: "const x = 1", language: "js", name: "JavaScript alias"),
+        .init(code: "x = 1", language: "py", name: "Python alias"),
+        .init(code: "const x: number = 1", language: "ts", name: "TypeScript alias"),
+    ]
 
     @Test("default singleton returns result for known language")
     func defaultSingletonReturnsResultForKnownLanguage() {
@@ -25,21 +31,12 @@ struct SyntaxHighlighterTests {
         #expect(result == nil)
     }
 
-    @Test("js alias resolves to JavaScript")
-    func jsAliasResolvesToJavaScript() {
-        let result = QuillHighlight.SyntaxHighlighter.default.highlight(code: "const x = 1", language: "js")
-        #expect(result != nil)
-    }
-
-    @Test("py alias resolves to Python")
-    func pyAliasResolvesToPython() {
-        let result = QuillHighlight.SyntaxHighlighter.default.highlight(code: "x = 1", language: "py")
-        #expect(result != nil)
-    }
-
-    @Test("ts alias resolves to TypeScript")
-    func tsAliasResolvesToTypeScript() {
-        let result = QuillHighlight.SyntaxHighlighter.default.highlight(code: "const x: number = 1", language: "ts")
+    @Test("language aliases resolve to highlighted results", arguments: aliasCases)
+    func languageAliasesResolve(_ testCase: SyntaxHighlighterAliasCase) {
+        let result = QuillHighlight.SyntaxHighlighter.default.highlight(
+            code: testCase.code,
+            language: testCase.language
+        )
         #expect(result != nil)
     }
 
@@ -47,12 +44,30 @@ struct SyntaxHighlighterTests {
     func concurrentCallsDoNotCrash() async {
         let highlighter = QuillHighlight.SyntaxHighlighter.default
 
-        await withTaskGroup(of: Void.self) { group in
+        let allHighlighted = await withTaskGroup(of: Bool.self, returning: [Bool].self) { group in
             for i in 0..<10 {
                 group.addTask {
-                    _ = highlighter.highlight(code: "let value = \(i)", language: "swift")
+                    highlighter.highlight(code: "let value = \(i)", language: "swift") != nil
                 }
             }
+
+            var results: [Bool] = []
+            for await result in group {
+                results.append(result)
+            }
+            return results
         }
+
+        #expect(allHighlighted.allSatisfy { $0 })
     }
+}
+
+struct SyntaxHighlighterAliasCase: Sendable {
+    let code: String
+    let language: String
+    let name: String
+}
+
+extension SyntaxHighlighterAliasCase: CustomTestStringConvertible {
+    var testDescription: String { name }
 }

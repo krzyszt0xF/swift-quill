@@ -1,7 +1,8 @@
 @testable import QuillCore
+import QuillSharedTestSupport
 import Testing
 
-@Suite("InlineParser")
+@Suite("InlineParser", .tags(.parsing))
 struct InlineParserTests {
 
     // MARK: - Plain Text
@@ -10,6 +11,13 @@ struct InlineParserTests {
     func plainText() {
         let result = InlineParser.parse("Hello world")
         #expect(result == [.text("Hello world")])
+    }
+
+    @Test("Long plain text stays as one text node")
+    func longPlainText() {
+        let input = String(repeating: "streaming markdown ", count: 64)
+        let result = InlineParser.parse(input)
+        #expect(result == [.text(input)])
     }
 
     // MARK: - Complete Spans
@@ -94,6 +102,18 @@ struct InlineParserTests {
             .text(" and "),
             .emphasis([.text("italic")]),
             .text(" world"),
+        ])
+    }
+
+    @Test("Mixed delimiters do not introduce empty text nodes")
+    func mixedContentWithoutEmptyTextNodes() {
+        let result = InlineParser.parse("start**bold**`code`[link](url)end")
+        #expect(result == [
+            .text("start"),
+            .strong([.text("bold")]),
+            .code("code"),
+            .link(destination: "url", children: [.text("link")]),
+            .text("end"),
         ])
     }
 

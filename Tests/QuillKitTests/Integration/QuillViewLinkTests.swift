@@ -4,7 +4,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("QuillView Links")
+@Suite("QuillView Links", .tags(.integration))
 struct QuillViewLinkTests {
     @Test("onLinkSelection callback receives URL from static render")
     func onLinkSelectionReceivesURLFromStaticRender() async throws {
@@ -17,14 +17,11 @@ struct QuillViewLinkTests {
         view.markdown = "[click](https://example.com)"
 
         let rendered = await eventually {
-            documentHasContent(view)
+            view.hasDocumentContent
         }
         #expect(rendered)
 
-        guard let textView = documentTextView(for: view) else {
-            Issue.record("Expected DocumentTextView in QuillView")
-            return
-        }
+        let textView = try #require(view.firstDocumentTextView())
         textView.layoutIfNeeded()
 
         #expect(view.onLinkSelection != nil)

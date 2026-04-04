@@ -1,0 +1,49 @@
+{
+  "configurations" : [
+    {
+      "id" : "12E3D0FF-0FE2-4BAF-AD07-5B6B70036CD1",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "tagsToRun" : {
+      "tags" : [
+        "rendering"
+      ]
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "QuillCoreTests",
+        "name" : "QuillCoreTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "QuillKitTests",
+        "name" : "QuillKitTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "QuillSwiftUITests",
+        "name" : "QuillSwiftUITests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "QuillHighlightTests",
+        "name" : "QuillHighlightTests"
+      }
+    }
+  ],
+  "version" : 1
+}

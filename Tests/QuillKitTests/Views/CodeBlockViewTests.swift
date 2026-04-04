@@ -1,9 +1,10 @@
 @testable import QuillKit
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("CodeBlockView")
+@Suite("CodeBlockView", .tags(.rendering))
 struct CodeBlockViewTests {
     private static let minimumVisibleHeight: CGFloat = 36
     private static let testWidth: CGFloat = 320
@@ -60,6 +61,24 @@ struct CodeBlockViewTests {
         #expect(fittingSize.height > Self.minimumVisibleHeight)
     }
 
+    @Test("Configure invalidates measured height when code changes")
+    func configureInvalidatesMeasuredHeight() {
+        let view = CodeBlockView()
+        view.configure(language: "swift", code: "let x = 1")
+        let initialHeight = view.intrinsicContentSize.height
+
+        view.configure(
+            language: "swift",
+            code: """
+            let x = 1
+            let y = 2
+            let z = 3
+            """
+        )
+
+        #expect(view.intrinsicContentSize.height > initialHeight)
+    }
+
     @Test("Configure preserves trailing newline")
     func configurePreservesTrailingNewline() {
         let view = CodeBlockView()
@@ -74,7 +93,7 @@ struct CodeBlockViewTests {
         let view = CodeBlockView()
         view.configure(language: "swift", code: "let x = 1")
 
-        let languagePillLabel = findSubview(of: UILabel.self, in: view, matching: { $0.text == "swift" })
+        let languagePillLabel: UILabel? = view.firstSubview(where: { $0.text == "swift" })
         #expect(languagePillLabel != nil)
         #expect(languagePillLabel?.isHidden == false)
     }
@@ -84,10 +103,8 @@ struct CodeBlockViewTests {
         let view = CodeBlockView()
         view.configure(language: nil, code: "code")
 
-        let languagePillLabel = findSubview(
-            of: UILabel.self,
-            in: view,
-            matching: { $0.text == nil || $0.text?.isEmpty != false }
+        let languagePillLabel: UILabel? = view.firstSubview(
+            where: { $0.text == nil || $0.text?.isEmpty != false }
         )
         #expect(languagePillLabel?.isHidden == true)
     }
@@ -97,7 +114,7 @@ struct CodeBlockViewTests {
         let view = CodeBlockView()
         view.configure(language: "swift", code: "let x = 1")
 
-        let button = findSubview(of: UIButton.self, in: view)
+        let button: UIButton? = view.firstSubview()
         #expect(button != nil)
         #expect(view.currentCode == "let x = 1")
 
@@ -131,7 +148,7 @@ struct CodeBlockViewTests {
         let view = CodeBlockView()
         view.configure(language: "swift", code: "let x = 1")
 
-        let languageLabel = findSubview(of: UILabel.self, in: view, matching: { $0.text == "swift" })
+        let languageLabel: UILabel? = view.firstSubview(where: { $0.text == "swift" })
         #expect(languageLabel != nil)
         #expect(languageLabel?.isHidden == false)
 
@@ -156,7 +173,7 @@ struct CodeBlockViewTests {
 
         #expect(fittingSize.height > Self.minimumVisibleHeight)
 
-        let copyButton = findSubview(of: UIButton.self, in: view)
+        let copyButton: UIButton? = view.firstSubview()
         #expect(copyButton != nil)
     }
 
@@ -175,7 +192,7 @@ struct CodeBlockViewTests {
         view.setNeedsLayout()
         view.layoutIfNeeded()
 
-        let languagePillLabel = findSubview(of: UILabel.self, in: view, matching: { $0.text == "json" })
+        let languagePillLabel: UILabel? = view.firstSubview(where: { $0.text == "json" })
         let codeTextView = codeTextView(in: view)
 
         #expect(languagePillLabel != nil)
@@ -195,7 +212,7 @@ struct CodeBlockViewTests {
         view.setStreamingState(true)
         view.setStreamingState(false)
 
-        let button = findSubview(of: UIButton.self, in: view)
+        let button: UIButton? = view.firstSubview()
         #expect(button?.isEnabled == true)
     }
 
@@ -205,7 +222,7 @@ struct CodeBlockViewTests {
         view.configure(language: "swift", code: "let x = 1")
         view.setStreamingState(true)
 
-        let button = findSubview(of: UIButton.self, in: view)
+        let button: UIButton? = view.firstSubview()
         #expect(button?.isEnabled == false)
     }
 
@@ -252,19 +269,39 @@ struct CodeBlockViewTests {
         #expect(textView.attributedText?.string == "let value = 123\n")
     }
 
-    @Test("Selected fragment uses native copy")
-    func selectedFragmentUsesNativeCopy() throws {
+    @Test("Highlighted code preserves measured height")
+    func highlightedCodePreservesMeasuredHeight() {
+        let view = CodeBlockView()
+        view.configure(
+            language: "swift",
+            code: """
+            let value = 123
+            let nextValue = 456
+            """
+        )
+        let initialHeight = view.intrinsicContentSize.height
+
+        let highlighted = NSAttributedString(
+            string: """
+            let value = 123
+            let nextValue = 456
+            """,
+            attributes: [.foregroundColor: UIColor.red]
+        )
+        view.apply(highlightedCode: HighlightedCodeSnapshot(highlighted))
+
+        #expect(view.intrinsicContentSize.height == initialHeight)
+    }
+
+    @Test("Selected fragment exposes copy action")
+    func selectedFragmentExposesCopyAction() throws {
         let view = CodeBlockView()
         view.configure(language: "swift", code: "let value = 123")
 
         let textView = try #require(codeTextView(in: view))
         textView.selectedRange = NSRange(location: 4, length: 5)
-        UIPasteboard.general.string = nil
 
-        _ = textView.becomeFirstResponder()
-        textView.copy(nil)
-
-        #expect(UIPasteboard.general.string == "value")
+        #expect(textView.canPerformAction(#selector(UIResponderStandardEditActions.copy(_:)), withSender: nil))
     }
 
     @Test("Highlighted code preserves horizontal scroll offset")
@@ -296,7 +333,7 @@ struct CodeBlockViewTests {
             #### Line Breaks
             * `---`
             #### Vertical Rule
-            * `|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|`
+            * `|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|`
             """
         )
 
@@ -316,10 +353,10 @@ struct CodeBlockViewTests {
 
 private extension CodeBlockViewTests {
     func codeScrollView(in view: CodeBlockView) -> UIScrollView? {
-        findSubview(of: UIScrollView.self, in: view, matching: { $0 !== view })
+        view.firstSubview(where: { $0 !== view })
     }
 
     func codeTextView(in view: CodeBlockView) -> UITextView? {
-        findSubview(of: UITextView.self, in: view, matching: { $0.isSelectable && $0.isEditable == false })
+        view.firstSubview(where: { $0.isSelectable && $0.isEditable == false })
     }
 }

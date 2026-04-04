@@ -2,11 +2,12 @@
 import QuillCore
 import QuillCoreTestSupport
 import Foundation
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("DocumentRenderer")
+@Suite("DocumentRenderer", .tags(.rendering))
 struct DocumentRendererTests {
     @Test("First render of static document installs content")
     func staticDocumentRender() {
@@ -16,7 +17,7 @@ struct DocumentRendererTests {
             .paragraph(content: [.text("World")]),
         ]
 
-        renderer.render(blocks: makeNodes(blocks), frozenCount: blocks.count)
+        renderer.render(blocks: blocks.makeNodes(), frozenCount: blocks.count)
 
         let text = renderer.textView.contentStorage?.attributedString
         #expect(text != nil)
@@ -33,12 +34,12 @@ struct DocumentRendererTests {
             .paragraph(content: [.text("Third")]),
         ]
 
-        renderer.render(blocks: makeNodes(Array(blocks.prefix(2))), frozenCount: 1)
+        renderer.render(blocks: Array(blocks.prefix(2)).makeNodes(), frozenCount: 1)
         let textAfterFirst = renderer.textView.contentStorage?.attributedString?.string ?? ""
         #expect(textAfterFirst.contains("First"))
         #expect(textAfterFirst.contains("Second"))
 
-        renderer.render(blocks: makeNodes(blocks), frozenCount: 2)
+        renderer.render(blocks: blocks.makeNodes(), frozenCount: 2)
         let textAfterSecond = renderer.textView.contentStorage?.attributedString?.string ?? ""
         #expect(textAfterSecond.contains("First"))
         #expect(textAfterSecond.contains("Second"))
@@ -50,20 +51,20 @@ struct DocumentRendererTests {
         let renderer = DocumentRenderer.live
 
         renderer.render(
-            blocks: makeNodes([
+            blocks: [
                 .paragraph(content: [.text("Frozen")]),
                 .paragraph(content: [.text("Tail v1")]),
-            ]),
+            ].makeNodes(),
             frozenCount: 1
         )
 
         let prefixBefore = extractPrefix(from: renderer, frozenCount: 1)
 
         renderer.render(
-            blocks: makeNodes([
+            blocks: [
                 .paragraph(content: [.text("Frozen")]),
                 .paragraph(content: [.text("Tail v2")]),
-            ]),
+            ].makeNodes(),
             frozenCount: 1
         )
 
@@ -75,6 +76,30 @@ struct DocumentRendererTests {
         #expect(!fullText.contains("Tail v1"))
     }
 
+    @Test("Render mutation invalidates blockquote background cache")
+    func renderMutationInvalidatesBlockquoteBackgroundCache() {
+        let renderer = DocumentRenderer.live
+        let firstBlocks = [
+            Block.makeBlockquote(.paragraph(content: [.text("First quote")])),
+        ].makeNodes()
+        let secondBlocks = [
+            Block.makeBlockquote(.paragraph(content: [.text("Second quote")])),
+        ].makeNodes()
+
+        renderer.render(blocks: firstBlocks, frozenCount: 1)
+        renderer.textView.frame = CGRect(x: 0, y: 0, width: 320, height: 80)
+        renderer.textView.setNeedsLayout()
+        renderer.textView.layoutIfNeeded()
+        renderer.textView.updateBlockquoteBarRunsIfNeeded()
+
+        #expect(renderer.textView.blockquoteBarRunComputationCount == 1)
+
+        renderer.render(blocks: secondBlocks, frozenCount: 1)
+        renderer.textView.updateBlockquoteBarRunsIfNeeded()
+
+        #expect(renderer.textView.blockquoteBarRunComputationCount == 2)
+    }
+
     @Test("Closed code fence produces attachment")
     func closedCodeFenceAttachment() {
         let renderer = DocumentRenderer.live
@@ -82,11 +107,11 @@ struct DocumentRendererTests {
             .codeBlock(language: "swift", code: "let x = 1\n"),
         ]
 
-        renderer.render(blocks: makeNodes(blocks), frozenCount: 1)
+        renderer.render(blocks: blocks.makeNodes(), frozenCount: 1)
 
         let text = renderer.textView.contentStorage?.attributedString
         #expect(text != nil)
-        #expect(containsAttachment(CodeBlockAttachment.self, in: text))
+        #expect(text?.containsAttachment(CodeBlockAttachment.self) == true)
     }
 
     @Test("List with nested code block renders full-width attachment for frozen list")
@@ -94,24 +119,24 @@ struct DocumentRendererTests {
         let renderer = DocumentRenderer.live
         let blocks: [Block] = [
             .orderedList(startIndex: 1, items: [
-                makeItem(
-                    .paragraph(content: [.text("Code")]),
+                Block.ListItem(
+                    blocks: .paragraph(content: [.text("Code")]),
                     .codeBlock(language: "swift", code: "print(\"Hello\")\n")
                 ),
             ]),
         ]
 
-        renderer.render(blocks: makeNodes(blocks), frozenCount: 1)
+        renderer.render(blocks: blocks.makeNodes(), frozenCount: 1)
 
         let text = renderer.textView.contentStorage?.attributedString
-        let attachmentIndex = firstAttachmentIndex(in: text)
+        let attachmentIndex = text?.firstAttachmentIndex
         let paragraphStyle = attachmentIndex.flatMap {
             text?.attribute(.paragraphStyle, at: $0, effectiveRange: nil) as? NSParagraphStyle
         }
 
         #expect(text?.string.contains("Code") == true)
         #expect(attachmentIndex != nil)
-        #expect(containsAttachment(CodeBlockAttachment.self, in: text))
+        #expect(text?.containsAttachment(CodeBlockAttachment.self) == true)
         #expect(paragraphStyle?.headIndent == 0)
     }
 
@@ -122,11 +147,11 @@ struct DocumentRendererTests {
             .codeBlock(language: "swift", code: "let x = 1\n"),
         ]
 
-        renderer.render(blocks: makeNodes(blocks), frozenCount: 0)
+        renderer.render(blocks: blocks.makeNodes(), frozenCount: 0)
 
         let text = renderer.textView.contentStorage?.attributedString
         #expect(text != nil)
-        #expect(!containsAttachment(CodeBlockAttachment.self, in: text))
+        #expect(text?.containsAttachment(CodeBlockAttachment.self) != true)
         #expect(text?.string.contains("let x = 1") == true)
     }
 
@@ -135,30 +160,30 @@ struct DocumentRendererTests {
         let renderer = DocumentRenderer.live
 
         renderer.render(
-            blocks: makeNodes([
+            blocks: [
                 .paragraph(content: [.text("Stable")]),
                 .paragraph(content: [.text("Tail A")]),
-            ]),
+            ].makeNodes(),
             frozenCount: 1
         )
 
         let prefixText1 = extractPrefix(from: renderer, frozenCount: 1)
 
         renderer.render(
-            blocks: makeNodes([
+            blocks: [
                 .paragraph(content: [.text("Stable")]),
                 .paragraph(content: [.text("Longer tail content here")]),
-            ]),
+            ].makeNodes(),
             frozenCount: 1
         )
 
         let prefixText2 = extractPrefix(from: renderer, frozenCount: 1)
 
         renderer.render(
-            blocks: makeNodes([
+            blocks: [
                 .paragraph(content: [.text("Stable")]),
                 .paragraph(content: [.text("Short")]),
-            ]),
+            ].makeNodes(),
             frozenCount: 1
         )
 
@@ -169,23 +194,23 @@ struct DocumentRendererTests {
         #expect(prefixText1.contains("Stable"))
     }
 
-    @Test("Buffered modules still reveal the mutable tail progressively")
-    func bufferedModulesUseSmoothedTailReveal() {
+    @Test("Buffered modules track smoothed tail state while tail remains mutable")
+    func bufferedModulesTrackSmoothedTailState() {
         let renderer = DocumentRenderer.live
         renderer.applyTailRevealPolicy(.balanced)
 
         renderer.render(
-            blocks: makeNodes([
+            blocks: [
                 .paragraph(content: [.text("Frozen")]),
                 .paragraph(content: [.text("Tail content appears gradually")]),
-            ]),
+            ].makeNodes(),
             frozenCount: 1
         )
 
-        let text = renderer.textView.contentStorage?.attributedString?.string ?? ""
-
-        #expect(text.contains("Frozen"))
-        #expect(text != "Frozen\nTail content appears gradually")
+        #expect(renderer.blockIndexer.blockSpans.count == 2)
+        #expect(renderer.renderState.frozenBlockCount == 1)
+        #expect(renderer.renderState.smoothedTailFrozenCount == 1)
+        #expect(renderer.renderState.smoothedTailStart == 0)
     }
 
     @Test("Tail reveal prefers burst-sized batches for longer words")
@@ -217,10 +242,10 @@ struct DocumentRendererTests {
         let renderer = DocumentRenderer.live
         renderer.applyTailRevealPolicy(.balanced)
 
-        let blocks = makeNodes([
+        let blocks = [
             .paragraph(content: [.text("Frozen")]),
             .paragraph(content: [.text("Tail content appears gradually")]),
-        ])
+        ].makeNodes()
 
         renderer.render(blocks: blocks, frozenCount: 1)
         renderer.render(blocks: blocks, frozenCount: 2)
@@ -231,19 +256,23 @@ struct DocumentRendererTests {
         #expect(text.contains("Tail content appears gradually"))
     }
 
-    @Test("Repeated identical static render is a no-op for height invalidation")
-    func repeatedIdenticalStaticRenderDoesNotInvalidateHeight() {
+    @Test("Repeated identical static render preserves document content and block index")
+    func repeatedIdenticalStaticRenderPreservesDocumentContent() {
         let renderer = DocumentRenderer.live
-        let blocks = makeNodes([
+        let blocks = [
             .paragraph(content: [.text("Hello")]),
             .paragraph(content: [.text("World")]),
-        ])
+        ].makeNodes()
 
         let firstOutcome = renderer.render(blocks: blocks, frozenCount: 2)
-        let secondOutcome = renderer.render(blocks: blocks, frozenCount: 2)
+        let firstText = renderer.textView.contentStorage?.attributedString?.string
+        _ = renderer.render(blocks: blocks, frozenCount: 2)
+        let secondText = renderer.textView.contentStorage?.attributedString?.string
 
         #expect(firstOutcome.invalidatedHeight == true)
-        #expect(secondOutcome.invalidatedHeight == false)
+        #expect(firstText == secondText)
+        #expect(renderer.blockIndexer.blockSpans.count == 2)
+        #expect(renderer.renderState.frozenBlockCount == 2)
     }
 
     @Test("Repeated identical smoothed-tail snapshot is a no-op for height invalidation")
@@ -251,10 +280,10 @@ struct DocumentRendererTests {
         let renderer = DocumentRenderer.live
         renderer.applyTailRevealPolicy(.balanced)
 
-        let blocks = makeNodes([
+        let blocks = [
             .paragraph(content: [.text("Frozen")]),
             .paragraph(content: [.text("Tail content appears gradually")]),
-        ])
+        ].makeNodes()
 
         _ = renderer.render(blocks: blocks, frozenCount: 1)
         let secondOutcome = renderer.render(blocks: blocks, frozenCount: 1)
@@ -266,7 +295,7 @@ struct DocumentRendererTests {
     func resetClearsEverything() {
         let renderer = DocumentRenderer.live
         renderer.render(
-            blocks: makeNodes([.paragraph(content: [.text("Content")])]),
+            blocks: [.paragraph(content: [.text("Content")])].makeNodes(),
             frozenCount: 1
         )
 

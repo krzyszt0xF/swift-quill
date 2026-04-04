@@ -1,8 +1,9 @@
 @testable import QuillCore
 import QuillCoreTestSupport
+import QuillSharedTestSupport
 import Testing
 
-@Suite("StreamController")
+@Suite("StreamController", .tags(.streaming))
 struct StreamControllerTests {
 
     // MARK: - Basic Streaming
@@ -10,7 +11,7 @@ struct StreamControllerTests {
     @Test("Single paragraph via controller")
     func singleParagraph() async {
         let controller = MarkdownStreamController()
-        let events = await collectEvents(from: controller, feeding: ["Hello\n\n"])
+        let events = await controller.collectEvents(feeding: ["Hello\n\n"])
 
         #expect(events == [.startParagraph, .text("Hello"), .endParagraph])
     }
@@ -18,7 +19,7 @@ struct StreamControllerTests {
     @Test("Multi-chunk produces same result as single append")
     func multiChunkMatchesSingleAppend() async {
         let controller = MarkdownStreamController()
-        let events = await collectEvents(from: controller, feeding: ["Hel", "lo\n\n"])
+        let events = await controller.collectEvents(feeding: ["Hel", "lo\n\n"])
 
         #expect(events == [.startParagraph, .text("Hello"), .endParagraph])
     }
@@ -26,7 +27,7 @@ struct StreamControllerTests {
     @Test("Finish closes open paragraph")
     func finishClosesOpenParagraph() async {
         let controller = MarkdownStreamController()
-        let events = await collectEvents(from: controller, feeding: ["Hello\n"])
+        let events = await controller.collectEvents(feeding: ["Hello\n"])
 
         #expect(events == [.startParagraph, .text("Hello"), .endParagraph])
     }
@@ -34,7 +35,7 @@ struct StreamControllerTests {
     @Test("Code block events through controller")
     func codeBlockProducesExpectedEvents() async {
         let controller = MarkdownStreamController()
-        let events = await collectEvents(from: controller, feeding: ["```swift\nlet x = 1\n```\n\n"])
+        let events = await controller.collectEvents(feeding: ["```swift\nlet x = 1\n```\n\n"])
 
         #expect(events == [
             .startCodeBlock(language: "swift"),
@@ -46,7 +47,7 @@ struct StreamControllerTests {
     @Test("Empty append produces no events")
     func emptyAppendProducesNoEvents() async {
         let controller = MarkdownStreamController()
-        let events = await collectEvents(from: controller, feeding: [""])
+        let events = await controller.collectEvents(feeding: [""])
 
         #expect(events.isEmpty)
     }
@@ -97,7 +98,7 @@ struct StreamControllerTests {
     @Test("Multiple chunks produce correct event ordering")
     func multipleChunksPreserveEventOrdering() async {
         let controller = MarkdownStreamController()
-        let events = await collectEvents(from: controller, feeding: [
+        let events = await controller.collectEvents(feeding: [
             "# Title\n",
             "Body text\n",
             "\n",
@@ -114,14 +115,65 @@ struct StreamControllerTests {
         let document = "# Hello\n\nSome text\n\n---\n\n"
 
         let singleController = MarkdownStreamController()
-        let singleEvents = await collectEvents(from: singleController, feeding: [document])
+        let singleEvents = await singleController.collectEvents(feeding: [document])
 
         let splitController = MarkdownStreamController()
-        let splitEvents = await collectEvents(from: splitController, feeding: [
+        let splitEvents = await splitController.collectEvents(feeding: [
             "# Hel", "lo\n\nSo", "me text\n", "\n---\n\n",
         ])
 
         #expect(singleEvents == splitEvents)
+    }
+
+    @Test("Split heading emits incremental events before newline")
+    func splitHeadingEmitsIncrementalEvents() async {
+        let controller = MarkdownStreamController()
+        let eventStream = await controller.events()
+
+        Task {
+            await controller.append("# Hel")
+            await controller.append("lo\n")
+            await controller.finish()
+        }
+
+        var events: [ParserEvent] = []
+        for await event in eventStream {
+            events.append(event)
+        }
+
+        #expect(events == [
+            .startHeading(level: 1),
+            .text("Hel"),
+            .text("lo"),
+            .endHeading,
+        ])
+    }
+
+    @Test("Paragraph to split heading emits paragraph close before heading preview")
+    func paragraphToSplitHeadingEmitsIncrementalHeadingEvents() async {
+        let controller = MarkdownStreamController()
+        let eventStream = await controller.events()
+
+        Task {
+            await controller.append("Intro paragraph\n## Tit")
+            await controller.append("le\n")
+            await controller.finish()
+        }
+
+        var events: [ParserEvent] = []
+        for await event in eventStream {
+            events.append(event)
+        }
+
+        #expect(events == [
+            .startParagraph,
+            .text("Intro paragraph"),
+            .endParagraph,
+            .startHeading(level: 2),
+            .text("Tit"),
+            .text("le"),
+            .endHeading,
+        ])
     }
 
     @Test("Immediate append after events installation does not drop prefix events")
@@ -169,8 +221,8 @@ struct StreamControllerTests {
             "\n\n| Key | Value |\n| --- | --- |\n| mode | streaming |\n\n<details><summary>More context</summary>\nTail text\n</details>\n",
         ]
 
-        let events = await collectEvents(from: controller, feeding: chunks)
-        let reducedBlocks = reduce(events)
+        let events = await controller.collectEvents(feeding: chunks)
+        let reducedBlocks = events.reduceToBlocks()
 
         #expect(reducedBlocks.contains { if case .heading = $0 { return true } else { return false } })
         #expect(reducedBlocks.contains { if case .unorderedList = $0 { return true } else { return false } })

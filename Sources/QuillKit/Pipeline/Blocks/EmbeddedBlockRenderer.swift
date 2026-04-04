@@ -16,15 +16,11 @@ enum EmbeddedBlockRenderer {
             code: code
         )
         attachment.highlightStore = highlightStore
-
-        let result = NSMutableAttributedString(attachment: attachment)
-        let style = BlockStyleFactory.makePresentationRoleParagraphStyle(
+        return makePresentationRoleAttributedString(
+            attachment: attachment,
             nestingContext: nestingContext,
-            paragraphSpacingBefore: 8,
             presentationRole: presentationRole
         )
-        result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
-        return result
     }
 
     static func makeOpenCodeFenceAttributedString(
@@ -32,17 +28,15 @@ enum EmbeddedBlockRenderer {
         nestingContext: NestingContext,
         presentationRole: RenderFragment.PresentationRole = .regularBlock
     ) -> NSAttributedString {
-        let result = NSMutableAttributedString(string: code, attributes: [
-            .font: BlockStyleFactory.monospaceFont(),
-            .foregroundColor: UIColor.label,
-        ])
-        let style = BlockStyleFactory.makePresentationRoleParagraphStyle(
+        makePresentationRoleAttributedString(
+            string: code,
+            attributes: [
+                .font: BlockStyleFactory.monospaceFont(),
+                .foregroundColor: UIColor.label,
+            ],
             nestingContext: nestingContext,
-            paragraphSpacingBefore: 8,
             presentationRole: presentationRole
         )
-        result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
-        return result
     }
 
     static func makeTableAttachmentAttributedString(
@@ -59,15 +53,11 @@ enum EmbeddedBlockRenderer {
             header: header,
             rows: rows
         )
-
-        let result = NSMutableAttributedString(attachment: attachment)
-        let style = BlockStyleFactory.makePresentationRoleParagraphStyle(
+        return makePresentationRoleAttributedString(
+            attachment: attachment,
             nestingContext: nestingContext,
-            paragraphSpacingBefore: 8,
             presentationRole: presentationRole
         )
-        result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
-        return result
     }
 
     static func makeTableFallbackAttributedString(
@@ -80,24 +70,23 @@ enum EmbeddedBlockRenderer {
         let headerCells = header.cells.map { InlineContentRenderer.plainText(from: $0.content) }
 
         lines.append("| " + headerCells.joined(separator: " | ") + " |")
-        lines.append("| " + headerCells.map { String(repeating: "-", count: max($0.count, 3)) }.joined(separator: " | ") + " |")
+        let separators = headerCells.map { String(repeating: "-", count: max($0.count, 3)) }
+        lines.append("| " + separators.joined(separator: " | ") + " |")
 
         for row in rows {
             let cells = row.cells.map { InlineContentRenderer.plainText(from: $0.content) }
             lines.append("| " + cells.joined(separator: " | ") + " |")
         }
 
-        let result = NSMutableAttributedString(string: lines.joined(separator: "\n"), attributes: [
-            .font: BlockStyleFactory.monospaceFont(),
-            .foregroundColor: UIColor.label,
-        ])
-        let style = BlockStyleFactory.makePresentationRoleParagraphStyle(
+        return makePresentationRoleAttributedString(
+            string: lines.joined(separator: "\n"),
+            attributes: [
+                .font: BlockStyleFactory.monospaceFont(),
+                .foregroundColor: UIColor.label,
+            ],
             nestingContext: nestingContext,
-            paragraphSpacingBefore: 8,
             presentationRole: presentationRole
         )
-        result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
-        return result
     }
 
     static func makeThematicBreakAttributedString() -> NSAttributedString {
@@ -116,6 +105,52 @@ enum EmbeddedBlockRenderer {
 }
 
 private extension EmbeddedBlockRenderer {
+    static func applyPresentationRoleAttributes(
+        to attributedString: NSMutableAttributedString,
+        nestingContext: NestingContext,
+        presentationRole: RenderFragment.PresentationRole
+    ) {
+        let style = BlockStyleFactory.makePresentationRoleParagraphStyle(
+            nestingContext: nestingContext,
+            paragraphSpacingBefore: 8,
+            presentationRole: presentationRole
+        )
+        attributedString.addAttribute(
+            .paragraphStyle,
+            value: style,
+            range: NSRange(location: 0, length: attributedString.length)
+        )
+    }
+
+    static func makePresentationRoleAttributedString(
+        attachment: NSTextAttachment,
+        nestingContext: NestingContext,
+        presentationRole: RenderFragment.PresentationRole
+    ) -> NSAttributedString {
+        let result = NSMutableAttributedString(attachment: attachment)
+        applyPresentationRoleAttributes(
+            to: result,
+            nestingContext: nestingContext,
+            presentationRole: presentationRole
+        )
+        return result
+    }
+
+    static func makePresentationRoleAttributedString(
+        string: String,
+        attributes: [NSAttributedString.Key: Any],
+        nestingContext: NestingContext,
+        presentationRole: RenderFragment.PresentationRole
+    ) -> NSAttributedString {
+        let result = NSMutableAttributedString(string: string, attributes: attributes)
+        applyPresentationRoleAttributes(
+            to: result,
+            nestingContext: nestingContext,
+            presentationRole: presentationRole
+        )
+        return result
+    }
+
     static let thematicBreakImage: UIImage = {
         let size = CGSize(width: 10000, height: 1)
         let renderer = UIGraphicsImageRenderer(size: size)

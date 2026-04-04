@@ -1,194 +1,9 @@
 @testable import QuillCore
+import QuillSharedTestSupport
 import Testing
 
-@Suite("StreamBuffer")
-struct StreamBufferTests {
-    // MARK: - Partial Line Accumulation
-
-    @Test("Partial line accumulation across chunks")
-    func partialLineAccumulation() {
-        var buffer = StreamBuffer()
-        let events1 = buffer.append("hel")
-        #expect(events1 == [.startParagraph, .text("hel")])
-
-        let events2 = buffer.append("lo\n")
-        #expect(events2 == [.text("lo")])
-    }
-
-    @Test("Empty chunk produces no events")
-    func emptyChunk() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("")
-        #expect(events.isEmpty)
-    }
-
-    // MARK: - Paragraph Detection
-
-    @Test("Blank line after paragraph emits endParagraph")
-    func paragraphBoundary() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("Hello world\n\n")
-        #expect(events == [.startParagraph, .text("Hello world"), .endParagraph])
-    }
-
-    @Test("Two paragraphs separated by blank line")
-    func twoParagraphs() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("First\n\nSecond\n")
-        #expect(events == [
-            .startParagraph, .text("First"), .endParagraph,
-            .startParagraph, .text("Second"),
-        ])
-    }
-
-    @Test("Finalize closes open paragraph")
-    func finalizeParagraph() {
-        var buffer = StreamBuffer()
-        _ = buffer.append("Open text\n")
-        let events = buffer.finalize()
-        #expect(events == [.endParagraph])
-    }
-
-    @Test("Injected state allows targeted finalize coverage")
-    func finalizeInjectedState() {
-        var buffer = StreamBuffer(state: .init(blockquoteDepth: 1, blockState: .paragraph))
-        let events = buffer.finalize()
-        #expect(events == [.endParagraph, .endBlockQuote])
-    }
-
-    @Test("Multi-line paragraph accumulates text events")
-    func multiLineParagraph() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("Line one\nLine two\n\n")
-        #expect(events == [
-            .startParagraph, .text("Line one"),
-            .text(" Line two"),
-            .endParagraph,
-        ])
-    }
-
-    // MARK: - Code Fence Detection
-
-    @Test("Backtick code fence with language")
-    func backtickFenceWithLanguage() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("```swift\nlet x = 1\n```\n")
-        #expect(events == [
-            .startCodeBlock(language: "swift"),
-            .codeBlockText("let x = 1\n"),
-            .endCodeBlock,
-        ])
-    }
-
-    @Test("Backtick code fence without language")
-    func backtickFenceNoLanguage() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("```\nhello\n```\n")
-        #expect(events == [
-            .startCodeBlock(language: nil),
-            .codeBlockText("hello\n"),
-            .endCodeBlock,
-        ])
-    }
-
-    @Test("Variable-length fence requires matching count to close")
-    func variableLengthFence() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("````\n```\nstill code\n````\n")
-        #expect(events == [
-            .startCodeBlock(language: nil),
-            .codeBlockText("```\n"),
-            .codeBlockText("still code\n"),
-            .endCodeBlock,
-        ])
-    }
-
-    @Test("Tilde fence open and close")
-    func tildeFence() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("~~~\ncode here\n~~~\n")
-        #expect(events == [
-            .startCodeBlock(language: nil),
-            .codeBlockText("code here\n"),
-            .endCodeBlock,
-        ])
-    }
-
-    @Test("Tilde fence not closed by backticks")
-    func tildeFenceNotClosedByBackticks() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("~~~\ncode\n```\n~~~\n")
-        #expect(events == [
-            .startCodeBlock(language: nil),
-            .codeBlockText("code\n"),
-            .codeBlockText("```\n"),
-            .endCodeBlock,
-        ])
-    }
-
-    @Test("Finalize closes open code fence")
-    func finalizeCodeFence() {
-        var buffer = StreamBuffer()
-        _ = buffer.append("```python\nprint('hi')\n")
-        let events = buffer.finalize()
-        #expect(events == [.endCodeBlock])
-    }
-
-    // MARK: - Heading Detection
-
-    @Test("ATX heading detection")
-    func headingDetection() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("## Title\n")
-        #expect(events == [.startHeading(level: 2), .text("Title"), .endHeading])
-    }
-
-    @Test("H1 heading")
-    func h1Heading() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("# Hello\n")
-        #expect(events == [.startHeading(level: 1), .text("Hello"), .endHeading])
-    }
-
-    @Test("H6 heading")
-    func h6Heading() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("###### Deep\n")
-        #expect(events == [.startHeading(level: 6), .text("Deep"), .endHeading])
-    }
-
-    @Test("Seven hashes is not a heading")
-    func sevenHashesNotHeading() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("####### Not a heading\n\n")
-        #expect(events.contains(.startParagraph))
-    }
-
-    // MARK: - Thematic Break Detection
-
-    @Test("Dashes thematic break")
-    func dashesThematicBreak() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("---\n")
-        #expect(events == [.thematicBreak])
-    }
-
-    @Test("Asterisks thematic break")
-    func asterisksThematicBreak() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("***\n")
-        #expect(events == [.thematicBreak])
-    }
-
-    @Test("Underscores thematic break")
-    func underscoresThematicBreak() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("___\n")
-        #expect(events == [.thematicBreak])
-    }
-
-    // MARK: - List Detection
-
+@Suite("StreamBuffer Lists, Blockquotes, and Tables", .tags(.streaming))
+struct StreamBufferListBlockquoteAndTableTests {
     @Test("Unordered list item")
     func unorderedListItem() {
         var buffer = StreamBuffer()
@@ -280,8 +95,10 @@ struct StreamBufferTests {
             .startCodeBlock(language: "python"),
             .codeBlockText("print(\"Hello\")\n"),
             .endCodeBlock,
-            .endListItem, .endList, .endListItem, .endList,
         ])
+
+        let finalEvents = buffer.finalize()
+        #expect(finalEvents == [.endListItem, .endList, .endListItem, .endList])
     }
 
     @Test("Nested table inside list item stays in list-scoped routing")
@@ -320,8 +137,6 @@ struct StreamBufferTests {
             .startParagraph, .text("After"),
         ])
     }
-
-    // MARK: - Blockquote Detection
 
     @Test("Simple blockquote")
     func simpleBlockquote() {
@@ -366,7 +181,7 @@ struct StreamBufferTests {
             .endParagraph,
             .startList(ordered: false), .startListItem, .startParagraph, .text("first"),
             .endParagraph, .endListItem, .startListItem, .startParagraph, .text("second"),
-            .endParagraph, .endListItem, .endList, .endBlockQuote, .endBlockQuote,
+            .endParagraph, .endListItem, .endList, .endBlockQuote, .endBlockQuote
         ])
     }
 
@@ -381,7 +196,7 @@ struct StreamBufferTests {
         let completionEvents = buffer.append("st\n\n")
         #expect(completionEvents == [
             .startList(ordered: false), .startListItem, .startParagraph, .text("first"),
-            .endParagraph, .endListItem, .endList, .endBlockQuote, .endBlockQuote,
+            .endParagraph, .endListItem, .endList, .endBlockQuote, .endBlockQuote
         ])
     }
 
@@ -407,11 +222,24 @@ struct StreamBufferTests {
         """)
 
         #expect(events == [
-            .startList(ordered: true), .startListItem, .startParagraph, .text("Parse markdown into a stable block tree"),
-            .endParagraph, .startList(ordered: true), .startListItem, .startParagraph, .text("Preserve nested ordered numbering"),
-            .endParagraph, .endListItem, .startListItem, .startParagraph, .text("Keep wrapped lines aligned under the marker when they span more than one visual row in the narrow stream pane"),
-            .endParagraph, .endListItem, .endList, .endListItem, .endList,
+            .startList(ordered: true),
+            .startListItem,
+            .startParagraph,
+            .text("Parse markdown into a stable block tree"),
+            .endParagraph,
+            .startList(ordered: true),
+            .startListItem,
+            .startParagraph,
+            .text("Preserve nested ordered numbering"),
+            .endParagraph,
+            .endListItem,
+            .startListItem,
+            .startParagraph,
+            .text("Keep wrapped lines aligned under the marker when they span more than one visual row in the narrow stream pane"),
         ])
+
+        let finalEvents = buffer.finalize()
+        #expect(finalEvents == [.endParagraph, .endListItem, .endList, .endListItem, .endList])
     }
 
     @Test("Finalize closes open blockquote")
@@ -422,8 +250,6 @@ struct StreamBufferTests {
         #expect(events == [.endParagraph, .endBlockQuote])
     }
 
-    // MARK: - Table Detection
-
     @Test("Table candidate confirmed by separator")
     func tableConfirmed() {
         var buffer = StreamBuffer()
@@ -431,7 +257,7 @@ struct StreamBufferTests {
         #expect(events == [
             .startTable, .tableAlignments([nil, nil]), .tableRow(["A", "B"]),
             .tableRow(["1", "2"]),
-            .endTable,
+            .endTable
         ])
     }
 
@@ -464,22 +290,6 @@ struct StreamBufferTests {
         #expect(events == [.endTable])
     }
 
-    // MARK: - Adversarial Chunk Splits
-
-    @Test("Adversarial: code fence split mid-language")
-    func adversarialFenceSplit() {
-        var buffer = StreamBuffer()
-        let events1 = buffer.append("```sw")
-        #expect(events1.isEmpty)
-
-        let events2 = buffer.append("ift\ncode\n```\n")
-        #expect(events2 == [
-            .startCodeBlock(language: "swift"),
-            .codeBlockText("code\n"),
-            .endCodeBlock,
-        ])
-    }
-
     @Test("Adversarial: paragraph split across chunks")
     func adversarialParagraphSplit() {
         var buffer = StreamBuffer()
@@ -491,14 +301,6 @@ struct StreamBufferTests {
 
         let events3 = buffer.append("World\n")
         #expect(events3 == [.startParagraph, .text("World")])
-    }
-
-    @Test("Top-level numeric paragraph still previews as paragraph")
-    func topLevelNumericParagraphPreview() {
-        var buffer = StreamBuffer()
-
-        let events = buffer.append("2026")
-        #expect(events == [.startParagraph, .text("2026")])
     }
 
     @Test("Partial list item waits for newline")
@@ -529,28 +331,6 @@ struct StreamBufferTests {
         ])
     }
 
-    @Test("Partial code line streams before newline inside fence")
-    func partialCodeLineStreamsBeforeNewline() {
-        var buffer = StreamBuffer()
-
-        let events1 = buffer.append("```\npri")
-        #expect(events1 == [.startCodeBlock(language: nil), .codeBlockText("pri")])
-
-        let events2 = buffer.append("nt\n")
-        #expect(events2 == [.codeBlockText("nt\n")])
-    }
-
-    @Test("Previewed full code line still emits trailing newline")
-    func previewedFullCodeLineStillEmitsTrailingNewline() {
-        var buffer = StreamBuffer()
-
-        let events1 = buffer.append("```\nprint")
-        #expect(events1 == [.startCodeBlock(language: nil), .codeBlockText("print")])
-
-        let events2 = buffer.append("\n")
-        #expect(events2 == [.codeBlockText("\n")])
-    }
-
     @Test("Partial nested ordered item does not leak into parent paragraph preview")
     func partialNestedOrderedItemDoesNotLeakIntoParentParagraphPreview() {
         var buffer = StreamBuffer()
@@ -566,16 +346,6 @@ struct StreamBufferTests {
         ])
     }
 
-    @Test("Adversarial: heading split mid-prefix")
-    func adversarialHeadingSplit() {
-        var buffer = StreamBuffer()
-        let events1 = buffer.append("#")
-        #expect(events1.isEmpty)
-
-        let events2 = buffer.append("# Title\n")
-        #expect(events2 == [.startHeading(level: 2), .text("Title"), .endHeading])
-    }
-
     @Test("Adversarial: list marker split across chunks")
     func adversarialListSplit() {
         var buffer = StreamBuffer()
@@ -589,16 +359,6 @@ struct StreamBufferTests {
         ])
     }
 
-    @Test("Adversarial: thematic break split")
-    func adversarialThematicBreakSplit() {
-        var buffer = StreamBuffer()
-        let events1 = buffer.append("--")
-        #expect(events1.isEmpty)
-
-        let events2 = buffer.append("-\n")
-        #expect(events2 == [.thematicBreak])
-    }
-
     @Test("Adversarial: ordered list marker split across chunks")
     func adversarialOrderedListSplit() {
         var buffer = StreamBuffer()
@@ -610,73 +370,5 @@ struct StreamBufferTests {
             .startList(ordered: true), .startListItem, .startParagraph, .text("item"),
             .endParagraph, .endListItem, .endList,
         ])
-    }
-
-    @Test("Adversarial: short fence prefix waits for disambiguation")
-    func adversarialShortFencePrefix() {
-        var buffer = StreamBuffer()
-        let events1 = buffer.append("``")
-        #expect(events1.isEmpty)
-
-        let events2 = buffer.append("`\ncode\n```\n")
-        #expect(events2 == [
-            .startCodeBlock(language: nil),
-            .codeBlockText("code\n"),
-            .endCodeBlock,
-        ])
-    }
-
-    // MARK: - Mixed Content
-
-    @Test("Heading followed by paragraph")
-    func headingThenParagraph() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("# Title\nSome text\n\n")
-        #expect(events == [
-            .startHeading(level: 1), .text("Title"), .endHeading,
-            .startParagraph, .text("Some text"), .endParagraph,
-        ])
-    }
-
-    @Test("Paragraph interrupted by code fence")
-    func paragraphInterruptedByFence() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("Text\n```\ncode\n```\n")
-        #expect(events == [
-            .startParagraph, .text("Text"),
-            .endParagraph,
-            .startCodeBlock(language: nil),
-            .codeBlockText("code\n"),
-            .endCodeBlock,
-        ])
-    }
-
-    @Test("Code fence preserves blank lines inside")
-    func codeFencePreservesBlankLines() {
-        var buffer = StreamBuffer()
-        let events = buffer.append("```\nline1\n\nline2\n```\n")
-        #expect(events == [
-            .startCodeBlock(language: nil),
-            .codeBlockText("line1\n"),
-            .codeBlockText("\n"),
-            .codeBlockText("line2\n"),
-            .endCodeBlock,
-        ])
-    }
-
-    @Test("Finalize with no open block produces no events")
-    func finalizeIdle() {
-        var buffer = StreamBuffer()
-        let events = buffer.finalize()
-        #expect(events.isEmpty)
-    }
-
-    @Test("Finalize with partial line processes it first")
-    func finalizePartialLine() {
-        var buffer = StreamBuffer()
-        let appendEvents = buffer.append("partial")
-        let finalizeEvents = buffer.finalize()
-        #expect(appendEvents == [.startParagraph, .text("partial")])
-        #expect(finalizeEvents == [.endParagraph])
     }
 }

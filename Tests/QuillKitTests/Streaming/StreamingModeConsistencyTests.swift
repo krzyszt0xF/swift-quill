@@ -5,7 +5,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("Streaming Mode Consistency")
+@Suite("Streaming Mode Consistency", .tags(.integration, .parity, .streaming))
 struct StreamingModeConsistencyTests {
     @Test("Buffered and stable modes converge to identical final markdown")
     func bufferedMatchesStableAfterFinish() async throws {
@@ -37,7 +37,6 @@ struct StreamingModeConsistencyTests {
         for chunk in markdownChunks {
             bufferedView.append(chunk)
             stableView.append(chunk)
-            await wait(for: .milliseconds(12))
         }
 
         bufferedView.finish()
@@ -49,7 +48,7 @@ struct StreamingModeConsistencyTests {
         #expect(markdownMatched)
 
         let bothRendered = await eventually(timeout: .milliseconds(800)) {
-            documentHasContent(bufferedView) && documentHasContent(stableView)
+            bufferedView.hasDocumentContent && stableView.hasDocumentContent
         }
         #expect(bothRendered)
     }

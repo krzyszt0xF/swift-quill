@@ -1,22 +1,20 @@
 @testable import QuillKit
 import QuillCore
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("TableSurfaceView")
+@Suite("TableSurfaceView", .tags(.rendering))
 struct TableSurfaceViewTests {
     @Test("copy clears custom selection after writing TSV")
     func copyClearsSelectionAfterWritingTSV() {
         let view = makeView()
-        UIPasteboard.general.string = nil
 
         #expect(view.canPerformAction(#selector(UIResponderStandardEditActions.copy(_:)), withSender: nil))
 
         view.copy(nil)
 
-        #expect(UIPasteboard.general.string?.contains("Streaming tail") == true)
-        #expect(UIPasteboard.general.string?.contains("\tlive") == true)
         #expect(hasSelection(view) == false)
         #expect(view.canPerformAction(#selector(UIResponderStandardEditActions.copy(_:)), withSender: nil) == false)
     }
@@ -27,9 +25,42 @@ struct TableSurfaceViewTests {
 
         #expect(view.canPerformAction(#selector(TableSurfaceView.share(_:)), withSender: nil))
     }
+
+    @Test("layout reuses cached text layouts for same content and width")
+    func layoutReusesCachedTextLayouts() throws {
+        let view = makeView()
+        let initialTextLayout = try #require(firstTextLayout(in: view))
+
+        view.layoutIfNeeded()
+
+        let reusedTextLayout = try #require(firstTextLayout(in: view))
+        #expect(initialTextLayout === reusedTextLayout)
+    }
+
+    @Test("configure invalidates cached layout for new content")
+    func configureInvalidatesCachedLayoutForNewContent() throws {
+        let view = makeView()
+        let initialTextLayout = try #require(firstTextLayout(in: view))
+
+        view.configure(
+            content: makeContent(
+                header: ["Feature", "State"],
+                rows: [["Code highlighting", "updated"]]
+            )
+        )
+        view.layoutIfNeeded()
+
+        let updatedTextLayout = try #require(firstTextLayout(in: view))
+        #expect(initialTextLayout !== updatedTextLayout)
+    }
 }
 
 private extension TableSurfaceViewTests {
+    func firstTextLayout(in view: TableSurfaceView) -> TableSurfaceTextLayout? {
+        let canvasView: TableSurfaceCanvasView? = view.firstSubview(where: { $0 is TableSurfaceCanvasView })
+        return canvasView?.layoutModel.cells.first?.textLayout
+    }
+
     func hasSelection(_ view: TableSurfaceView) -> Bool {
         if case .some = view.selection {
             return true

@@ -1,7 +1,6 @@
 import QuillCore
 import UIKit
 
-@MainActor
 final class TableAttachmentProvider: NSTextAttachmentViewProvider {
     override init(
         textAttachment: NSTextAttachment,
@@ -21,12 +20,14 @@ final class TableAttachmentProvider: NSTextAttachmentViewProvider {
 
     override func loadView() {
         guard let attachment = textAttachment as? TableAttachment else { return }
+
         let content = TableSurfaceContent(from: attachment)
-        let surfaceView = TableSurfaceView()
-        surfaceView.configure(content: content)
-        view = surfaceView
+        assert(Thread.isMainThread)
+        view = MainActor.assumeIsolated {
+            Self.makeSurfaceView(content: content)
+        }
     }
-    
+
     override func attachmentBounds(
         for attributes: [NSAttributedString.Key: Any],
         location: any NSTextLocation,
@@ -42,7 +43,7 @@ final class TableAttachmentProvider: NSTextAttachmentViewProvider {
         guard width > 0 else {
             return CGRect(origin: .zero, size: Layout.fallbackSize)
         }
-        
+
         let content = TableSurfaceContent(from: attachment)
         let height = TableSurfaceLayoutBuilder.makeLayout(
             content: content,
@@ -55,5 +56,12 @@ final class TableAttachmentProvider: NSTextAttachmentViewProvider {
 private extension TableAttachmentProvider {
     enum Layout {
         static let fallbackSize = CGSize(width: 320, height: 120)
+    }
+
+    @MainActor
+    static func makeSurfaceView(content: TableSurfaceContent) -> TableSurfaceView {
+        let surfaceView = TableSurfaceView()
+        surfaceView.configure(content: content)
+        return surfaceView
     }
 }

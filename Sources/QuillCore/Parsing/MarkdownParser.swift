@@ -12,7 +12,7 @@ package extension MarkdownParser {
     static let live = MarkdownParser { markdown in
         let document = Document(parsing: markdown)
         var visitor = BlockVisitor()
-        
+
         return visitor.visit(document)
     }
 }

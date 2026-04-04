@@ -16,7 +16,7 @@ extension UIView {
             guard fallbackWidth.isFinite, fallbackWidth > 0 else { return nil }
             return fallbackWidth
         }
-        
+
         let screenWidth = window?.screen.bounds.width ?? UIScreen.main.bounds.width
         let fallbackWidth = max(bounds.width, screenWidth)
         let width = resolvedWidth(

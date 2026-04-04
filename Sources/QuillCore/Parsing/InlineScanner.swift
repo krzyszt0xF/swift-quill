@@ -6,7 +6,7 @@ enum InlineScanner {
     static func advance(_ parser: inout InlineParser.Parser, by token: String) {
         for _ in token {
             guard parser.position < parser.source.endIndex else { return }
-            
+
             advance(&parser)
         }
     }
@@ -14,7 +14,7 @@ enum InlineScanner {
     static func advancePastIncompleteDestination(_ parser: inout InlineParser.Parser) {
         while parser.position < parser.source.endIndex {
             guard !checkWhitespace(parser.source[parser.position]) else { return }
-            
+
             advance(&parser)
         }
     }
@@ -22,7 +22,7 @@ enum InlineScanner {
     static func checkCanStartEmphasis(_ parser: InlineParser.Parser) -> Bool {
         let nextPosition = parser.source.index(after: parser.position)
         guard nextPosition < parser.source.endIndex else { return false }
-        
+
         return !checkWhitespace(parser.source[nextPosition])
     }
 
@@ -34,7 +34,10 @@ enum InlineScanner {
         character.unicodeScalars.allSatisfy(\.properties.isWhitespace)
     }
 
-    static func findClosingBracket(startingAt start: Substring.Index, in parser: InlineParser.Parser) -> Substring.Index? {
+    static func findClosingBracket(
+        startingAt start: Substring.Index,
+        in parser: InlineParser.Parser
+    ) -> Substring.Index? {
         var bracketDepth = 0
         var searchIndex = start
 
@@ -54,7 +57,10 @@ enum InlineScanner {
         return nil
     }
 
-    static func findClosingParenthesis(startingAt start: Substring.Index, in parser: InlineParser.Parser) -> Substring.Index? {
+    static func findClosingParenthesis(
+        startingAt start: Substring.Index,
+        in parser: InlineParser.Parser
+    ) -> Substring.Index? {
         var searchIndex = start
 
         while searchIndex < parser.source.endIndex {
