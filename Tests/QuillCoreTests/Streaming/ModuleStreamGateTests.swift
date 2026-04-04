@@ -189,4 +189,99 @@ struct ModuleStreamGateTests {
         #expect(latestCommit.contains("Paragraph four starts") == false)
         #expect(gate.hasPendingText)
     }
+
+    @Test("Chunked appends preserve same committed output as single append")
+    func chunkedAppendsMatchSingleAppend() {
+        let markdown = """
+        # Intro
+        alpha
+
+        ## Details
+        beta
+
+        ## More
+        gamma
+
+        """
+
+        var singleGate = ModuleStreamGate(
+            configuration: .init(minModuleLength: 10, maxBufferingDelay: 1.5)
+        )
+        let singleResult = singleGate.append(markdown, now: 0)
+        let singleFlush = singleGate.flushRemaining()
+
+        var chunkedGate = ModuleStreamGate(
+            configuration: .init(minModuleLength: 10, maxBufferingDelay: 1.5)
+        )
+        let chunks = ["# Intro\nalp", "ha\n\n## Details\nbe", "ta\n\n## More\ngamma\n\n"]
+        var chunkedCommits: [String] = []
+
+        for (index, chunk) in chunks.enumerated() {
+            let result = chunkedGate.append(chunk, now: Double(index) * 0.1)
+            chunkedCommits.append(contentsOf: result.committedChunks)
+        }
+
+        let chunkedFlush = chunkedGate.flushRemaining()
+        let singleOutput = singleResult.committedChunks.joined() + singleFlush
+        let chunkedOutput = chunkedCommits.joined() + chunkedFlush
+
+        #expect(normalizeTerminalNewlines(in: chunkedOutput) == normalizeTerminalNewlines(in: singleOutput))
+    }
+
+    @Test("Split code fence keeps pending structure until closed")
+    func splitCodeFenceKeepsPendingStructureUntilClosed() {
+        var gate = ModuleStreamGate(
+            configuration: .init(minModuleLength: 10, maxBufferingDelay: 1.5)
+        )
+
+        let first = gate.append("```", now: 0)
+        let second = gate.append("swift\nlet x = 1\n", now: 0.1)
+        let third = gate.append("```\n\n# Next\nbody\n\n", now: 0.2)
+
+        #expect(first.hasPendingStructure)
+        #expect(first.committedChunks.isEmpty)
+        #expect(second.hasPendingStructure)
+        #expect(second.committedChunks.isEmpty)
+        #expect(third.hasPendingStructure == false)
+        #expect(third.committedChunks.isEmpty == false)
+        #expect(third.committedChunks.joined().contains("let x = 1"))
+    }
+
+    @Test("Reset clears rebuilt analysis after committed prefix compaction")
+    func resetClearsAnalysisAfterCompaction() {
+        var gate = ModuleStreamGate(
+            configuration: .init(minModuleLength: 8, maxBufferingDelay: 1.5)
+        )
+
+        _ = gate.append(
+            """
+            # First
+            alpha
+
+            # Second
+            beta
+
+            """,
+            now: 0
+        )
+
+        gate.reset()
+
+        let result = gate.append(
+            "Standalone paragraph after reset.\n\n",
+            now: 0.1
+        )
+
+        #expect(result.committedChunks.count == 1)
+        #expect(result.committedChunks[0].contains("Standalone paragraph after reset."))
+        #expect(result.hasPendingStructure == false)
+    }
+}
+
+private extension ModuleStreamGateTests {
+    func normalizeTerminalNewlines(in text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .newlines)
+        guard text.last == "\n" else { return trimmed }
+        return trimmed + "\n"
+    }
 }

@@ -46,12 +46,12 @@ extension InlineParser.Parser {
 
     mutating func parse(until delimiter: InlineParser.Delimiter?) -> InlineParser.ParseResult {
         var inlines: [Inline] = []
-        var textBuffer = ""
+        var textStart: Substring.Index?
 
         while position < source.endIndex {
             if let delimiter,
                InlineDelimiterParser.checkClosingDelimiter(delimiter, in: self) {
-                appendText(textBuffer, to: &inlines)
+                flushText(&textStart, to: &inlines)
                 InlineScanner.advance(&self, by: delimiter.token)
                 return InlineParser.ParseResult(
                     didReachDelimiter: true,
@@ -60,53 +60,47 @@ extension InlineParser.Parser {
             }
 
             if InlineScanner.checkTokenPrefix("![", in: self) {
-                appendText(textBuffer, to: &inlines)
-                textBuffer = ""
+                flushText(&textStart, to: &inlines)
                 inlines.append(contentsOf: InlineLinkParser.parseImageInlines(&self))
                 continue
             }
 
             if InlineScanner.checkTokenPrefix("**", in: self) {
-                appendText(textBuffer, to: &inlines)
-                textBuffer = ""
+                flushText(&textStart, to: &inlines)
                 inlines.append(contentsOf: InlineDelimiterParser.parseStrongInlines(&self))
                 continue
             }
 
             if InlineScanner.checkTokenPrefix("~~", in: self) {
-                appendText(textBuffer, to: &inlines)
-                textBuffer = ""
+                flushText(&textStart, to: &inlines)
                 inlines.append(contentsOf: InlineDelimiterParser.parseStrikethroughInlines(&self))
                 continue
             }
 
             if InlineScanner.checkTokenPrefix("`", in: self) {
-                appendText(textBuffer, to: &inlines)
-                textBuffer = ""
+                flushText(&textStart, to: &inlines)
                 inlines.append(parseBacktickInline())
                 continue
             }
 
             if InlineScanner.checkTokenPrefix("[", in: self) {
-                appendText(textBuffer, to: &inlines)
-                textBuffer = ""
+                flushText(&textStart, to: &inlines)
                 inlines.append(contentsOf: InlineLinkParser.parseLinkInlines(&self))
                 continue
             }
 
             if InlineScanner.checkTokenPrefix("*", in: self),
                InlineScanner.checkCanStartEmphasis(self) {
-                appendText(textBuffer, to: &inlines)
-                textBuffer = ""
+                flushText(&textStart, to: &inlines)
                 inlines.append(contentsOf: InlineDelimiterParser.parseEmphasisInlines(&self))
                 continue
             }
 
-            textBuffer.append(source[position])
+            textStart = textStart ?? position
             InlineScanner.advance(&self)
         }
 
-        appendText(textBuffer, to: &inlines)
+        flushText(&textStart, to: &inlines)
 
         return InlineParser.ParseResult(
             didReachDelimiter: false,
@@ -131,9 +125,13 @@ private extension InlineParser.Parser {
         return .code(code)
     }
 
-    func appendText(_ text: String, to inlines: inout [Inline]) {
-        guard !text.isEmpty else { return }
+    mutating func flushText(
+        _ textStart: inout Substring.Index?,
+        to inlines: inout [Inline]
+    ) {
+        guard let start = textStart, start < position else { return }
 
-        inlines.append(.text(text))
+        inlines.append(.text(String(source[start..<position])))
+        textStart = nil
     }
 }
