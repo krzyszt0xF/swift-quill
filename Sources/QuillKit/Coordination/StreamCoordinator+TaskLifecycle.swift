@@ -12,7 +12,7 @@ extension StreamCoordinator {
         invalidateHeight(for: .rendererSnapshotApplied)
     }
 
-    func cancelAllTasks() {
+    func cancelActiveWork() {
         lastTailRevealHeightInvalidation = 0
         renderer.cancelStreaming()
         bufferedVisualFeeder.cancel()
@@ -23,6 +23,10 @@ extension StreamCoordinator {
         bufferedStreamCommitScheduler.reset()
         controller = nil
         streamGeneration += 1
+    }
+
+    func cancelAllTasks() {
+        cancelActiveWork()
     }
 
     func handleParserEvent(

@@ -95,8 +95,8 @@ extension StreamCoordinator {
             if renderConfiguration.streamingMode == .bufferedModules {
                 let remaining = self.bufferedStreamCommitScheduler.flushRemaining()
                 if !remaining.isEmpty {
-                    self.bufferedVisualFeeder.enqueueBufferedModules(
-                        [remaining],
+                    self.bufferedVisualFeeder.enqueue(
+                        bufferedModules: [remaining],
                         policy: renderConfiguration.tailReveal,
                         to: streamController
                     )
@@ -113,12 +113,15 @@ extension StreamCoordinator {
     }
 
     func renderStatic(blocks: [BlockNode]) {
-        reset()
-        renderer.render(blocks: blocks, frozenCount: blocks.count)
+        cancelActiveWork()
+        let outcome = renderer.render(blocks: blocks, frozenCount: blocks.count)
+        guard outcome.invalidatedHeight else { return }
+
+        invalidateHeight(for: .rendererSnapshotApplied)
     }
 
     func reset() {
-        cancelAllTasks()
+        cancelActiveWork()
         renderer.reset()
     }
 }

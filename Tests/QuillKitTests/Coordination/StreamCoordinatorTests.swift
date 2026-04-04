@@ -3,7 +3,7 @@ import QuillSharedTestSupport
 @testable import QuillKit
 import Testing
 
-@Suite("StreamCoordinator", .tags(.rendering, .streaming))
+@MainActor @Suite("StreamCoordinator", .tags(.rendering, .streaming))
 struct StreamCoordinatorTests {
     @Test("Buffered visual feed chunks preserve the original module text")
     func bufferedVisualFeedChunksPreserveModuleText() {
@@ -25,7 +25,7 @@ struct StreamCoordinatorTests {
         #expect(chunks.joined() == module)
     }
 
-    @Test("Buffered visual feed keeps newline boundaries as separate chunks")
+    @MainActor @Test("Buffered visual feed keeps newline boundaries as separate chunks")
     func bufferedVisualFeedChunksKeepNewlineBoundaries() {
         let configuration = RenderConfiguration(
             streamingMode: .bufferedModules,

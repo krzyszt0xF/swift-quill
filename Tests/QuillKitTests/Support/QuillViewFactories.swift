@@ -82,7 +82,9 @@ private func makeQuillViewDependencies(
         renderer: renderer,
         renderConfiguration: configuration,
         bufferedStreamCommitScheduler: scheduler,
-        bufferedVisualFeeder: .init(),
+        bufferedVisualFeeder: .init(sleep: { duration in
+            await schedulerTimeController.sleep(for: duration)
+        }),
         streamController: MarkdownStreamController.init
     )
 

@@ -3,27 +3,40 @@ import QuillCore
 
 @MainActor
 final class BufferedVisualFeeder {
-    private var appendTask: Task<Void, Never>?
+    private var drainContinuations: [CheckedContinuation<Void, Never>] = []
+    private var drainTask: Task<Void, Never>?
+    private var nextPendingChunkIndex = 0
+    private var pendingChunks: [QueuedChunk] = []
+    private let sleep: (Duration) async -> Void
 
-    init() {}
+    init(sleep: @escaping (Duration) async -> Void = { duration in
+        try? await Task.sleep(for: duration)
+    }) {
+        self.sleep = sleep
+    }
 
     deinit {
-        appendTask?.cancel()
+        drainTask?.cancel()
+        MainActor.assumeIsolated {
+            resumeDrainContinuations()
+        }
     }
 
     func cancel() {
-        appendTask?.cancel()
-        appendTask = nil
+        drainTask?.cancel()
+        drainTask = nil
+        clearPendingChunks()
+        resumeDrainContinuations()
     }
 
-    func enqueueBufferedModules(
-        _ modules: [String],
+    func enqueue(
+        bufferedModules: [String],
         policy: TailRevealPolicy,
         to streamController: MarkdownStreamController
     ) {
-        for module in modules where module.isEmpty == false {
-            enqueueVisualChunks(
-                Self.makeVisualFeedChunks(
+        for module in bufferedModules where module.isEmpty == false {
+            enqueue(
+                visualChunks: Self.makeVisualFeedChunks(
                     from: module,
                     policy: policy
                 ),
@@ -33,14 +46,14 @@ final class BufferedVisualFeeder {
         }
     }
 
-    func enqueueImmediateChunk(
-        _ chunk: String,
+    func enqueue(
+        immediateChunk: String,
         policy: TailRevealPolicy,
         to streamController: MarkdownStreamController
     ) {
-        enqueueVisualChunks(
-            Self.makeImmediateFeedChunks(
-                from: chunk,
+        enqueue(
+            visualChunks:Self.makeImmediateFeedChunks(
+                from: immediateChunk,
                 policy: policy
             ),
             policy: policy,
@@ -49,13 +62,17 @@ final class BufferedVisualFeeder {
     }
 
     func waitUntilDrained() async {
-        let appendTask = appendTask
-        await appendTask?.value
+        let hasPendingWork = drainTask != nil || nextPendingChunkIndex < pendingChunks.count
+        guard hasPendingWork else { return }
+
+        await withCheckedContinuation { continuation in
+            drainContinuations.append(continuation)
+        }
     }
 }
 
 extension BufferedVisualFeeder {
-    nonisolated static func makeImmediateFeedChunks(
+    static func makeImmediateFeedChunks(
         from text: String,
         policy: TailRevealPolicy
     ) -> [String] {
@@ -63,92 +80,167 @@ extension BufferedVisualFeeder {
         return makeVisualFeedChunks(from: text, policy: policy)
     }
 
-    nonisolated static func makeVisualFeedChunks(
+    static func makeVisualFeedChunks(
         from text: String,
         policy: TailRevealPolicy
     ) -> [String] {
-        let targetLength = max(2, policy.lowQueue.charsPerStep)
-        let tokens = makeVisualFeedTokens(from: text)
-        var chunks: [String] = []
-        var current = ""
-
-        for token in tokens {
-            if token.contains("\n") {
-                if current.isEmpty == false {
-                    chunks.append(current)
-                    current = ""
-                }
-                chunks.append(token)
-                continue
-            }
-
-            if current.isEmpty == false, current.count + token.count > targetLength {
-                chunks.append(current)
-                current = token
-                continue
-            }
-
-            current += token
+        enum TokenKind {
+            case text
+            case whitespace
         }
 
+        let targetLength = max(2, policy.lowQueue.charsPerStep)
+        var chunks: [String] = []
+        var current = ""
+        var token = ""
+        var tokenKind: TokenKind?
+
+        for character in text {
+            let nextTokenKind: TokenKind = character.isWhitespace ? .whitespace : .text
+
+            if tokenKind == nil || tokenKind == nextTokenKind {
+                token.append(character)
+            } else {
+                append(
+                    token: token,
+                    to: &chunks,
+                    currentChunk: &current,
+                    targetLength: targetLength
+                )
+                token = String(character)
+            }
+
+            tokenKind = nextTokenKind
+
+            if character == "\n" {
+                append(
+                    token: token,
+                    to: &chunks,
+                    currentChunk: &current,
+                    targetLength: targetLength
+                )
+                token = ""
+                tokenKind = nil
+            }
+        }
+
+        if token.isEmpty == false {
+            append(
+                token: token,
+                to: &chunks,
+                currentChunk: &current,
+                targetLength: targetLength
+            )
+        }
         if current.isEmpty == false {
             chunks.append(current)
         }
 
-        return chunks.filter { $0.isEmpty == false }
+        return chunks
     }
 }
 
 private extension BufferedVisualFeeder {
-    enum Layout {
+    struct QueuedChunk {
+        let delay: Duration?
+        let text: String
+    }
+
+    enum Timing {
+        static let pendingChunkCompactionThreshold = 32
         static let minimumDelay: TimeInterval = 0.015
     }
 
-    func enqueueVisualChunks(
-        _ chunks: [String],
+    static func append(
+        token: String,
+        to chunks: inout [String],
+        currentChunk: inout String,
+        targetLength: Int
+    ) {
+        if token.contains("\n") {
+            if currentChunk.isEmpty == false {
+                chunks.append(currentChunk)
+                currentChunk = ""
+            }
+            chunks.append(token)
+            return
+        }
+
+        if currentChunk.isEmpty == false, currentChunk.count + token.count > targetLength {
+            chunks.append(currentChunk)
+            currentChunk = token
+            return
+        }
+
+        currentChunk += token
+    }
+
+    func clearPendingChunks() {
+        nextPendingChunkIndex = 0
+        pendingChunks.removeAll(keepingCapacity: true)
+    }
+
+    func compactPendingChunksIfNeeded() {
+        guard
+            nextPendingChunkIndex > Timing.pendingChunkCompactionThreshold,
+            nextPendingChunkIndex * 2 >= pendingChunks.count
+        else {
+            return
+        }
+
+        pendingChunks.removeFirst(nextPendingChunkIndex)
+        nextPendingChunkIndex = 0
+    }
+
+    func dequeuePendingChunk() -> QueuedChunk? {
+        guard nextPendingChunkIndex < pendingChunks.count else {
+            clearPendingChunks()
+            return nil
+        }
+
+        let chunk = pendingChunks[nextPendingChunkIndex]
+        nextPendingChunkIndex += 1
+        compactPendingChunksIfNeeded()
+        return chunk
+    }
+
+    func drainPendingChunks(to streamController: MarkdownStreamController) async {
+        while let pendingChunk = dequeuePendingChunk() {
+            if let delay = pendingChunk.delay {
+                await sleep(delay)
+            }
+
+            guard !Task.isCancelled else { break }
+            await streamController.append(pendingChunk.text)
+        }
+
+        drainTask = nil
+        resumeDrainContinuations()
+    }
+
+    func enqueue(
+        visualChunks: [String],
         policy: TailRevealPolicy,
         to streamController: MarkdownStreamController
     ) {
-        for (index, chunk) in chunks.enumerated() {
+        for (index, chunk) in visualChunks.enumerated() {
             let delay = index == 0
                 ? nil
                 : Duration.seconds(
                     makeBufferedVisualFeedDelay(
-                        after: chunk,
+                        for: chunk,
                         policy: policy
                     )
                 )
-            enqueueChunk(
-                chunk,
-                delay: delay,
-                to: streamController
-            )
+            
+            pendingChunks.append(QueuedChunk(delay: delay, text: chunk))
         }
-    }
 
-    func enqueueChunk(
-        _ chunk: String,
-        delay: Duration?,
-        to streamController: MarkdownStreamController
-    ) {
-        guard chunk.isEmpty == false else { return }
-
-        let priorTask = appendTask
-        appendTask = Task {
-            await priorTask?.value
-            guard !Task.isCancelled else { return }
-
-            if let delay {
-                try? await Task.sleep(for: delay)
-                guard !Task.isCancelled else { return }
-            }
-
-            await streamController.append(chunk)
-        }
+        startDrainingIfNeeded(to: streamController)
     }
 
     func makeBufferedVisualFeedDelay(
-        after chunk: String,
+        for chunk: String,
         policy: TailRevealPolicy
     ) -> TimeInterval {
         let queueTiming = policy.lowQueue
@@ -162,42 +254,24 @@ private extension BufferedVisualFeeder {
             delay += policy.punctuationDelay(after: lastCharacter)
         }
 
-        return max(Layout.minimumDelay, delay)
+        return max(Timing.minimumDelay, delay)
     }
 
-    nonisolated static func makeVisualFeedTokens(from text: String) -> [String] {
-        enum TokenKind {
-            case text
-            case whitespace
+    func resumeDrainContinuations() {
+        let continuations = drainContinuations
+        drainContinuations.removeAll(keepingCapacity: true)
+
+        for continuation in continuations {
+            continuation.resume()
         }
+    }
 
-        var current = ""
-        var currentKind: TokenKind?
-        var tokens: [String] = []
-
-        for character in text {
-            let nextKind: TokenKind = character.isWhitespace ? .whitespace : .text
-
-            if currentKind == nil || currentKind == nextKind {
-                current.append(character)
-            } else {
-                tokens.append(current)
-                current = String(character)
-            }
-
-            currentKind = nextKind
-
-            if character == "\n" {
-                tokens.append(current)
-                current = ""
-                currentKind = nil
-            }
+    func startDrainingIfNeeded(to streamController: MarkdownStreamController) {
+        guard drainTask == nil, nextPendingChunkIndex < pendingChunks.count else { return }
+        
+        drainTask = Task { [weak self] in
+            guard let self else { return }
+            await self.drainPendingChunks(to: streamController)
         }
-
-        if current.isEmpty == false {
-            tokens.append(current)
-        }
-
-        return tokens
     }
 }

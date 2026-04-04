@@ -10,8 +10,8 @@ extension StreamCoordinator {
             generation: streamGeneration,
             commitChunks: { [weak self] chunks in
                 guard let self else { return }
-                self.bufferedVisualFeeder.enqueueBufferedModules(
-                    chunks,
+                self.bufferedVisualFeeder.enqueue(
+                    bufferedModules: chunks,
                     policy: self.renderConfiguration.tailReveal,
                     to: streamController
                 )
@@ -32,8 +32,8 @@ extension StreamCoordinator {
             generation: generation,
             commitChunks: { [weak self] chunks in
                 guard let self else { return }
-                self.bufferedVisualFeeder.enqueueBufferedModules(
-                    chunks,
+                self.bufferedVisualFeeder.enqueue(
+                    bufferedModules: chunks,
                     policy: self.renderConfiguration.tailReveal,
                     to: streamController
                 )
@@ -60,8 +60,8 @@ extension StreamCoordinator {
         _ chunk: String,
         to streamController: MarkdownStreamController
     ) {
-        bufferedVisualFeeder.enqueueImmediateChunk(
-            chunk,
+        bufferedVisualFeeder.enqueue(
+            immediateChunk: chunk,
             policy: renderConfiguration.tailReveal,
             to: streamController
         )
