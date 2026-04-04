@@ -79,10 +79,8 @@ private extension ListFragmentRenderer {
         )
 
         return RenderFragment(
-            attributedString: AttributedStringAttributeFormatter.makeAttributedStringWithBlockquoteDepth(
-                attributedString,
-                nestingContext: nestingContext
-            ),
+            attributedString: attributedString,
+            blockquoteDepth: fragment.blockquoteDepth,
             contentBlockID: fragment.contentBlockID,
             ownerBlockID: fragment.ownerBlockID,
             presentationRole: fragment.presentationRole
@@ -114,10 +112,8 @@ private extension ListFragmentRenderer {
         )
 
         return RenderFragment(
-            attributedString: AttributedStringAttributeFormatter.makeAttributedStringWithBlockquoteDepth(
-                markerString,
-                nestingContext: nestingContext
-            ),
+            attributedString: markerString,
+            blockquoteDepth: fragment.blockquoteDepth,
             contentBlockID: fragment.contentBlockID,
             ownerBlockID: fragment.ownerBlockID,
             presentationRole: fragment.presentationRole
@@ -283,6 +279,7 @@ private extension ListFragmentRenderer {
 
         return RenderFragment(
             attributedString: attributedString,
+            blockquoteDepth: fragment.blockquoteDepth,
             contentBlockID: fragment.contentBlockID,
             ownerBlockID: fragment.ownerBlockID,
             presentationRole: fragment.presentationRole
@@ -308,10 +305,8 @@ private extension ListFragmentRenderer {
         ])
 
         return RenderFragment(
-            attributedString: AttributedStringAttributeFormatter.makeAttributedStringWithBlockquoteDepth(
-                attributedString,
-                nestingContext: nestingContext
-            ),
+            attributedString: attributedString,
+            blockquoteDepth: nestingContext.blockquoteDepth,
             contentBlockID: ownerBlockID,
             ownerBlockID: ownerBlockID,
             presentationRole: .standaloneListMarker
@@ -325,11 +320,9 @@ private extension ListFragmentRenderer {
         ownerBlockID: BlockIdentity,
         presentationRole: RenderFragment.PresentationRole
     ) -> RenderFragment {
-        RenderFragment(
-            attributedString: AttributedStringAttributeFormatter.makeAttributedStringWithBlockquoteDepth(
-                attributedString,
-                nestingContext: nestingContext
-            ),
+        return RenderFragment(
+            attributedString: attributedString,
+            blockquoteDepth: nestingContext.blockquoteDepth,
             contentBlockID: contentBlockID,
             ownerBlockID: ownerBlockID,
             presentationRole: presentationRole

@@ -101,10 +101,7 @@ struct AttributedStringBuilderFragmentTests {
         let fragments = AttributedStringBuilder.buildRenderFragments(from: blocks.makeNodes(), frozenCount: blocks.count)
 
         #expect(fragments.count == 1)
-
-        let deepRange = (fragments[0].attributedString.string as NSString).range(of: "deep")
-        let depth = fragments[0].attributedString.attribute(.blockquoteDepth, at: deepRange.location, effectiveRange: nil) as? Int
-        #expect(depth == 2)
+        #expect(fragments[0].blockquoteDepth == 2)
     }
 
     @Test("Blockquote nested list fragment keeps owner identity and list text role")
@@ -134,12 +131,9 @@ struct AttributedStringBuilderFragmentTests {
 
         #expect(fragments.count == 1)
         #expect(fragments[0].presentationRole == .indentedListText)
+        #expect(fragments[0].blockquoteDepth == 1)
         #expect(fragments[0].ownerBlockID == blockquoteID)
         #expect(fragments[0].contentBlockID == paragraphID)
-
-        let nestedRange = (fragments[0].attributedString.string as NSString).range(of: "Nested")
-        let depth = fragments[0].attributedString.attribute(.blockquoteDepth, at: nestedRange.location, effectiveRange: nil) as? Int
-        #expect(depth == 1)
     }
 
     @Test("Empty input produces no fragments")
@@ -185,6 +179,71 @@ struct AttributedStringBuilderFragmentTests {
         #expect(alphaOwnerBlockID == id1)
         #expect(betaContentBlockID == id2)
         #expect(betaOwnerBlockID == id2)
+    }
+
+    @Test("buildDocument keeps separator unstamped and attachment range stamped")
+    func buildDocumentSeparatorAndAttachmentAttributes() throws {
+        let textID = BlockIdentity(rawValue: 10)
+        let attachmentID = BlockIdentity(rawValue: 11)
+        let attachment = NSTextAttachment()
+        let fragments = [
+            RenderFragment(
+                attributedString: NSAttributedString(string: "alpha"),
+                blockquoteDepth: 0,
+                contentBlockID: textID,
+                ownerBlockID: textID,
+                presentationRole: .regularBlock
+            ),
+            RenderFragment(
+                attributedString: NSAttributedString(attachment: attachment),
+                blockquoteDepth: 2,
+                contentBlockID: attachmentID,
+                ownerBlockID: attachmentID,
+                presentationRole: .fullWidthEmbeddedBlock
+            ),
+        ]
+
+        let document = AttributedStringBuilder.buildDocument(from: fragments)
+        let separatorIndex = (document.string as NSString).range(of: "\n").location
+        let attachmentIndex = try #require(document.firstAttachmentIndex)
+
+        let separatorOwnerID = document.attribute(
+            .ownerBlockID,
+            at: separatorIndex,
+            effectiveRange: nil
+        ) as? BlockIdentity
+        let separatorContentID = document.attribute(
+            .contentBlockID,
+            at: separatorIndex,
+            effectiveRange: nil
+        ) as? BlockIdentity
+        let attachmentOwnerID = document.attribute(
+            .ownerBlockID,
+            at: attachmentIndex,
+            effectiveRange: nil
+        ) as? BlockIdentity
+        let attachmentContentID = document.attribute(
+            .contentBlockID,
+            at: attachmentIndex,
+            effectiveRange: nil
+        ) as? BlockIdentity
+        let separatorBlockquoteDepth = document.attribute(
+            .blockquoteDepth,
+            at: separatorIndex,
+            effectiveRange: nil
+        ) as? Int
+        let attachmentBlockquoteDepth = document.attribute(
+            .blockquoteDepth,
+            at: attachmentIndex,
+            effectiveRange: nil
+        ) as? Int
+
+        #expect(separatorOwnerID == nil)
+        #expect(separatorContentID == nil)
+        #expect(separatorBlockquoteDepth == nil)
+        #expect(attachmentOwnerID == attachmentID)
+        #expect(attachmentContentID == attachmentID)
+        #expect(attachmentBlockquoteDepth == 2)
     }
 
     @Test("Each simple top-level fragment keeps matching owner and content IDs")

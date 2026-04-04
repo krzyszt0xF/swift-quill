@@ -168,6 +168,7 @@ private extension DocumentBlockIndexerTests {
     ) -> RenderFragment {
         RenderFragment(
             attributedString: NSAttributedString(string: text),
+            blockquoteDepth: 0,
             contentBlockID: BlockIdentity(rawValue: contentBlockID ?? ownerBlockID),
             ownerBlockID: BlockIdentity(rawValue: ownerBlockID),
             presentationRole: .regularBlock

@@ -172,10 +172,8 @@ private extension RenderFragmentBuilder {
         }
 
         return RenderFragment(
-            attributedString: AttributedStringAttributeFormatter.makeAttributedStringWithBlockquoteDepth(
-                attributedString,
-                nestingContext: nestingContext
-            ),
+            attributedString: attributedString,
+            blockquoteDepth: nestingContext.blockquoteDepth,
             contentBlockID: node.id,
             ownerBlockID: ownerBlockID,
             presentationRole: presentationRole
