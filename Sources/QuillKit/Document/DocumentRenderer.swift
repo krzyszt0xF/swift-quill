@@ -7,9 +7,11 @@ final class DocumentRenderer {
     var onTailRevealProgress: (() -> Void)? {
         didSet { tailRevealEngine.onProgress = onTailRevealProgress }
     }
+    var onImageAspectRatioChanged: (() -> Void)?
 
     var blockIndexer = DocumentBlockIndexer()
     var highlightCoordinator: HighlightCoordinator
+    var imageLoadingCoordinator: ImageLoadingCoordinator
     var renderState = RenderState()
     let tailAnimator = TailAnimator()
     var tailRevealPolicy: TailRevealPolicy?
@@ -19,15 +21,20 @@ final class DocumentRenderer {
 
     init(
         textView: DocumentTextView,
-        highlightCoordinator: HighlightCoordinator
+        highlightCoordinator: HighlightCoordinator,
+        imageLoadingCoordinator: ImageLoadingCoordinator
     ) {
         self.textView = textView
         self.highlightCoordinator = highlightCoordinator
+        self.imageLoadingCoordinator = imageLoadingCoordinator
         tailRevealEngine.advancePresentation = { [weak self] timestamp in
             self?.advanceTailFade(timestamp: timestamp) ?? false
         }
         tailRevealEngine.hasPresentationWork = { [weak self] in
             self?.tailAnimator.hasActiveSegments ?? false
+        }
+        self.imageLoadingCoordinator.onAspectRatioChanged = { [weak self] in
+            self?.onImageAspectRatioChanged?()
         }
     }
 
@@ -39,6 +46,7 @@ final class DocumentRenderer {
         tailRevealEngine.cancel()
         tailAnimator.cancel()
         highlightCoordinator.cancelAll()
+        imageLoadingCoordinator.cancelAll()
         renderState.resetSmoothedTailStart()
     }
 
@@ -47,7 +55,9 @@ final class DocumentRenderer {
         let fragments = AttributedStringBuilder.buildRenderFragments(
             from: blocks,
             frozenCount: frozenCount,
-            highlightStore: highlightCoordinator
+            highlightStore: highlightCoordinator,
+            imageLoadStore: imageLoadingCoordinator,
+            imageAppearance: imageLoadingCoordinator.imageAppearance
         )
         let previousFrozenCount = renderState.frozenBlockCount
         let renderOutcome = makeRenderOutcome(
@@ -62,6 +72,11 @@ final class DocumentRenderer {
             previousFrozenCount: previousFrozenCount,
             newFrozenCount: frozenCount
         )
+        scheduleImageLoadsForNewlyFrozenBlocks(
+            blocks: blocks,
+            previousFrozenCount: previousFrozenCount,
+            newFrozenCount: frozenCount
+        )
 
         return renderOutcome
     }
@@ -70,6 +85,7 @@ final class DocumentRenderer {
         cancelStreaming()
         blockIndexer.removeAll()
         highlightCoordinator.cancelAll()
+        imageLoadingCoordinator.reset()
         renderState.reset()
 
         guard let contentStorage = textView.contentStorage,
@@ -88,6 +104,14 @@ final class DocumentRenderer {
 
     func set(highlighter: (any SyntaxHighlighting)?) {
         highlightCoordinator.set(highlighter: highlighter)
+    }
+
+    func set(imageLoader: (any ImageLoading)?) {
+        imageLoadingCoordinator.set(loader: imageLoader)
+    }
+
+    func set(imageOptions: ImageOptions) {
+        imageLoadingCoordinator.set(options: imageOptions)
     }
 }
 
@@ -113,7 +137,8 @@ extension DocumentRenderer {
     static var live: DocumentRenderer {
         DocumentRenderer(
             textView: .init(),
-            highlightCoordinator: .live)
+            highlightCoordinator: .live,
+            imageLoadingCoordinator: .live)
     }
 }
 
@@ -122,6 +147,11 @@ extension DocumentRenderer {
         let blockID: BlockIdentity
         let code: String
         let language: String
+    }
+
+    struct LoadableImage {
+        let blockID: BlockIdentity
+        let source: String?
     }
 
     struct RenderState {

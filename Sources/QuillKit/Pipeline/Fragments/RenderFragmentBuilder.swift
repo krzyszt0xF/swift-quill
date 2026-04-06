@@ -5,13 +5,17 @@ enum RenderFragmentBuilder {
     static func buildRenderFragments(
         from nodes: [BlockNode],
         frozenCount: Int,
-        highlightStore: (any CodeBlockHighlightStore)? = nil
+        highlightStore: (any CodeBlockHighlightStore)? = nil,
+        imageLoadStore: (any ImageLoadStore)? = nil,
+        imageAppearance: ImageAppearance = .default
     ) -> [RenderFragment] {
         var fragments: [RenderFragment] = []
 
         for (index, node) in nodes.enumerated() {
             let renderContext = RenderContext(
                 highlightStore: highlightStore,
+                imageAppearance: imageAppearance,
+                imageLoadStore: imageLoadStore,
                 rendersAttachments: index < frozenCount
             )
             let nodeFragments = makeRenderFragments(
@@ -143,10 +147,24 @@ private extension RenderFragmentBuilder {
                 rawHTML: rawHTML
             )
         case let .paragraph(content):
-            attributedString = TextBlockAttributedStringRenderer.makeParagraphAttributedString(
-                content: content,
-                nestingContext: nestingContext
-            )
+            if renderContext.rendersAttachments,
+               content.count == 1,
+               case let .image(source, _, alt)? = content.first {
+                attributedString = EmbeddedBlockRenderer.makeImageAttachmentAttributedString(
+                    blockID: node.id,
+                    source: source,
+                    alt: InlineContentRenderer.plainText(from: alt),
+                    imageLoadStore: renderContext.imageLoadStore,
+                    appearance: renderContext.imageAppearance,
+                    nestingContext: nestingContext,
+                    presentationRole: presentationRole
+                )
+            } else {
+                attributedString = TextBlockAttributedStringRenderer.makeParagraphAttributedString(
+                    content: content,
+                    nestingContext: nestingContext
+                )
+            }
         case let .table(columnAlignments, header, rows):
             if renderContext.rendersAttachments {
                 attributedString = EmbeddedBlockRenderer.makeTableAttachmentAttributedString(
