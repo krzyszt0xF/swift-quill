@@ -3,7 +3,7 @@ import Foundation
 extension StreamCoordinator {
     func invalidateHeight(for reason: HeightInvalidationReason) {
         switch reason {
-        case .rendererSnapshotApplied, .streamFinished, .streamReset:
+        case .imageAspectRatioUpdated, .rendererSnapshotApplied, .streamFinished, .streamReset:
             lastTailRevealHeightInvalidation = Date.timeIntervalSinceReferenceDate
             onHeightInvalidated?()
         case .tailRevealProgress:

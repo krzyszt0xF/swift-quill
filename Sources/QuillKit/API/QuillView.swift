@@ -21,6 +21,14 @@ public final class QuillView: UIView {
         didSet { streamCoordinator.syntaxHighlighter = syntaxHighlighter }
     }
 
+    public var imageLoader: (any ImageLoading)? {
+        didSet { streamCoordinator.imageLoader = imageLoader }
+    }
+
+    public var imageOptions: ImageOptions = .default {
+        didSet { streamCoordinator.imageOptions = imageOptions }
+    }
+
     public var markdown: String? {
         didSet {
             guard markdown != oldValue else { return }

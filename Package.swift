@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "QuillKit", targets: ["QuillKit"]),
         .library(name: "QuillSwiftUI", targets: ["QuillSwiftUI"]),
         .library(name: "QuillHighlight", targets: ["QuillHighlight"]),
+        .library(name: "QuillImageLoader", targets: ["QuillImageLoader"]),
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.7.0"),
@@ -38,6 +39,10 @@ let package = Package(
                 "QuillKit",
                 .product(name: "Highlighter", package: "HighlighterSwift"),
             ]
+        ),
+        .target(
+            name: "QuillImageLoader",
+            dependencies: ["QuillKit"]
         ),
         .target(
             name: "QuillSharedTestSupport",

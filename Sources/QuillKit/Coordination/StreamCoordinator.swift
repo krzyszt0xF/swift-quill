@@ -12,6 +12,12 @@ final class StreamCoordinator {
     var onLinkSelection: ((URL) -> Void)? {
         didSet { renderer.textView.onLinkSelection = onLinkSelection }
     }
+    var imageLoader: (any ImageLoading)? {
+        didSet { renderer.set(imageLoader: imageLoader) }
+    }
+    var imageOptions: ImageOptions = .default {
+        didSet { renderer.set(imageOptions: imageOptions) }
+    }
     var syntaxHighlighter: (any SyntaxHighlighting)? {
         didSet { renderer.set(highlighter: syntaxHighlighter) }
     }
@@ -39,8 +45,12 @@ final class StreamCoordinator {
         self.bufferedVisualFeeder = bufferedVisualFeeder
         self.renderer = renderer
         self.renderConfiguration = renderConfiguration
+        self.renderer.set(imageOptions: imageOptions)
         self.renderer.onTailRevealProgress = { [weak self] in
             self?.invalidateHeight(for: .tailRevealProgress)
+        }
+        self.renderer.onImageAspectRatioChanged = { [weak self] in
+            self?.invalidateHeight(for: .imageAspectRatioUpdated)
         }
     }
 }
@@ -128,6 +138,7 @@ extension StreamCoordinator {
 
 extension StreamCoordinator {
     enum HeightInvalidationReason {
+        case imageAspectRatioUpdated
         case rendererSnapshotApplied
         case streamFinished
         case streamReset

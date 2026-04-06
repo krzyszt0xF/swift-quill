@@ -1,0 +1,408 @@
+@testable import QuillKit
+import QuillCore
+import QuillSharedTestSupport
+import Testing
+import UIKit
+
+@MainActor
+@Suite("ImageLoadingCoordinator", .tags(.rendering))
+struct ImageLoadingCoordinatorTests {
+    @Test("scheduleLoad with valid URL stores loaded result and notifies sink")
+    func scheduleLoadStoresLoadedResult() async {
+        let coordinator = ImageLoadingCoordinator()
+        let loader = MockImageLoader()
+        let blockID = BlockIdentity(rawValue: 1)
+        let sink = MockImageLoadSink()
+        let url = URL(string: "https://example.com/image.png")!
+        let image = makeImage(width: 120, height: 60)
+
+        coordinator.set(loader: loader)
+        coordinator.register(sink: sink, for: blockID)
+        await loader.resolve(.success(image), for: url)
+
+        coordinator.scheduleLoad(blockID: blockID, source: url.absoluteString)
+
+        let rendered = await eventually {
+            sink.loadedImageSize == image.size
+        }
+
+        #expect(rendered)
+        #expect(coordinator.loadResult(for: blockID).isLoadedImage)
+    }
+
+    @Test("scheduleLoad with cached URL does not invoke loader again")
+    func scheduleLoadUsesCache() async {
+        let coordinator = ImageLoadingCoordinator()
+        let loader = MockImageLoader()
+        let firstBlockID = BlockIdentity(rawValue: 1)
+        let secondBlockID = BlockIdentity(rawValue: 2)
+        let firstSink = MockImageLoadSink()
+        let secondSink = MockImageLoadSink()
+        let url = URL(string: "https://example.com/cached.png")!
+        let image = makeImage(width: 200, height: 100)
+
+        coordinator.set(loader: loader)
+        await loader.resolve(.success(image), for: url)
+        coordinator.register(sink: firstSink, for: firstBlockID)
+        coordinator.scheduleLoad(blockID: firstBlockID, source: url.absoluteString)
+
+        let firstRendered = await eventually {
+            firstSink.loadedImageSize == image.size
+        }
+        #expect(firstRendered)
+        #expect(await loader.callCount(for: url) == 1)
+
+        coordinator.register(sink: secondSink, for: secondBlockID)
+        coordinator.scheduleLoad(blockID: secondBlockID, source: url.absoluteString)
+
+        #expect(secondSink.loadedImageSize == image.size)
+        #expect(await loader.callCount(for: url) == 1)
+    }
+
+    @Test("scheduleLoad with nil loader stores failed result")
+    func scheduleLoadWithoutLoaderFails() {
+        let coordinator = ImageLoadingCoordinator()
+        let blockID = BlockIdentity(rawValue: 3)
+        let sink = MockImageLoadSink()
+
+        coordinator.register(sink: sink, for: blockID)
+        coordinator.scheduleLoad(
+            blockID: blockID,
+            source: "https://example.com/missing-loader.png"
+        )
+
+        #expect(sink.failureCount == 1)
+        #expect(coordinator.loadResult(for: blockID).isFailure == true)
+    }
+
+    @Test("scheduleLoad with invalid source stores failed result")
+    func scheduleLoadWithInvalidSourceFails() {
+        let coordinator = ImageLoadingCoordinator()
+        let loader = MockImageLoader()
+        let blockID = BlockIdentity(rawValue: 4)
+        let sink = MockImageLoadSink()
+
+        coordinator.set(loader: loader)
+        coordinator.register(sink: sink, for: blockID)
+        coordinator.scheduleLoad(blockID: blockID, source: "%%not-a-url%%")
+
+        #expect(sink.failureCount == 1)
+        #expect(coordinator.loadResult(for: blockID).isFailure == true)
+    }
+
+    @Test("cancelAll cancels pending loads and clears stored state")
+    func cancelAllCancelsPendingLoads() async {
+        let coordinator = ImageLoadingCoordinator()
+        let loader = MockImageLoader()
+        let blockID = BlockIdentity(rawValue: 5)
+        let sink = MockImageLoadSink()
+        let url = URL(string: "https://example.com/cancel.png")!
+        let image = makeImage(width: 80, height: 40)
+
+        coordinator.set(loader: loader)
+        coordinator.register(sink: sink, for: blockID)
+        coordinator.scheduleLoad(blockID: blockID, source: url.absoluteString)
+
+        let started = await eventually {
+            await loader.callCount(for: url) == 1
+        }
+        #expect(started)
+
+        coordinator.cancelAll()
+        await loader.resolve(.success(image), for: url)
+        await wait(for: .milliseconds(50))
+
+        #expect(sink.results.isEmpty)
+        #expect(coordinator.loadResult(for: blockID) == nil)
+    }
+
+    @Test("reset clears cache so subsequent load re-invokes loader")
+    func resetClearsCache() async {
+        let coordinator = ImageLoadingCoordinator()
+        let loader = MockImageLoader()
+        let firstBlockID = BlockIdentity(rawValue: 6)
+        let secondBlockID = BlockIdentity(rawValue: 7)
+        let firstSink = MockImageLoadSink()
+        let secondSink = MockImageLoadSink()
+        let url = URL(string: "https://example.com/reset.png")!
+        let image = makeImage(width: 90, height: 45)
+
+        coordinator.set(loader: loader)
+        await loader.resolve(.success(image), for: url)
+        coordinator.register(sink: firstSink, for: firstBlockID)
+        coordinator.scheduleLoad(blockID: firstBlockID, source: url.absoluteString)
+
+        let firstRendered = await eventually {
+            firstSink.loadedImageSize == image.size
+        }
+        #expect(firstRendered)
+        #expect(await loader.callCount(for: url) == 1)
+
+        coordinator.reset()
+        coordinator.register(sink: secondSink, for: secondBlockID)
+        coordinator.scheduleLoad(blockID: secondBlockID, source: url.absoluteString)
+
+        let secondRendered = await eventually {
+            secondSink.loadedImageSize == image.size
+        }
+        #expect(secondRendered)
+        #expect(await loader.callCount(for: url) == 2)
+    }
+
+    @Test("retryLoad reissues request after failure")
+    func retryLoadReissuesRequest() async {
+        let coordinator = ImageLoadingCoordinator()
+        let loader = MockImageLoader()
+        let blockID = BlockIdentity(rawValue: 8)
+        let sink = MockImageLoadSink()
+        let url = URL(string: "https://example.com/retry.png")!
+        let image = makeImage(width: 110, height: 55)
+
+        coordinator.set(loader: loader)
+        coordinator.register(sink: sink, for: blockID)
+        await loader.resolve(.failure(MockError.failed), for: url)
+
+        coordinator.scheduleLoad(blockID: blockID, source: url.absoluteString)
+
+        let failed = await eventually {
+            sink.failureCount == 1
+        }
+        #expect(failed)
+
+        await loader.resolve(.success(image), for: url)
+        coordinator.retryLoad(blockID: blockID, source: url.absoluteString)
+
+        let retried = await eventually {
+            sink.loadedImageSize == image.size
+        }
+        #expect(retried)
+        #expect(await loader.callCount(for: url) == 2)
+    }
+
+    @Test("dedup shares one underlying load for multiple block IDs")
+    func dedupSharesUnderlyingLoad() async {
+        let coordinator = ImageLoadingCoordinator()
+        let loader = MockImageLoader()
+        let firstBlockID = BlockIdentity(rawValue: 9)
+        let secondBlockID = BlockIdentity(rawValue: 10)
+        let firstSink = MockImageLoadSink()
+        let secondSink = MockImageLoadSink()
+        let url = URL(string: "https://example.com/shared.png")!
+        let image = makeImage(width: 300, height: 150)
+
+        coordinator.set(loader: loader)
+        coordinator.register(sink: firstSink, for: firstBlockID)
+        coordinator.register(sink: secondSink, for: secondBlockID)
+
+        coordinator.scheduleLoad(blockID: firstBlockID, source: url.absoluteString)
+        coordinator.scheduleLoad(blockID: secondBlockID, source: url.absoluteString)
+
+        let started = await eventually {
+            await loader.callCount(for: url) == 1
+        }
+        #expect(started)
+
+        await loader.resolve(.success(image), for: url)
+
+        let delivered = await eventually {
+            firstSink.loadedImageSize == image.size && secondSink.loadedImageSize == image.size
+        }
+        #expect(delivered)
+        #expect(await loader.callCount(for: url) == 1)
+    }
+
+    @Test("same block ID rescheduled with different URL keeps only latest result")
+    func sameBlockIDRescheduledUsesLatestURL() async {
+        let coordinator = ImageLoadingCoordinator()
+        let loader = MockImageLoader()
+        let blockID = BlockIdentity(rawValue: 11)
+        let sink = MockImageLoadSink()
+        let oldURL = URL(string: "https://example.com/old.png")!
+        let newURL = URL(string: "https://example.com/new.png")!
+        let oldImage = makeImage(width: 40, height: 20)
+        let newImage = makeImage(width: 160, height: 80)
+
+        coordinator.set(loader: loader)
+        coordinator.register(sink: sink, for: blockID)
+        coordinator.scheduleLoad(blockID: blockID, source: oldURL.absoluteString)
+
+        let oldStarted = await eventually {
+            await loader.callCount(for: oldURL) == 1
+        }
+        #expect(oldStarted)
+
+        await loader.resolve(.success(newImage), for: newURL)
+        coordinator.scheduleLoad(blockID: blockID, source: newURL.absoluteString)
+
+        let latestDelivered = await eventually {
+            sink.loadedImageSize == newImage.size
+        }
+        #expect(latestDelivered)
+
+        await loader.resolve(.success(oldImage), for: oldURL)
+        await wait(for: .milliseconds(50))
+
+        #expect(sink.loadedImageSize == newImage.size)
+        #expect(sink.loadedImageCount == 1)
+    }
+
+    @Test("aspect ratio callback fires only when geometry changes relative to fallback")
+    func aspectRatioCallbackFiresOnlyForGeometryChange() async {
+        let changingCoordinator = ImageLoadingCoordinator()
+        let changingLoader = MockImageLoader()
+        let changingURL = URL(string: "https://example.com/wide.png")!
+        let changedImage = makeImage(width: 200, height: 100)
+        var changedCount = 0
+
+        changingCoordinator.set(loader: changingLoader)
+        changingCoordinator.onAspectRatioChanged = { changedCount += 1 }
+        await changingLoader.resolve(.success(changedImage), for: changingURL)
+        changingCoordinator.scheduleLoad(
+            blockID: BlockIdentity(rawValue: 12),
+            source: changingURL.absoluteString
+        )
+
+        let changed = await eventually {
+            changedCount == 1
+        }
+        #expect(changed)
+
+        let matchingAppearance = ImageAppearance(
+            placeholderColor: .systemGray5,
+            fallbackAspectRatio: 16.0 / 9.0,
+            maxHeight: 400,
+            errorIconColor: .secondaryLabel
+        )
+        let matchingCoordinator = ImageLoadingCoordinator(appearance: matchingAppearance)
+        let matchingLoader = MockImageLoader()
+        let matchingURL = URL(string: "https://example.com/match.png")!
+        let matchingImage = makeImage(width: 160, height: 90)
+        var unchangedCount = 0
+
+        matchingCoordinator.set(loader: matchingLoader)
+        matchingCoordinator.onAspectRatioChanged = { unchangedCount += 1 }
+        await matchingLoader.resolve(.success(matchingImage), for: matchingURL)
+        matchingCoordinator.scheduleLoad(
+            blockID: BlockIdentity(rawValue: 13),
+            source: matchingURL.absoluteString
+        )
+
+        await wait(for: .milliseconds(50))
+        #expect(unchangedCount == 0)
+    }
+}
+
+private extension ImageLoadingCoordinatorTests {
+    enum MockError: Error {
+        case failed
+    }
+
+    @MainActor
+    final class MockImageLoadSink: ImageLoadSink {
+        private(set) var results: [ImageLoadResult] = []
+
+        var failureCount: Int {
+            results.reduce(into: 0) { count, result in
+                if case .failed = result {
+                    count += 1
+                }
+            }
+        }
+
+        var loadedImageCount: Int {
+            results.reduce(into: 0) { count, result in
+                if case .loaded = result {
+                    count += 1
+                }
+            }
+        }
+
+        var loadedImageSize: CGSize? {
+            for result in results.reversed() {
+                if case let .loaded(image) = result {
+                    return image.size
+                }
+            }
+            return nil
+        }
+
+        func apply(imageLoadResult: ImageLoadResult) {
+            results.append(imageLoadResult)
+        }
+    }
+
+    final class MockImageLoader: ImageLoading, @unchecked Sendable {
+        private let lock = NSLock()
+        private var callURLs: [URL] = []
+        private var immediateResults: [URL: Result<UIImage, Error>] = [:]
+        private var pendingContinuations: [URL: [CheckedContinuation<UIImage, Error>]] = [:]
+
+        func loadImage(from url: URL) async throws -> UIImage {
+            return try await withCheckedThrowingContinuation { continuation in
+                let result: Result<UIImage, Error>? = lock.withLock {
+                    callURLs.append(url)
+
+                    if let result = immediateResults[url] {
+                        return result
+                    }
+
+                    pendingContinuations[url, default: []].append(continuation)
+                    return nil
+                }
+
+                if let result {
+                    continuation.resume(with: result)
+                }
+            }
+        }
+
+        func callCount(for url: URL) async -> Int {
+            lock.withLock {
+                callURLs.filter { $0 == url }.count
+            }
+        }
+
+        func resolve(_ result: Result<UIImage, Error>, for url: URL) async {
+            let continuations: [CheckedContinuation<UIImage, Error>] = lock.withLock {
+                immediateResults[url] = result
+                return pendingContinuations.removeValue(forKey: url) ?? []
+            }
+
+            for continuation in continuations {
+                continuation.resume(with: result)
+            }
+        }
+    }
+
+    func makeImage(
+        width: CGFloat,
+        height: CGFloat,
+        color: UIColor = .systemBlue
+    ) -> UIImage {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
+        return renderer.image { context in
+            color.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        }
+    }
+}
+
+private extension ImageLoadResult? {
+    var isFailure: Bool {
+        switch self {
+        case .some(.failed):
+            return true
+        default:
+            return false
+        }
+    }
+
+    var isLoadedImage: Bool {
+        switch self {
+        case .some(.loaded(_)):
+            return true
+        default:
+            return false
+        }
+    }
+}

@@ -11,12 +11,16 @@ enum AttributedStringBuilder {
     static func buildRenderFragments(
         from nodes: [BlockNode],
         frozenCount: Int,
-        highlightStore: (any CodeBlockHighlightStore)? = nil
+        highlightStore: (any CodeBlockHighlightStore)? = nil,
+        imageLoadStore: (any ImageLoadStore)? = nil,
+        imageAppearance: ImageAppearance = .default
     ) -> [RenderFragment] {
         RenderFragmentBuilder.buildRenderFragments(
             from: nodes,
             frozenCount: frozenCount,
-            highlightStore: highlightStore
+            highlightStore: highlightStore,
+            imageLoadStore: imageLoadStore,
+            imageAppearance: imageAppearance
         )
     }
 }

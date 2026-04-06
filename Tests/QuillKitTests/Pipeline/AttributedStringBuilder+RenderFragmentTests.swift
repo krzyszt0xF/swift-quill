@@ -333,6 +333,74 @@ struct AttributedStringBuilderFragmentTests {
         #expect(attachment == nil)
     }
 
+    @Test("Frozen standalone image paragraph produces image attachment")
+    func frozenStandaloneImageParagraph() {
+        let nodes = [
+            Block.paragraph(content: [
+                .image(source: "https://example.com/image.png", title: nil, alt: [.text("cover")]),
+            ]),
+        ].makeNodes()
+
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 1)
+
+        #expect(fragments.count == 1)
+        #expect(fragments[0].attributedString.containsAttachment(ImageAttachment.self))
+    }
+
+    @Test("Unfrozen standalone image paragraph produces fallback text")
+    func unfrozenStandaloneImageParagraph() {
+        let nodes = [
+            Block.paragraph(content: [
+                .image(source: "https://example.com/image.png", title: nil, alt: [.text("cover")]),
+            ]),
+        ].makeNodes()
+
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 0)
+
+        #expect(fragments.count == 1)
+        #expect(fragments[0].attributedString.containsAttachment(ImageAttachment.self) == false)
+        #expect(fragments[0].attributedString.string.contains("[cover]"))
+    }
+
+    @Test("Frozen mixed paragraph with image does not produce attachment")
+    func frozenMixedParagraphWithImage() {
+        let nodes = [
+            Block.paragraph(content: [
+                .text("Hello "),
+                .image(source: "https://example.com/image.png", title: nil, alt: [.text("cover")]),
+            ]),
+        ].makeNodes()
+
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 1)
+
+        #expect(fragments.count == 1)
+        #expect(fragments[0].attributedString.containsAttachment(ImageAttachment.self) == false)
+        #expect(fragments[0].attributedString.string.contains("Hello"))
+    }
+
+    @Test("Frozen blockquote standalone image produces image attachment")
+    func frozenBlockquoteStandaloneImage() {
+        let nodes: [BlockNode] = [
+            BlockNode(
+                block: .blockquote(children: [
+                    BlockNode(
+                        block: .paragraph(content: [
+                            .image(source: "https://example.com/image.png", title: nil, alt: [.text("cover")]),
+                        ]),
+                        id: BlockIdentity(rawValue: 91)
+                    ),
+                ]),
+                id: BlockIdentity(rawValue: 90)
+            ),
+        ]
+
+        let fragments = AttributedStringBuilder.buildRenderFragments(from: nodes, frozenCount: 1)
+
+        #expect(fragments.count == 1)
+        #expect(fragments[0].blockquoteDepth == 1)
+        #expect(fragments[0].attributedString.containsAttachment(ImageAttachment.self))
+    }
+
     @Test("Frozen ordered list renders nested code block attachment")
     func frozenOrderedListNestedCodeBlockAttachment() {
         let nodes = [

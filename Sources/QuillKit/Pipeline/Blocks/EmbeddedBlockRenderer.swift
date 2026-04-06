@@ -23,6 +23,29 @@ enum EmbeddedBlockRenderer {
         )
     }
 
+    static func makeImageAttachmentAttributedString(
+        blockID: BlockIdentity,
+        source: String?,
+        alt: String,
+        imageLoadStore: (any ImageLoadStore)?,
+        appearance: ImageAppearance,
+        nestingContext: NestingContext,
+        presentationRole: RenderFragment.PresentationRole = .regularBlock
+    ) -> NSAttributedString {
+        let attachment = ImageAttachment(
+            blockID: blockID,
+            source: source,
+            alt: alt.isEmpty ? "image" : alt,
+            appearance: appearance
+        )
+        attachment.imageLoadStore = imageLoadStore
+        return makePresentationRoleAttributedString(
+            attachment: attachment,
+            nestingContext: nestingContext,
+            presentationRole: presentationRole
+        )
+    }
+
     static func makeOpenCodeFenceAttributedString(
         code: String,
         nestingContext: NestingContext,
