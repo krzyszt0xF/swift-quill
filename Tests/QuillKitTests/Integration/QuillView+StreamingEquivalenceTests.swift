@@ -37,7 +37,7 @@ struct QuillViewStreamingEquivalenceTests {
     )
     func presetEquivalence(preset: QuillStreamingPreset) async {
         let view = QuillView(frame: CGRect(x: 0, y: 0, width: 320, height: 0))
-        view.streamingPreset = preset
+        view.configuration.streaming.preset = preset
         view.layoutIfNeeded()
 
         let fullMarkdown = quillIntegrationMixedMarkdownFixture

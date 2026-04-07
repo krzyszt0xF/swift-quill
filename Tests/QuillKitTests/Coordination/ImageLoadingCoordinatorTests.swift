@@ -267,18 +267,15 @@ struct ImageLoadingCoordinatorTests {
         }
         #expect(changed)
 
-        let matchingAppearance = ImageAppearance(
-            placeholderColor: .systemGray5,
-            fallbackAspectRatio: 16.0 / 9.0,
-            maxHeight: 400,
-            errorIconColor: .secondaryLabel
-        )
-        let matchingCoordinator = ImageLoadingCoordinator(appearance: matchingAppearance)
+        let matchingCoordinator = ImageLoadingCoordinator()
         let matchingLoader = MockImageLoader()
         let matchingURL = URL(string: "https://example.com/match.png")!
         let matchingImage = makeImage(width: 160, height: 90)
         var unchangedCount = 0
 
+        var theme = QuillTheme.default
+        theme.image.fallbackAspectRatio = 16.0 / 9.0
+        matchingCoordinator.apply(theme: theme.image, retryEnabled: true)
         matchingCoordinator.set(loader: matchingLoader)
         matchingCoordinator.onAspectRatioChanged = { unchangedCount += 1 }
         await matchingLoader.resolve(.success(matchingImage), for: matchingURL)

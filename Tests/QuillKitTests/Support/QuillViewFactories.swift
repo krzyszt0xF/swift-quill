@@ -27,7 +27,7 @@ func makeQuillView(
     bufferedStreamConfiguration: BufferedStreamConfiguration? = nil,
     schedulerTimeController: TestTimeController? = nil
 ) -> QuillView {
-    var configuration = RenderConfiguration(
+    var renderConfiguration = RenderConfiguration(
         streamingMode: mode,
         performanceProfile: .balanced,
         tailReveal: .balanced,
@@ -36,15 +36,20 @@ func makeQuillView(
     )
 
     if mode == .bufferedModules {
-        configuration.bufferedStream = bufferedStreamConfiguration ?? BufferedStreamConfiguration(
+        renderConfiguration.bufferedStream = bufferedStreamConfiguration ?? BufferedStreamConfiguration(
             minModuleLength: 1,
             maxBufferingDelay: 0.1
         )
     }
 
+    let configuration = QuillConfiguration(
+        streaming: .init(mode: mode, preset: .balanced),
+        renderConfiguration: renderConfiguration
+    )
+
     let dependencies = if let schedulerTimeController {
         makeQuillViewDependencies(
-            configuration: configuration,
+            renderConfiguration: renderConfiguration,
             schedulerTimeController: schedulerTimeController
         )
     } else {
@@ -67,7 +72,7 @@ func makeSmoothedTailQuillView() -> QuillView {
 
 @MainActor
 private func makeQuillViewDependencies(
-    configuration: RenderConfiguration,
+    renderConfiguration: RenderConfiguration,
     schedulerTimeController: TestTimeController
 ) -> QuillView.Dependencies {
     let renderer = makeDocumentRenderer()
@@ -80,7 +85,7 @@ private func makeQuillViewDependencies(
     )
     let streamCoordinator = StreamCoordinator(
         renderer: renderer,
-        renderConfiguration: configuration,
+        renderConfiguration: renderConfiguration,
         bufferedStreamCommitScheduler: scheduler,
         bufferedVisualFeeder: .init(sleep: { duration in
             await schedulerTimeController.sleep(for: duration)

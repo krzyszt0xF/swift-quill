@@ -120,11 +120,11 @@ struct QuillViewLifecycleTests {
     @Test("preset change applies without crash")
     func presetSwitchPreservesUsableState() {
         let view = QuillView(frame: CGRect(x: 0, y: 0, width: 320, height: 0))
-        view.streamingPreset = .snappy
-        view.streamingPreset = .longForm
-        view.streamingPreset = .balanced
+        view.configuration.streaming.preset = .snappy
+        view.configuration.streaming.preset = .longForm
+        view.configuration.streaming.preset = .balanced
 
-        #expect(view.streamingPreset == .balanced)
+        #expect(view.configuration.streaming.preset == .balanced)
     }
 
     @Test("reset clears currentMarkdown and rendered content")
