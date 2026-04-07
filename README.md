@@ -14,7 +14,7 @@ QuillSwiftUI  ->  QuillKit  ->  QuillCore  ->  swift-markdown
 ```
 
 - **[QuillCore](Sources/QuillCore/README.md)** -- Platform-agnostic markdown parsing, streaming infrastructure, and Block AST. All symbols are package-scoped. Depends on [swift-markdown](https://github.com/swiftlang/swift-markdown) but fully encapsulates it.
-- **[QuillKit](Sources/QuillKit/README.md)** -- UIKit rendering and product API. Public surface is limited to `QuillView` and preset-based configuration.
+- **[QuillKit](Sources/QuillKit/README.md)** -- UIKit rendering and product API. Public surface is limited to `QuillView` plus a small `QuillConfiguration`.
 - **[QuillSwiftUI](Sources/QuillSwiftUI/README.md)** -- SwiftUI wrapper over QuillKit. Provides `QuillMarkdownView` for static rendering and `QuillStreamView` for streaming via `AsyncSequence`.
 
 ## Usage
@@ -28,7 +28,12 @@ import QuillSwiftUI
 QuillMarkdownView(markdown: "# Hello\n\nSome **bold** text.")
 
 // Streaming via AsyncSequence
-QuillStreamView(chunks: myAsyncStream, preset: .balanced)
+QuillStreamView(
+    chunks: myAsyncStream,
+    configuration: .init(
+        streaming: .init(preset: .balanced)
+    )
+)
     .id(streamID) // required: use a new id each time you start a new stream
 ```
 
@@ -44,7 +49,11 @@ let view = QuillView()
 view.markdown = "# Hello\n\nSome **bold** text."
 
 // Streaming
-let streamView = QuillView(streamingPreset: .balanced)
+let streamView = QuillView(
+    configuration: .init(
+        streaming: .init(preset: .balanced)
+    )
+)
 streamView.append("# Title\n\n")
 streamView.append("Streaming content...")
 streamView.finish()
@@ -57,14 +66,13 @@ streamView.reset()
 
 ```swift
 // Named presets
-view.streamingPreset = .snappy    // Faster reveal
-view.streamingPreset = .balanced  // Default
-view.streamingPreset = .longForm  // Deliberate pacing
+view.configuration.streaming.preset = .snappy    // Faster reveal
+view.configuration.streaming.preset = .balanced  // Default
+view.configuration.streaming.preset = .longForm  // Deliberate pacing
 
 // Custom tuning
-view.streamingPreset = .custom(
+view.configuration.streaming.preset = .custom(
     speedMultiplier: 1.2,
-    tailAggressiveness: .aggressive,
     bufferingDelay: 1.0
 )
 ```
