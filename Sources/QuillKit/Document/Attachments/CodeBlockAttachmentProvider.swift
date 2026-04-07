@@ -1,5 +1,6 @@
 import UIKit
 
+@MainActor
 final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
     override init(
         textAttachment: NSTextAttachment,
@@ -20,13 +21,11 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
     override func loadView() {
         guard let attachment = textAttachment as? CodeBlockAttachment else { return }
 
-        let content = CodeBlockContent(from: attachment)
-        let store = attachment.highlightStore
-
-        assert(Thread.isMainThread)
-        view = MainActor.assumeIsolated {
-            Self.makeBlockView(from: content, highlightStore: store)
-        }
+        view = Self.makeBlockView(
+            from: CodeBlockContent(from: attachment),
+            highlightStore: attachment.highlightStore,
+            theme: attachment.theme
+        )
     }
 
     override func attachmentBounds(
@@ -45,13 +44,12 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
             return CGRect(origin: .zero, size: Layout.fallbackSize)
         }
 
-        let code = attachment.code
-        let language = attachment.language
-        assert(Thread.isMainThread)
-        return MainActor.assumeIsolated {
-            let height = CodeBlockView.measureHeight(of: code, in: language)
-            return CGRect(origin: .zero, size: CGSize(width: width, height: height))
-        }
+        let height = CodeBlockView.measureHeight(
+            of: attachment.code,
+            in: attachment.language,
+            theme: attachment.theme
+        )
+        return CGRect(origin: .zero, size: CGSize(width: width, height: height))
     }
 }
 
@@ -60,12 +58,12 @@ private extension CodeBlockAttachmentProvider {
         static let fallbackSize = CGSize(width: 320, height: 80)
     }
 
-    @MainActor
     static func makeBlockView(
         from content: CodeBlockContent,
-        highlightStore: CodeBlockHighlightStore?
+        highlightStore: CodeBlockHighlightStore?,
+        theme: QuillTheme
     ) -> CodeBlockView {
-        let view = CodeBlockView()
+        let view = CodeBlockView(theme: theme)
         view.configure(language: content.language, code: content.code)
 
         let highlighted = highlightStore?.highlightedResult(for: content.blockID)

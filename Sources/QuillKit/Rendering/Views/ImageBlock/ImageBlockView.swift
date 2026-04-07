@@ -9,6 +9,7 @@ final class ImageBlockView: UIView {
     private let errorView = ErrorView()
     private let imageView = UIImageView()
     private let loadingView = LoadingView()
+    private let theme: QuillTheme
 
     override var intrinsicContentSize: CGSize {
         CGSize(
@@ -17,11 +18,15 @@ final class ImageBlockView: UIView {
         )
     }
 
-    override init(frame: CGRect) {
+    init(
+        theme: QuillTheme = .default,
+        frame: CGRect = .zero
+    ) {
+        self.theme = theme
         super.init(frame: frame)
 
         clipsToBounds = true
-        layer.cornerRadius = 16
+        layer.cornerRadius = theme.image.cornerRadius
 
         setupErrorView()
         setupImageView()
@@ -36,12 +41,11 @@ final class ImageBlockView: UIView {
 
     func configure(
         content: ImageBlockContent,
-        appearance: ImageAppearance,
         retryEnabled: Bool = true
     ) {
         accessibilityLabel = content.alt.isEmpty ? "Image" : content.alt
-        errorView.update(appearance: appearance, retryEnabled: retryEnabled)
-        loadingView.update(appearance: appearance)
+        errorView.update(theme: theme, retryEnabled: retryEnabled)
+        loadingView.update(theme: theme)
         transition(to: .loading)
     }
 }
@@ -149,10 +153,10 @@ private extension ImageBlockView {
             fatalError("init(coder:) has not been implemented")
         }
 
-        func update(appearance: ImageAppearance, retryEnabled: Bool) {
-            backgroundColor = appearance.placeholderColor
-            iconView.tintColor = appearance.errorIconColor
-            label.textColor = appearance.errorIconColor
+        func update(theme: QuillTheme, retryEnabled: Bool) {
+            backgroundColor = theme.image.placeholderColor
+            iconView.tintColor = theme.image.errorIconColor
+            label.textColor = theme.image.errorIconColor
             isUserInteractionEnabled = retryEnabled
             label.text = retryEnabled ? "Tap to retry" : "Unable to load"
         }
@@ -197,14 +201,14 @@ private extension ImageBlockView {
             placeholderView.alpha = 1
         }
 
-        func update(appearance: ImageAppearance) {
-            placeholderView.update(appearance: appearance)
+        func update(theme: QuillTheme) {
+            placeholderView.update(theme: theme)
         }
     }
 
     final class PlaceholderView: UIView {
-        func update(appearance: ImageAppearance) {
-            backgroundColor = appearance.placeholderColor
+        func update(theme: QuillTheme) {
+            backgroundColor = theme.image.placeholderColor
         }
     }
 }

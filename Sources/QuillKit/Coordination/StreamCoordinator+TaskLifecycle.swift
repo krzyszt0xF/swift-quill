@@ -42,8 +42,12 @@ extension StreamCoordinator {
         applyStreamingSnapshot(snapshot)
     }
 
-    func startStream(bootstrap: String? = nil) {
+    func startStream(
+        bootstrap: String? = nil,
+        configuration: QuillConfiguration
+    ) {
         cancelStreaming()
+        apply(configuration: configuration)
 
         let streamController = makeStreamController()
         controller = streamController
@@ -60,14 +64,24 @@ extension StreamCoordinator {
             for await event in events {
                 guard !Task.isCancelled, let self, self.streamGeneration == generation else { break }
 
-                self.handleParserEvent(event, state: &state)
+                self.handleParserEvent(
+                    event,
+                    state: &state
+                )
             }
         }
     }
 
-    func startStreamIfNeeded(currentMarkdown: String?, needsRestart: Bool) {
+    func startStreamIfNeeded(
+        currentMarkdown: String?,
+        configuration: QuillConfiguration,
+        needsRestart: Bool
+    ) {
         guard needsRestart else { return }
-        startStream(bootstrap: currentMarkdown)
+        startStream(
+            bootstrap: currentMarkdown,
+            configuration: configuration
+        )
     }
 
     func syncConfiguration(_ configuration: RenderConfiguration) {

@@ -2,10 +2,17 @@ import QuillCore
 import UIKit
 
 enum InlineContentRenderer {
-    static func attributedString(for inlines: [Inline], baseFont: UIFont) -> NSAttributedString {
+    static func attributedString(
+        for inlines: [Inline],
+        baseFont: UIFont,
+        theme: QuillTheme
+    ) -> NSAttributedString {
         attributedString(
             for: inlines,
-            context: FontContext(baseFont: baseFont)
+            context: FontContext(
+                baseFont: baseFont,
+                theme: theme
+            )
         )
     }
 
@@ -17,11 +24,13 @@ enum InlineContentRenderer {
 private extension InlineContentRenderer {
     struct FontContext {
         let baseFont: UIFont
+        let theme: QuillTheme
         var traits: UIFontDescriptor.SymbolicTraits = []
 
         func adding(trait: UIFontDescriptor.SymbolicTraits) -> FontContext {
             FontContext(
                 baseFont: baseFont,
+                theme: theme,
                 traits: traits.union(trait)
             )
         }
@@ -31,10 +40,8 @@ private extension InlineContentRenderer {
         }
 
         var monospaceFont: UIFont {
-            let monospaceFont = UIFont.monospacedSystemFont(
-                ofSize: baseFont.pointSize - 1,
-                weight: .regular
-            )
+            let pointSize = max(1, baseFont.pointSize + theme.inline.fontSizeOffset)
+            let monospaceFont = theme.codeBlock.font.withSize(pointSize)
             return traits.isEmpty ? monospaceFont : monospaceFont.withTraits(traits)
         }
     }
@@ -49,8 +56,8 @@ private extension InlineContentRenderer {
         case let .code(text):
             return NSAttributedString(string: text, attributes: [
                 .font: context.monospaceFont,
-                .backgroundColor: UIColor.systemGray6,
-                .foregroundColor: UIColor.label,
+                .backgroundColor: context.theme.inline.backgroundColor,
+                .foregroundColor: context.theme.inline.textColor,
             ])
         case let .emphasis(children):
             return attributedString(
@@ -61,7 +68,7 @@ private extension InlineContentRenderer {
             let text = alt.isEmpty ? "image" : plainText(from: alt)
             return NSAttributedString(string: "[\(text)]", attributes: [
                 .font: context.bodyFont,
-                .foregroundColor: UIColor.secondaryLabel,
+                .foregroundColor: context.theme.image.altTextColor,
             ])
         case .inlineHTML:
             return NSAttributedString()
@@ -124,8 +131,12 @@ private extension InlineContentRenderer {
             )
         )
         let fullRange = NSRange(location: 0, length: result.length)
-        result.addAttribute(.foregroundColor, value: UIColor.systemBlue, range: fullRange)
-        result.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: fullRange)
+        result.addAttribute(.foregroundColor, value: context.theme.link.color, range: fullRange)
+        result.addAttribute(
+            .underlineStyle,
+            value: context.theme.link.underlineStyle.rawValue,
+            range: fullRange
+        )
 
         let trimmedDestination = destination.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedDestination.isEmpty == false,
@@ -142,7 +153,7 @@ private extension InlineContentRenderer {
     ) -> NSAttributedString {
         let result = NSMutableAttributedString(string: string, attributes: [
             .font: context.bodyFont,
-            .foregroundColor: UIColor.label,
+            .foregroundColor: context.theme.body.textColor,
         ])
         guard
             string.contains("://") ||
@@ -160,8 +171,12 @@ private extension InlineContentRenderer {
                 return
             }
 
-            result.addAttribute(.foregroundColor, value: UIColor.systemBlue, range: match.range)
-            result.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: match.range)
+            result.addAttribute(.foregroundColor, value: context.theme.link.color, range: match.range)
+            result.addAttribute(
+                .underlineStyle,
+                value: context.theme.link.underlineStyle.rawValue,
+                range: match.range
+            )
             result.addAttribute(.link, value: url, range: match.range)
         }
 

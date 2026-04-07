@@ -2,21 +2,28 @@ import UIKit
 
 @MainActor
 enum CodeBlockDisplayRenderer {
-    static func makeAttributedString(from code: String) -> NSAttributedString {
+    static func makeAttributedString(
+        from code: String,
+        theme: QuillTheme
+    ) -> NSAttributedString {
         NSAttributedString(
             string: code,
-            attributes: CodeBlockTextStyle.makeAttributes()
+            attributes: makeAttributes(theme: theme)
         )
     }
 
     static func makeAttributedString(
         from highlightedCode: HighlightedCodeSnapshot,
-        code: String
+        code: String,
+        theme: QuillTheme
     ) -> NSAttributedString {
         let displayCode = NSMutableAttributedString(
             attributedString: highlightedCode.makeAttributedString()
         )
-        applyCodeBlockTypography(to: displayCode)
+        applyCodeBlockTypography(
+            to: displayCode,
+            theme: theme
+        )
 
         let missingTrailingNewlines = max(
             0,
@@ -26,21 +33,24 @@ enum CodeBlockDisplayRenderer {
 
         displayCode.append(NSAttributedString(
             string: String(repeating: "\n", count: missingTrailingNewlines),
-            attributes: CodeBlockTextStyle.makeAttributes()
+            attributes: makeAttributes(theme: theme)
         ))
         return displayCode
     }
 }
 
 private extension CodeBlockDisplayRenderer {
-    static func applyCodeBlockTypography(to attributedString: NSMutableAttributedString) {
+    static func applyCodeBlockTypography(
+        to attributedString: NSMutableAttributedString,
+        theme: QuillTheme
+    ) {
         let fullRange = NSRange(location: 0, length: attributedString.length)
         guard fullRange.length > 0 else { return }
 
         attributedString.addAttributes(
             [
-                .font: CodeBlockTextStyle.font,
-                .paragraphStyle: CodeBlockTextStyle.paragraphStyle,
+                .font: theme.codeBlock.font,
+                .paragraphStyle: makeParagraphStyle(theme: theme),
             ],
             range: fullRange
         )
@@ -49,32 +59,24 @@ private extension CodeBlockDisplayRenderer {
             guard value == nil else { return }
             attributedString.addAttribute(
                 .foregroundColor,
-                value: UIColor.label,
+                value: theme.codeBlock.textColor,
                 range: range
             )
         }
     }
-}
 
-enum CodeBlockTextStyle {
-    static let font = UIFont(name: "Menlo-Regular", size: 14)
-        ?? .monospacedSystemFont(ofSize: 14, weight: .regular)
-
-    @MainActor static let paragraphStyle: NSParagraphStyle = {
-        let style = NSMutableParagraphStyle()
-        style.lineSpacing = 2
-        return style
-    }()
-
-    @MainActor
-    static func makeAttributes(
-        foregroundColor: UIColor = .label
-    ) -> [NSAttributedString.Key: Any] {
+    static func makeAttributes(theme: QuillTheme) -> [NSAttributedString.Key: Any] {
         [
-            .font: font,
-            .foregroundColor: foregroundColor,
-            .paragraphStyle: paragraphStyle,
+            .font: theme.codeBlock.font,
+            .foregroundColor: theme.codeBlock.textColor,
+            .paragraphStyle: makeParagraphStyle(theme: theme),
         ]
+    }
+
+    static func makeParagraphStyle(theme: QuillTheme) -> NSParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        style.lineSpacing = theme.codeBlock.lineSpacing
+        return style
     }
 }
 

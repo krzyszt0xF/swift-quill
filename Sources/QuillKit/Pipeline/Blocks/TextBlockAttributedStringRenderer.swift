@@ -5,15 +5,26 @@ enum TextBlockAttributedStringRenderer {
     static func makeHeadingAttributedString(
         content: [Inline],
         level: Int,
-        nestingContext: NestingContext
+        nestingContext: NestingContext,
+        theme: QuillTheme
     ) -> NSAttributedString {
-        let font = BlockStyleFactory.headingFont(level: level)
+        let font = BlockStyleFactory.headingFont(level: level, theme: theme)
         let result = NSMutableAttributedString(
-            attributedString: InlineContentRenderer.attributedString(for: content, baseFont: font)
+            attributedString: InlineContentRenderer.attributedString(
+                for: content,
+                baseFont: font,
+                theme: theme
+            )
         )
         let style = BlockStyleFactory.makeParagraphStyle(
             nestingContext: nestingContext,
-            paragraphSpacingBefore: 12
+            paragraphSpacingBefore: theme.headingSpacingScaled,
+            theme: theme
+        )
+        result.addAttribute(
+            .foregroundColor,
+            value: makeTextColor(nestingContext: nestingContext, theme: theme),
+            range: NSRange(location: 0, length: result.length)
         )
         result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
         return result
@@ -21,16 +32,18 @@ enum TextBlockAttributedStringRenderer {
 
     static func makeHTMLBlockAttributedString(
         nestingContext: NestingContext,
-        rawHTML: String
+        rawHTML: String,
+        theme: QuillTheme
     ) -> NSAttributedString {
-        let font = BlockStyleFactory.bodyFont()
+        let font = BlockStyleFactory.bodyFont(theme: theme)
         let result = NSMutableAttributedString(string: rawHTML, attributes: [
             .font: font,
-            .foregroundColor: UIColor.label,
+            .foregroundColor: makeTextColor(nestingContext: nestingContext, theme: theme),
         ])
         let style = BlockStyleFactory.makeParagraphStyle(
             nestingContext: nestingContext,
-            paragraphSpacingBefore: 8
+            paragraphSpacingBefore: theme.blockSpacingScaled,
+            theme: theme
         )
         result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
         return result
@@ -38,17 +51,40 @@ enum TextBlockAttributedStringRenderer {
 
     static func makeParagraphAttributedString(
         content: [Inline],
-        nestingContext: NestingContext
+        nestingContext: NestingContext,
+        theme: QuillTheme
     ) -> NSAttributedString {
-        let font = BlockStyleFactory.bodyFont()
+        let font = BlockStyleFactory.bodyFont(theme: theme)
         let result = NSMutableAttributedString(
-            attributedString: InlineContentRenderer.attributedString(for: content, baseFont: font)
+            attributedString: InlineContentRenderer.attributedString(
+                for: content,
+                baseFont: font,
+                theme: theme
+            )
         )
         let style = BlockStyleFactory.makeParagraphStyle(
             nestingContext: nestingContext,
-            paragraphSpacingBefore: 8
+            paragraphSpacingBefore: theme.blockSpacingScaled,
+            theme: theme
+        )
+        result.addAttribute(
+            .foregroundColor,
+            value: makeTextColor(nestingContext: nestingContext, theme: theme),
+            range: NSRange(location: 0, length: result.length)
         )
         result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
         return result
+    }
+}
+
+private extension TextBlockAttributedStringRenderer {
+    static func makeTextColor(
+        nestingContext: NestingContext,
+        theme: QuillTheme
+    ) -> UIColor {
+        if nestingContext.blockquoteDepth > 0 {
+            return theme.blockquote.textColor
+        }
+        return theme.body.textColor
     }
 }

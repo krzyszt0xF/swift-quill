@@ -4,6 +4,9 @@ import UIKit
 @MainActor
 final class DocumentTextView: UITextView {
     var onLinkSelection: ((URL) -> Void)?
+    var theme: QuillTheme {
+        didSet { blockquoteBackgroundView.invalidateBarRuns() }
+    }
     private(set) var contentRevision = 0
     private let blockquoteBackgroundView = BlockquoteBackgroundView()
 
@@ -24,7 +27,8 @@ final class DocumentTextView: UITextView {
         blockquoteBackgroundView.invalidateBarRuns()
     }
 
-    init() {
+    init(theme: QuillTheme = .default) {
+        self.theme = theme
         super.init(frame: .zero, textContainer: nil)
 
         isEditable = false
@@ -116,19 +120,22 @@ private final class BlockquoteBackgroundView: UIView {
         defer { context.restoreGState() }
 
         context.clip(to: rect)
-        context.setFillColor(BlockquoteStyle.barColor.cgColor)
+        guard let textView else { return }
+        let theme = textView.theme
+        context.setFillColor(theme.blockquote.barColor.cgColor)
 
         for barRun in cachedBarRuns {
-            let xOrigin = BlockquoteStyle.barLeadingInset + CGFloat(barRun.level - 1) * BlockquoteStyle.levelSpacing
+            let xOrigin = theme.blockquote.barLeadingInset
+                + CGFloat(barRun.level - 1) * theme.blockquoteLevelSpacingScaled
             let barRect = CGRect(
                 x: xOrigin,
                 y: barRun.minY,
-                width: BlockquoteStyle.barWidth,
+                width: theme.blockquote.barWidth,
                 height: barRun.maxY - barRun.minY
             )
             let path = UIBezierPath(
                 roundedRect: barRect,
-                cornerRadius: BlockquoteStyle.barCornerRadius
+                cornerRadius: theme.blockquote.barCornerRadius
             )
             context.addPath(path.cgPath)
             context.fillPath()

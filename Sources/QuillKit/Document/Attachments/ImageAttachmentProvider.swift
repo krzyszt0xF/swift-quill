@@ -1,5 +1,6 @@
 import UIKit
 
+@MainActor
 final class ImageAttachmentProvider: NSTextAttachmentViewProvider {
     override init(
         textAttachment: NSTextAttachment,
@@ -22,16 +23,12 @@ final class ImageAttachmentProvider: NSTextAttachmentViewProvider {
 
         let content = ImageBlockContent(from: attachment)
         let imageLoadStore = attachment.imageLoadStore
-        let appearance = attachment.appearance
 
-        assert(Thread.isMainThread)
-        view = MainActor.assumeIsolated {
-            Self.makeImageView(
-                from: content,
-                imageLoadStore: imageLoadStore,
-                appearance: appearance
-            )
-        }
+        view = Self.makeImageView(
+            from: content,
+            imageLoadStore: imageLoadStore,
+            theme: attachment.theme
+        )
     }
 
     override func attachmentBounds(
@@ -50,8 +47,10 @@ final class ImageAttachmentProvider: NSTextAttachmentViewProvider {
             return CGRect(origin: .zero, size: Layout.fallbackSize)
         }
 
-        let aspectRatio = Self.imageAspectRatio(for: attachment)
-        let height = min(width / aspectRatio, attachment.appearance.maxHeight)
+        let resolvedAspectRatio = attachment.imageLoadStore?.resolvedAspectRatio(for: attachment.blockID)
+            ?? attachment.theme.image.fallbackAspectRatio
+        let aspectRatio = max(0.01, resolvedAspectRatio)
+        let height = min(width / aspectRatio, attachment.theme.image.maxHeight)
         return CGRect(origin: .zero, size: CGSize(width: width, height: height))
     }
 }
@@ -61,23 +60,15 @@ private extension ImageAttachmentProvider {
         static let fallbackSize = CGSize(width: 320, height: 180)
     }
 
-    static func imageAspectRatio(for attachment: ImageAttachment) -> CGFloat {
-        let resolvedAspectRatio = attachment.imageLoadStore?.resolvedAspectRatio(for: attachment.blockID)
-            ?? attachment.appearance.fallbackAspectRatio
-        return max(0.01, resolvedAspectRatio)
-    }
-
-    @MainActor
     static func makeImageView(
         from content: ImageBlockContent,
         imageLoadStore: (any ImageLoadStore)?,
-        appearance: ImageAppearance
+        theme: QuillTheme
     ) -> ImageBlockView {
-        let view = ImageBlockView()
+        let view = ImageBlockView(theme: theme)
         let retryEnabled = imageLoadStore?.retryEnabled ?? true
         view.configure(
             content: content,
-            appearance: appearance,
             retryEnabled: retryEnabled
         )
 
@@ -89,7 +80,6 @@ private extension ImageAttachmentProvider {
             let retryEnabled = imageLoadStore?.retryEnabled ?? true
             view?.configure(
                 content: content,
-                appearance: appearance,
                 retryEnabled: retryEnabled
             )
             imageLoadStore?.retryLoad(blockID: content.blockID, source: content.source)

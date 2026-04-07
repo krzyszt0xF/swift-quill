@@ -27,9 +27,14 @@ final class TableSurfaceCanvasView: UIView {
     }
 
     private let leadingHandle = TableSurfaceSelectionHandleView(isLeading: true)
+    private let theme: QuillTheme
     private let trailingHandle = TableSurfaceSelectionHandleView(isLeading: false)
 
-    override init(frame: CGRect) {
+    init(
+        theme: QuillTheme,
+        frame: CGRect = .zero
+    ) {
+        self.theme = theme
         super.init(frame: frame)
 
         backgroundColor = .clear
@@ -82,13 +87,13 @@ private extension TableSurfaceCanvasView {
         context.saveGState()
         defer { context.restoreGState() }
 
-        context.setFillColor(UIColor.separator.withAlphaComponent(0.22).cgColor)
+        context.setFillColor(theme.table.separatorColor.cgColor)
 
         for xPosition in layoutModel.verticalSeparatorXPositions {
             context.fill(CGRect(
                 x: xPosition,
                 y: 0,
-                width: Layout.separatorWidth,
+                width: theme.table.separatorWidth,
                 height: layoutModel.contentSize.height
             ))
         }
@@ -98,7 +103,7 @@ private extension TableSurfaceCanvasView {
                 x: 0,
                 y: yPosition,
                 width: max(layoutModel.contentSize.width, viewportWidth),
-                height: Layout.separatorWidth
+                height: theme.table.separatorWidth
             ))
         }
     }

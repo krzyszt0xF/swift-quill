@@ -4,6 +4,7 @@ import UIKit
 @MainActor
 final class DocumentRenderer {
     let textView: DocumentTextView
+    private(set) var theme: QuillTheme
     var onTailRevealProgress: (() -> Void)? {
         didSet { tailRevealEngine.onProgress = onTailRevealProgress }
     }
@@ -20,13 +21,21 @@ final class DocumentRenderer {
     }
 
     init(
+        theme: QuillTheme,
         textView: DocumentTextView,
         highlightCoordinator: HighlightCoordinator,
-        imageLoadingCoordinator: ImageLoadingCoordinator
+        imageLoadingCoordinator: ImageLoadingCoordinator,
+        retryEnabled: Bool = true
     ) {
+        self.theme = theme
         self.textView = textView
         self.highlightCoordinator = highlightCoordinator
         self.imageLoadingCoordinator = imageLoadingCoordinator
+        self.textView.theme = theme
+        self.imageLoadingCoordinator.apply(
+            theme: theme.image,
+            retryEnabled: retryEnabled
+        )
         tailRevealEngine.advancePresentation = { [weak self] timestamp in
             self?.advanceTailFade(timestamp: timestamp) ?? false
         }
@@ -42,6 +51,15 @@ final class DocumentRenderer {
         tailRevealPolicy = policy
     }
 
+    func apply(configuration: QuillConfiguration) {
+        theme = configuration.theme
+        textView.theme = configuration.theme
+        imageLoadingCoordinator.apply(
+            theme: configuration.theme.image,
+            retryEnabled: configuration.images.retryEnabled
+        )
+    }
+
     func cancelStreaming() {
         tailRevealEngine.cancel()
         tailAnimator.cancel()
@@ -51,13 +69,16 @@ final class DocumentRenderer {
     }
 
     @discardableResult
-    func render(blocks: [BlockNode], frozenCount: Int) -> RenderOutcome {
+    func render(
+        blocks: [BlockNode],
+        frozenCount: Int
+    ) -> RenderOutcome {
         let fragments = AttributedStringBuilder.buildRenderFragments(
             from: blocks,
             frozenCount: frozenCount,
             highlightStore: highlightCoordinator,
             imageLoadStore: imageLoadingCoordinator,
-            imageAppearance: imageLoadingCoordinator.imageAppearance
+            theme: theme
         )
         let previousFrozenCount = renderState.frozenBlockCount
         let renderOutcome = makeRenderOutcome(
@@ -109,10 +130,6 @@ final class DocumentRenderer {
     func set(imageLoader: (any ImageLoading)?) {
         imageLoadingCoordinator.set(loader: imageLoader)
     }
-
-    func set(imageOptions: ImageOptions) {
-        imageLoadingCoordinator.set(options: imageOptions)
-    }
 }
 
 extension DocumentRenderer {
@@ -136,9 +153,11 @@ extension DocumentRenderer {
 
     static var live: DocumentRenderer {
         DocumentRenderer(
-            textView: .init(),
+            theme: .default,
+            textView: .init(theme: .default),
             highlightCoordinator: .live,
-            imageLoadingCoordinator: .live)
+            imageLoadingCoordinator: .live
+        )
     }
 }
 

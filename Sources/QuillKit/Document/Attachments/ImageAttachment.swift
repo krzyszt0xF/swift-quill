@@ -3,21 +3,21 @@ import UIKit
 
 final class ImageAttachment: NSTextAttachment {
     let alt: String
-    let appearance: ImageAppearance
     let blockID: BlockIdentity
     weak var imageLoadStore: (any ImageLoadStore)?
     let source: String?
+    let theme: QuillTheme
 
     init(
         blockID: BlockIdentity,
         source: String?,
         alt: String,
-        appearance: ImageAppearance
+        theme: QuillTheme = .default
     ) {
         self.alt = alt
-        self.appearance = appearance
         self.blockID = blockID
         self.source = source
+        self.theme = theme
         super.init(data: nil, ofType: nil)
 
         allowsTextAttachmentView = true

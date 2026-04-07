@@ -1,8 +1,8 @@
 struct RenderContext {
     let highlightStore: (any CodeBlockHighlightStore)?
-    let imageAppearance: ImageAppearance
     let imageLoadStore: (any ImageLoadStore)?
     let rendersAttachments: Bool
+    let theme: QuillTheme
 }
 
 struct NestingContext {

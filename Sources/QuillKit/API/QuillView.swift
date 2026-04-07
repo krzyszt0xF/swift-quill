@@ -4,6 +4,13 @@ import UIKit
 @MainActor
 public final class QuillView: UIView {
     public private(set) var currentMarkdown: String?
+    public var configuration = QuillConfiguration.default {
+        didSet {
+            guard streamCoordinator.hasActiveController == false else { return }
+            guard markdown != nil || currentMarkdown != nil else { return }
+            renderStatic()
+        }
+    }
 
     public var onHeightChange: ((_ old: CGFloat, _ new: CGFloat) -> Void)? {
         didSet { heightCoordinator.onHeightChange = onHeightChange }
@@ -25,10 +32,6 @@ public final class QuillView: UIView {
         didSet { streamCoordinator.imageLoader = imageLoader }
     }
 
-    public var imageOptions: ImageOptions = .default {
-        didSet { streamCoordinator.imageOptions = imageOptions }
-    }
-
     public var markdown: String? {
         didSet {
             guard markdown != oldValue else { return }
@@ -36,26 +39,21 @@ public final class QuillView: UIView {
         }
     }
 
-    public var streamingMode: StreamingMode = .smoothedTail {
-        didSet {
-            configuration.streamingMode = streamingMode
-            streamCoordinator.applyConfiguration(configuration)
-        }
-    }
-
-    public var streamingPreset: QuillStreamingPreset = .balanced {
-        didSet { applyPreset() }
-    }
-
-    private var configuration = RenderConfiguration(preset: .balanced)
+    // Active streams render against a frozen snapshot so later public configuration changes
+    // do not alter content mid-stream.
+    private var activeConfiguration = QuillConfiguration.default
     private let heightCoordinator: HeightCoordinator
     private let markdownParser: MarkdownParser
     private let streamCoordinator: StreamCoordinator
 
-    public convenience init(frame: CGRect = .zero, preset: QuillStreamingPreset) {
+    public convenience init(
+        frame: CGRect = .zero,
+        configuration: QuillConfiguration = .default
+    ) {
         self.init(frame: frame)
-        self.streamingPreset = preset
-        applyPreset()
+        self.configuration = configuration
+        activeConfiguration = configuration
+        streamCoordinator.apply(configuration: configuration)
     }
 
     override public init(frame: CGRect) {
@@ -78,27 +76,31 @@ public final class QuillView: UIView {
 
     package init(
         frame: CGRect = .zero,
-        configuration: RenderConfiguration,
-        dependencies: Dependencies) {
-            heightCoordinator = dependencies.heightCoordinator
-            markdownParser = dependencies.markdownParser
-            streamCoordinator = dependencies.streamCoordinator
-            super.init(frame: frame)
-            setup()
-            self.configuration = configuration
-            streamCoordinator.applyConfiguration(configuration)
-        }
+        configuration: QuillConfiguration,
+        dependencies: Dependencies
+    ) {
+        heightCoordinator = dependencies.heightCoordinator
+        markdownParser = dependencies.markdownParser
+        streamCoordinator = dependencies.streamCoordinator
+        super.init(frame: frame)
+        self.configuration = configuration
+        activeConfiguration = configuration
+        setup()
+    }
 
     public func append(_ chunk: String) {
         let needsRestart = !streamCoordinator.hasActiveController
         let previousContent = needsRestart ? currentMarkdown : nil
+        if needsRestart {
+            activeConfiguration = configuration
+        }
 
         currentMarkdown = (currentMarkdown ?? "") + chunk
 
         streamCoordinator.append(
             chunk,
             currentMarkdown: previousContent,
-            configuration: configuration,
+            configuration: activeConfiguration,
             needsRestart: needsRestart
         )
     }
@@ -108,7 +110,7 @@ public final class QuillView: UIView {
     }
 
     public func finish() {
-        streamCoordinator.finish(configuration: configuration)
+        streamCoordinator.finish(configuration: activeConfiguration)
     }
 
     public func reset() {
@@ -126,23 +128,22 @@ public final class QuillView: UIView {
 }
 
 private extension QuillView {
-    func applyPreset() {
-        configuration = RenderConfiguration(preset: streamingPreset)
-        configuration.streamingMode = streamingMode
-        streamCoordinator.applyConfiguration(configuration)
-    }
-
     func renderStatic() {
-        currentMarkdown = markdown
+        let source = markdown ?? currentMarkdown
+        currentMarkdown = source
+        activeConfiguration = configuration
 
-        guard let markdown, !markdown.isEmpty else {
+        guard let source, !source.isEmpty else {
             streamCoordinator.reset()
             heightCoordinator.resetLastNotifiedHeight()
             return
         }
 
-        let blocks = markdownParser.parse(markdown)
-        streamCoordinator.renderStatic(blocks: blocks)
+        let blocks = markdownParser.parse(source)
+        streamCoordinator.renderStatic(
+            blocks: blocks,
+            configuration: activeConfiguration
+        )
     }
 
     func scheduleHeightUpdate() {
@@ -150,7 +151,7 @@ private extension QuillView {
             hostView: self,
             contentRevision: streamCoordinator.hostView.contentRevision,
             documentTextView: streamCoordinator.hostView,
-            configuration: configuration.layout
+            configuration: activeConfiguration.renderConfiguration.layout
         )
     }
 
@@ -169,7 +170,7 @@ private extension QuillView {
             documentView.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])
 
-        streamCoordinator.applyConfiguration(configuration)
+        streamCoordinator.apply(configuration: activeConfiguration)
         streamCoordinator.onHeightInvalidated = { [weak self] in
             self?.scheduleHeightUpdate()
         }

@@ -15,9 +15,6 @@ final class StreamCoordinator {
     var imageLoader: (any ImageLoading)? {
         didSet { renderer.set(imageLoader: imageLoader) }
     }
-    var imageOptions: ImageOptions = .default {
-        didSet { renderer.set(imageOptions: imageOptions) }
-    }
     var syntaxHighlighter: (any SyntaxHighlighting)? {
         didSet { renderer.set(highlighter: syntaxHighlighter) }
     }
@@ -45,7 +42,6 @@ final class StreamCoordinator {
         self.bufferedVisualFeeder = bufferedVisualFeeder
         self.renderer = renderer
         self.renderConfiguration = renderConfiguration
-        self.renderer.set(imageOptions: imageOptions)
         self.renderer.onTailRevealProgress = { [weak self] in
             self?.invalidateHeight(for: .tailRevealProgress)
         }
@@ -67,18 +63,22 @@ extension StreamCoordinator {
 }
 
 extension StreamCoordinator {
-    func applyConfiguration(_ configuration: RenderConfiguration) {
-        syncConfiguration(configuration)
+    func apply(configuration: QuillConfiguration) {
+        renderer.apply(configuration: configuration)
+        syncConfiguration(configuration.renderConfiguration)
     }
 
     func append(
         _ chunk: String,
         currentMarkdown: String?,
-        configuration: RenderConfiguration,
+        configuration: QuillConfiguration,
         needsRestart: Bool
     ) {
-        syncConfiguration(configuration)
-        startStreamIfNeeded(currentMarkdown: currentMarkdown, needsRestart: needsRestart)
+        startStreamIfNeeded(
+            currentMarkdown: currentMarkdown,
+            configuration: configuration,
+            needsRestart: needsRestart
+        )
 
         guard let streamController = controller else { return }
         routeIncomingChunk(chunk, to: streamController)
@@ -89,9 +89,9 @@ extension StreamCoordinator {
         invalidateHeight(for: .streamReset)
     }
 
-    func finish(configuration: RenderConfiguration) {
+    func finish(configuration: QuillConfiguration) {
         guard let streamController = controller else { return }
-        syncConfiguration(configuration)
+        syncConfiguration(configuration.renderConfiguration)
 
         controller = nil
         let task = streamTask
@@ -122,8 +122,12 @@ extension StreamCoordinator {
         }
     }
 
-    func renderStatic(blocks: [BlockNode]) {
+    func renderStatic(
+        blocks: [BlockNode],
+        configuration: QuillConfiguration
+    ) {
         cancelActiveWork()
+        apply(configuration: configuration)
         let outcome = renderer.render(blocks: blocks, frozenCount: blocks.count)
         guard outcome.invalidatedHeight else { return }
 
