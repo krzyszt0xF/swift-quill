@@ -21,6 +21,7 @@ enum EmbeddedBlockRenderer {
         return makePresentationRoleAttributedString(
             attachment: attachment,
             nestingContext: nestingContext,
+            plainText: code,
             presentationRole: presentationRole,
             theme: theme
         )
@@ -38,13 +39,14 @@ enum EmbeddedBlockRenderer {
         let attachment = ImageAttachment(
             blockID: blockID,
             source: source,
-            alt: alt.isEmpty ? "image" : alt,
+            alt: alt,
             theme: theme
         )
         attachment.imageLoadStore = imageLoadStore
         return makePresentationRoleAttributedString(
             attachment: attachment,
             nestingContext: nestingContext,
+            plainText: alt,
             presentationRole: presentationRole,
             theme: theme
         )
@@ -84,9 +86,17 @@ enum EmbeddedBlockRenderer {
             rows: rows,
             theme: theme
         )
+        let headerCells = header.cells.map { InlineContentRenderer.plainText(from: $0.content) }
+        var tsvLines = [headerCells.joined(separator: "\t")]
+        for row in rows {
+            let cells = row.cells.map { InlineContentRenderer.plainText(from: $0.content) }
+            tsvLines.append(cells.joined(separator: "\t"))
+        }
+        let tsv = tsvLines.joined(separator: "\n")
         return makePresentationRoleAttributedString(
             attachment: attachment,
             nestingContext: nestingContext,
+            plainText: tsv,
             presentationRole: presentationRole,
             theme: theme
         )
@@ -161,6 +171,7 @@ private extension EmbeddedBlockRenderer {
     static func makePresentationRoleAttributedString(
         attachment: NSTextAttachment,
         nestingContext: NestingContext,
+        plainText: String? = nil,
         presentationRole: RenderFragment.PresentationRole,
         theme: QuillTheme
     ) -> NSAttributedString {
@@ -171,6 +182,13 @@ private extension EmbeddedBlockRenderer {
             presentationRole: presentationRole,
             theme: theme
         )
+        if let plainText {
+            result.addAttribute(
+                .attachmentPlainText,
+                value: plainText,
+                range: NSRange(location: 0, length: result.length)
+            )
+        }
         return result
     }
 

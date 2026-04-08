@@ -20,6 +20,7 @@ extension RenderFragment {
 }
 
 extension NSAttributedString.Key {
+    static let attachmentPlainText = NSAttributedString.Key("quill.attachmentPlainText")
     static let blockquoteDepth = NSAttributedString.Key("quill.blockquoteDepth")
     static let contentBlockID = NSAttributedString.Key("quill.contentBlockID")
     static let ownerBlockID = NSAttributedString.Key("quill.ownerBlockID")

@@ -6,6 +6,7 @@ final class TableSurfaceView: UIView {
     private lazy var editMenuInteraction = UIEditMenuInteraction(delegate: self)
     private let scrollView = UIScrollView()
     private let theme: QuillTheme
+    var onCopy: OnCopy? = CopyAction.live
 
     private var contentVersion = 0
     private var currentLayoutCacheKey: LayoutCacheKey?
@@ -57,7 +58,7 @@ final class TableSurfaceView: UIView {
         guard let selection else { return }
         let tsv = canvasView.layoutModel.makeTSV(selection: selection)
         guard tsv.isEmpty == false else { return }
-        UIPasteboard.general.string = tsv
+        onCopy?(tsv)
         self.selection = nil
         editMenuInteraction.dismissMenu()
     }

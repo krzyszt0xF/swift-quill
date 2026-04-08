@@ -395,6 +395,11 @@ private extension ImageLoadResult? {
     }
 
     var isLoadedImage: Bool {
-        self == .loaded
+        switch self {
+        case .some(.loaded):
+            return true
+        default:
+            return false
+        }
     }
 }

@@ -3,7 +3,9 @@ import UIKit
 
 @MainActor
 final class DocumentTextView: UITextView {
+    var frozenContentLength: Int?
     var onLinkSelection: ((URL) -> Void)?
+    var onCopy: OnCopy? = CopyAction.live
     var theme: QuillTheme {
         didSet { blockquoteBackgroundView.invalidateBarRuns() }
     }
@@ -74,6 +76,53 @@ extension DocumentTextView: UITextViewDelegate {
         return UIAction { action in
             handler(action)
         }
+    }
+
+    func textViewDidChangeSelection(_ textView: UITextView) {
+        guard let frozenContentLength else { return }
+
+        let selectedNSRange = textView.selectedRange
+        guard selectedNSRange.location + selectedNSRange.length > frozenContentLength else { return }
+
+        let clampedLength = max(0, frozenContentLength - selectedNSRange.location)
+        if clampedLength <= 0 {
+            textView.selectedRange = NSRange(location: frozenContentLength, length: 0)
+        } else {
+            textView.selectedRange = NSRange(location: selectedNSRange.location, length: clampedLength)
+        }
+    }
+}
+
+extension DocumentTextView {
+    override func copy(_ sender: Any?) {
+        guard let contentStorage,
+              let attributedString = contentStorage.attributedString
+        else {
+            super.copy(sender)
+            return
+        }
+
+        let selectedNSRange = selectedRange
+        guard selectedNSRange.length > 0,
+              selectedNSRange.location + selectedNSRange.length <= attributedString.length
+        else { return }
+
+        let selectedAttributed = attributedString.attributedSubstring(from: selectedNSRange)
+        onCopy?(makeSelectionPlainText(from: selectedAttributed))
+    }
+
+    func makeSelectionPlainText(from attributedString: NSAttributedString) -> String {
+        var result = ""
+        attributedString.enumerateAttributes(
+            in: NSRange(location: 0, length: attributedString.length)
+        ) { attributes, range, _ in
+            if let plainText = attributes[.attachmentPlainText] as? String {
+                result += plainText
+            } else {
+                result += (attributedString.string as NSString).substring(with: range)
+            }
+        }
+        return result
     }
 }
 

@@ -75,4 +75,24 @@ struct DocumentTextViewTests {
 
         #expect(textView.blockquoteBarRunComputationCount == 2)
     }
+
+    @Test("copy uses injected onCopy closure")
+    func copyUsesInjectedOnCopyClosure() throws {
+        let textView = DocumentTextView()
+        let contentStorage = try #require(textView.contentStorage)
+        var copiedText: String?
+        textView.onCopy = { copiedText = $0 }
+
+        contentStorage.performEditingTransaction {
+            contentStorage.textStorage?.replaceCharacters(
+                in: NSRange(location: 0, length: 0),
+                with: NSAttributedString(string: "Hello world")
+            )
+        }
+
+        textView.selectedRange = NSRange(location: 0, length: 5)
+        textView.copy(nil)
+
+        #expect(copiedText == "Hello")
+    }
 }
