@@ -33,7 +33,14 @@ public extension QuillTheme {
                 textColor: .label
             ),
             heading: .init(
-                fontScales: [.relative(1.75), .relative(1.5), .relative(1.25), .relative(1.125), .relative(1), .relative(0.875)],
+                fontScales: [
+                    .relative(1.75),
+                    .relative(1.5),
+                    .relative(1.25),
+                    .relative(1.125),
+                    .relative(1),
+                    .relative(0.875)
+                ],
                 fontWeights: [.semibold, .semibold, .semibold, .semibold, .semibold, .semibold],
                 spacingBefore: .relative(0.75)
             ),
@@ -71,9 +78,11 @@ public extension QuillTheme {
                 blockSpacing: .relative(0.5)
             ),
             table: .init(
-                bodyFont: UIFont(name: "Menlo-Regular", size: 14) ?? .monospacedSystemFont(ofSize: 14, weight: .regular),
+                bodyFont: UIFont(name: "Menlo-Regular", size: 14)
+                ?? .monospacedSystemFont(ofSize: 14, weight: .regular),
                 cellPadding: UIEdgeInsets(top: 10, left: 12, bottom: 10, right: 12),
-                headerFont: UIFont(name: "Menlo-Bold", size: 14) ?? .monospacedSystemFont(ofSize: 14, weight: .semibold),
+                headerFont: UIFont(name: "Menlo-Bold", size: 14)
+                ?? .monospacedSystemFont(ofSize: 14, weight: .semibold),
                 minimumRowHeight: 44,
                 separatorColor: UIColor.separator.withAlphaComponent(0.22),
                 separatorWidth: 1

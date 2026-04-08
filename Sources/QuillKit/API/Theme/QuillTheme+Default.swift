@@ -29,7 +29,14 @@ public extension QuillTheme {
                 textColor: .label
             ),
             heading: .init(
-                fontScales: [.relative(1.75), .relative(1.5), .relative(1.25), .relative(1.125), .relative(1), .relative(0.875)],
+                fontScales: [
+                    .relative(1.75),
+                    .relative(1.5),
+                    .relative(1.25),
+                    .relative(1.125),
+                    .relative(1),
+                    .relative(0.875)
+                ],
                 fontWeights: [.bold, .bold, .semibold, .semibold, .medium, .medium],
                 spacingBefore: .relative(0.75)
             ),

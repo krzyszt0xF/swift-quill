@@ -57,7 +57,7 @@ struct TableSurfaceViewTests {
 
 private extension TableSurfaceViewTests {
     func firstTextLayout(in view: TableSurfaceView) -> TableSurfaceTextLayout? {
-        let canvasView: TableSurfaceCanvasView? = view.firstSubview(where: { $0 is TableSurfaceCanvasView })
+        let canvasView: TableSurfaceCanvasView? = view.firstSubview()
         return canvasView?.layoutModel.cells.first?.textLayout
     }
 

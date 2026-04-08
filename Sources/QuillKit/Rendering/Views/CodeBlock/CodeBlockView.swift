@@ -210,9 +210,15 @@ private extension CodeBlockView {
         addSubview(headerView)
 
         NSLayoutConstraint.activate([
-            headerView.topAnchor.constraint(equalTo: topAnchor, constant: Layout.insetVertical(theme: theme)),
-            headerView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Layout.insetHorizontal(theme: theme)),
-            headerView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Layout.insetHorizontal(theme: theme)),
+            headerView.topAnchor.constraint(
+                equalTo: topAnchor,
+                constant: Layout.insetVertical(theme: theme)),
+            headerView.leadingAnchor.constraint(
+                equalTo: leadingAnchor,
+                constant: Layout.insetHorizontal(theme: theme)),
+            headerView.trailingAnchor.constraint(
+                equalTo: trailingAnchor,
+                constant: -Layout.insetHorizontal(theme: theme)),
         ])
     }
 
@@ -241,11 +247,20 @@ private extension CodeBlockView {
         addSubview(scrollView)
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: Layout.headerToCodeSpacing),
-            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Layout.insetHorizontal(theme: theme)),
-            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Layout.insetHorizontal(theme: theme)),
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Layout.insetVertical(theme: theme)),
-            scrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.minimumVisibleCodeHeight),
+            scrollView.topAnchor.constraint(
+                equalTo: headerView.bottomAnchor,
+                constant: Layout.headerToCodeSpacing),
+            scrollView.leadingAnchor.constraint(
+                equalTo: leadingAnchor,
+                constant: Layout.insetHorizontal(theme: theme)),
+            scrollView.trailingAnchor.constraint(
+                equalTo: trailingAnchor,
+                constant: -Layout.insetHorizontal(theme: theme)),
+            scrollView.bottomAnchor.constraint(
+                equalTo: bottomAnchor,
+                constant: -Layout.insetVertical(theme: theme)),
+            scrollView.heightAnchor.constraint(
+                greaterThanOrEqualToConstant: Layout.minimumVisibleCodeHeight),
         ])
     }
 }

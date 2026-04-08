@@ -6,9 +6,12 @@ public final class QuillView: UIView {
     public private(set) var currentMarkdown: String?
     public var configuration = QuillConfiguration.default {
         didSet {
-            guard streamCoordinator.hasActiveController == false else { return }
-            guard markdown != nil || currentMarkdown != nil else { return }
-            renderStatic()
+            guard
+                streamCoordinator.hasActiveController == false,
+                markdown != nil || currentMarkdown != nil
+            else { return }
+
+            renderStatic(source: markdown ?? currentMarkdown)
         }
     }
 
@@ -35,7 +38,7 @@ public final class QuillView: UIView {
     public var markdown: String? {
         didSet {
             guard markdown != oldValue else { return }
-            renderStatic()
+            renderStatic(source: markdown)
         }
     }
 
@@ -128,8 +131,7 @@ public final class QuillView: UIView {
 }
 
 private extension QuillView {
-    func renderStatic() {
-        let source = markdown ?? currentMarkdown
+    func renderStatic(source: String?) {
         currentMarkdown = source
         activeConfiguration = configuration
 

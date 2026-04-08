@@ -53,7 +53,9 @@ enum TableSurfaceLayoutBuilder {
                 theme: theme
             )
             let rowHeight = cellLayouts.reduce(theme.table.minimumRowHeight) { partialResult, cell in
-                max(partialResult, cell.textLayout.usedHeight + theme.table.cellPadding.top + theme.table.cellPadding.bottom)
+                max(
+                    partialResult,
+                    cell.textLayout.usedHeight + theme.table.cellPadding.top + theme.table.cellPadding.bottom)
             }
 
             cells.append(contentsOf: positionRowLayouts(
