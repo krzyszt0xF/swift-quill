@@ -11,7 +11,7 @@ struct HeightCoordinatorTests {
     @Test("Burst schedules coalesce into one callback")
     func burstSchedulesCoalesceIntoOneCallback() async {
         let sleepController = ControlledSleepController()
-        var measuredHeight: CGFloat = 120
+        let measuredHeight: CGFloat = 120
         let coordinator = makeHeightCoordinator(
             sleepController: sleepController,
             measuredHeight: { measuredHeight }

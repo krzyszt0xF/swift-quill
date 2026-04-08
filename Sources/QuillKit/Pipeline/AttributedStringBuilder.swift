@@ -13,14 +13,14 @@ enum AttributedStringBuilder {
         frozenCount: Int,
         highlightStore: (any CodeBlockHighlightStore)? = nil,
         imageLoadStore: (any ImageLoadStore)? = nil,
-        imageAppearance: ImageAppearance = .default
+        theme: QuillTheme = .default
     ) -> [RenderFragment] {
         RenderFragmentBuilder.buildRenderFragments(
             from: nodes,
             frozenCount: frozenCount,
             highlightStore: highlightStore,
             imageLoadStore: imageLoadStore,
-            imageAppearance: imageAppearance
+            theme: theme
         )
     }
 }

@@ -13,7 +13,7 @@ struct ImageAttachmentTests {
             blockID: blockID,
             source: "https://example.com/image.png",
             alt: "hero",
-            appearance: .default
+            theme: .default
         )
 
         #expect(attachment.blockID == blockID)
@@ -27,7 +27,7 @@ struct ImageAttachmentTests {
             blockID: BlockIdentity(rawValue: 2),
             source: nil,
             alt: "",
-            appearance: .default
+            theme: .default
         )
 
         #expect(attachment.allowsTextAttachmentView == true)
@@ -39,7 +39,7 @@ struct ImageAttachmentTests {
             blockID: BlockIdentity(rawValue: 3),
             source: "https://example.com/image.png",
             alt: "cover",
-            appearance: .default
+            theme: .default
         )
         let layoutManager = NSTextLayoutManager()
         let location = layoutManager.documentRange.location
@@ -59,7 +59,7 @@ struct ImageAttachmentTests {
             blockID: BlockIdentity(rawValue: 30),
             source: "https://example.com/image.png",
             alt: "cover",
-            appearance: .default
+            theme: .default
         )
         let (provider, _) = makeProvider(for: attachment, store: nil)
 
@@ -73,7 +73,7 @@ struct ImageAttachmentTests {
             blockID: blockID,
             source: "https://example.com/image.png",
             alt: "cover",
-            appearance: .default
+            theme: .default
         )
         let store = MockImageLoadStore(aspectRatios: [blockID: 2.0])
         let (provider, location) = makeProvider(for: attachment, store: store)
@@ -96,7 +96,7 @@ struct ImageAttachmentTests {
             blockID: BlockIdentity(rawValue: 5),
             source: nil,
             alt: "",
-            appearance: .default
+            theme: .default
         )
         let (provider, location) = makeProvider(for: attachment, store: nil)
 
@@ -114,17 +114,13 @@ struct ImageAttachmentTests {
 
     @Test("Provider uses fallback aspect ratio when store is nil")
     func fallbackAspectRatioWithoutStore() {
-        let appearance = ImageAppearance(
-            placeholderColor: .systemGray5,
-            fallbackAspectRatio: 4.0 / 3.0,
-            maxHeight: 400,
-            errorIconColor: .secondaryLabel
-        )
+        var theme = QuillTheme.default
+        theme.image.fallbackAspectRatio = 4.0 / 3.0
         let attachment = ImageAttachment(
             blockID: BlockIdentity(rawValue: 6),
             source: nil,
             alt: "",
-            appearance: appearance
+            theme: theme
         )
         let (provider, location) = makeProvider(for: attachment, store: nil)
 
@@ -142,17 +138,14 @@ struct ImageAttachmentTests {
     @Test("Provider respects max height guardrail")
     func respectsMaxHeightGuardrail() {
         let blockID = BlockIdentity(rawValue: 7)
-        let appearance = ImageAppearance(
-            placeholderColor: .systemGray5,
-            fallbackAspectRatio: 1,
-            maxHeight: 100,
-            errorIconColor: .secondaryLabel
-        )
+        var theme = QuillTheme.default
+        theme.image.fallbackAspectRatio = 1
+        theme.image.maxHeight = 100
         let attachment = ImageAttachment(
             blockID: blockID,
             source: nil,
             alt: "",
-            appearance: appearance
+            theme: theme
         )
         let store = MockImageLoadStore(aspectRatios: [blockID: 0.5])
         let (provider, location) = makeProvider(for: attachment, store: store)
@@ -174,7 +167,7 @@ struct ImageAttachmentTests {
             blockID: BlockIdentity(rawValue: 8),
             source: "https://example.com/image.png",
             alt: "cover",
-            appearance: .default
+            theme: .default
         )
         let (provider, _) = makeProvider(for: attachment, store: nil)
 
@@ -189,7 +182,7 @@ struct ImageAttachmentTests {
             blockID: BlockIdentity(rawValue: 9),
             source: "https://example.com/image.png",
             alt: "cover",
-            appearance: .default
+            theme: .default
         )
         let store = MockImageLoadStore(
             loadResults: [BlockIdentity(rawValue: 9): .failed],
@@ -199,8 +192,7 @@ struct ImageAttachmentTests {
 
         provider.loadView()
         let view = provider.view as? ImageBlockView
-        let errorControl: UIControl? = view?.firstSubview()
-        errorControl?.sendActions(for: .touchUpInside)
+        view?.onRetry?()
 
         #expect(store.retryCalls.count == 1)
         #expect(store.retryCalls.first?.blockID == BlockIdentity(rawValue: 9))
@@ -214,7 +206,7 @@ struct ImageAttachmentTests {
             blockID: blockID,
             source: "https://example.com/image.png",
             alt: "cover",
-            appearance: .default
+            theme: .default
         )
         let store = MockImageLoadStore(
             loadResults: [blockID: .failed],

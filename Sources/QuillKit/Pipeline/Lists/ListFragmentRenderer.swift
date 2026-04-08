@@ -9,13 +9,14 @@ enum ListFragmentRenderer {
         renderContext: RenderContext,
         startIndex: UInt
     ) -> [RenderFragment] {
-        let bodyFont = BlockStyleFactory.bodyFont()
+        let bodyFont = BlockStyleFactory.bodyFont(theme: renderContext.theme)
 
         return items.enumerated().flatMap { index, item in
             let marker = ListMarkerFactory.makeOrderedListMarker(
                 checkbox: item.checkbox,
                 itemIndex: index,
-                startIndex: startIndex
+                startIndex: startIndex,
+                theme: renderContext.theme
             )
             return makeListItemRenderFragments(
                 bodyFont: bodyFont,
@@ -34,13 +35,14 @@ enum ListFragmentRenderer {
         nestingContext: NestingContext,
         renderContext: RenderContext
     ) -> [RenderFragment] {
-        let bodyFont = BlockStyleFactory.bodyFont()
-        let bullet = ListMarkerFactory.makeUnorderedBullet(for: nestingContext.listLevel)
+        let bodyFont = BlockStyleFactory.bodyFont(theme: renderContext.theme)
+        let bullet = ListMarkerFactory.makeUnorderedBullet(theme: renderContext.theme)
 
         return items.flatMap { item in
             let marker = ListMarkerFactory.makeUnorderedListMarker(
                 bullet: bullet,
-                checkbox: item.checkbox
+                checkbox: item.checkbox,
+                theme: renderContext.theme
             )
             return makeListItemRenderFragments(
                 bodyFont: bodyFont,
@@ -64,12 +66,14 @@ private extension ListFragmentRenderer {
         bodyFont: UIFont,
         marker: String,
         nestingContext: NestingContext,
+        theme: QuillTheme,
         to fragment: RenderFragment
     ) -> RenderFragment {
         let style = BlockStyleFactory.makeAlignedListItemParagraphStyle(
             bodyFont: bodyFont,
             marker: marker,
-            nestingContext: nestingContext
+            nestingContext: nestingContext,
+            theme: theme
         )
         let attributedString = NSMutableAttributedString(attributedString: fragment.attributedString)
         attributedString.addAttribute(
@@ -91,16 +95,18 @@ private extension ListFragmentRenderer {
         bodyFont: UIFont,
         marker: String,
         nestingContext: NestingContext,
+        theme: QuillTheme,
         to fragment: RenderFragment
     ) -> RenderFragment {
         let style = BlockStyleFactory.makeListItemMarkerParagraphStyle(
             bodyFont: bodyFont,
             marker: marker,
-            nestingContext: nestingContext
+            nestingContext: nestingContext,
+            theme: theme
         )
         let markerString = NSMutableAttributedString(string: marker, attributes: [
             .font: bodyFont,
-            .foregroundColor: UIColor.label,
+            .foregroundColor: theme.body.textColor,
             .paragraphStyle: style,
             .structuralMarker: true,
         ])
@@ -135,7 +141,8 @@ private extension ListFragmentRenderer {
                         attributedString: TextBlockAttributedStringRenderer.makeHeadingAttributedString(
                             content: content,
                             level: level,
-                            nestingContext: nestingContext
+                            nestingContext: nestingContext,
+                            theme: renderContext.theme
                         )
                     ),
                     contentBlockID: child.id,
@@ -151,7 +158,8 @@ private extension ListFragmentRenderer {
                     attributedString: NSMutableAttributedString(
                         attributedString: TextBlockAttributedStringRenderer.makeHTMLBlockAttributedString(
                             nestingContext: nestingContext,
-                            rawHTML: rawHTML
+                            rawHTML: rawHTML,
+                            theme: renderContext.theme
                         )
                     ),
                     contentBlockID: child.id,
@@ -167,7 +175,8 @@ private extension ListFragmentRenderer {
                     attributedString: NSMutableAttributedString(
                         attributedString: TextBlockAttributedStringRenderer.makeParagraphAttributedString(
                             content: content,
-                            nestingContext: nestingContext
+                            nestingContext: nestingContext,
+                            theme: renderContext.theme
                         )
                     ),
                     contentBlockID: child.id,
@@ -214,7 +223,8 @@ private extension ListFragmentRenderer {
                 bodyFont: bodyFont,
                 marker: marker,
                 nestingContext: nestingContext,
-                ownerBlockID: ownerBlockID
+                ownerBlockID: ownerBlockID,
+                theme: renderContext.theme
             ))
         }
 
@@ -224,6 +234,7 @@ private extension ListFragmentRenderer {
                     bodyFont: bodyFont,
                     marker: marker,
                     nestingContext: nestingContext,
+                    theme: renderContext.theme,
                     to: unit.fragments[0]
                 ))
                 fragments.append(contentsOf: unit.fragments.dropFirst())
@@ -236,6 +247,7 @@ private extension ListFragmentRenderer {
                         bodyFont: bodyFont,
                         marker: marker,
                         nestingContext: nestingContext,
+                        theme: renderContext.theme,
                         to: firstFragment
                     ))
                 }
@@ -290,16 +302,18 @@ private extension ListFragmentRenderer {
         bodyFont: UIFont,
         marker: String,
         nestingContext: NestingContext,
-        ownerBlockID: BlockIdentity
+        ownerBlockID: BlockIdentity,
+        theme: QuillTheme
     ) -> RenderFragment {
         let style = BlockStyleFactory.makeListItemMarkerParagraphStyle(
             bodyFont: bodyFont,
             marker: marker,
-            nestingContext: nestingContext
+            nestingContext: nestingContext,
+            theme: theme
         )
         let attributedString = NSMutableAttributedString(string: marker, attributes: [
             .font: bodyFont,
-            .foregroundColor: UIColor.label,
+            .foregroundColor: theme.body.textColor,
             .paragraphStyle: style,
             .structuralMarker: true,
         ])

@@ -9,7 +9,7 @@ struct ImageBlockViewTests {
     @Test("Configure shows loading state")
     func configureShowsLoadingState() {
         let view = ImageBlockView()
-        view.configure(content: makeContent(), appearance: .default, retryEnabled: true)
+        view.configure(content: makeContent(), retryEnabled: true)
 
         #expect(contentImageView(in: view)?.isHidden == true)
         #expect(errorControl(in: view)?.isHidden == true)
@@ -20,7 +20,7 @@ struct ImageBlockViewTests {
     func loadedImageShowsImageView() {
         let view = ImageBlockView()
         let image = makeImage(width: 120, height: 60)
-        view.configure(content: makeContent(), appearance: .default, retryEnabled: true)
+        view.configure(content: makeContent(), retryEnabled: true)
 
         view.apply(imageLoadResult: .loaded(image))
 
@@ -32,7 +32,7 @@ struct ImageBlockViewTests {
     @Test("Failed load shows error state")
     func failedLoadShowsErrorState() {
         let view = ImageBlockView()
-        view.configure(content: makeContent(), appearance: .default, retryEnabled: true)
+        view.configure(content: makeContent(), retryEnabled: true)
 
         view.apply(imageLoadResult: .failed)
 
@@ -44,7 +44,7 @@ struct ImageBlockViewTests {
     @Test("Retry enabled keeps interactive retry affordance")
     func retryEnabledKeepsInteractiveAffordance() {
         let view = ImageBlockView()
-        view.configure(content: makeContent(), appearance: .default, retryEnabled: true)
+        view.configure(content: makeContent(), retryEnabled: true)
         view.apply(imageLoadResult: .failed)
 
         #expect(errorControl(in: view)?.isUserInteractionEnabled == true)
@@ -54,7 +54,7 @@ struct ImageBlockViewTests {
     @Test("Retry disabled removes retry affordance")
     func retryDisabledRemovesRetryAffordance() {
         let view = ImageBlockView()
-        view.configure(content: makeContent(), appearance: .default, retryEnabled: false)
+        view.configure(content: makeContent(), retryEnabled: false)
         view.apply(imageLoadResult: .failed)
 
         #expect(errorControl(in: view)?.isUserInteractionEnabled == false)

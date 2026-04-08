@@ -6,11 +6,18 @@ final class CodeBlockAttachment: NSTextAttachment {
     let code: String
     weak var highlightStore: (any CodeBlockHighlightStore)?
     let language: String?
+    let theme: QuillTheme
 
-    init(blockID: BlockIdentity, language: String?, code: String) {
+    init(
+        blockID: BlockIdentity,
+        language: String?,
+        code: String,
+        theme: QuillTheme
+    ) {
         self.blockID = blockID
         self.code = code
         self.language = language
+        self.theme = theme
         super.init(data: nil, ofType: nil)
 
         allowsTextAttachmentView = true

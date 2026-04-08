@@ -12,8 +12,7 @@ struct QuillStreamViewTests {
     func contentRemainsAfterStreamError() async throws {
         let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
         let coordinator = QuillStreamView<AsyncThrowingStream<String, Error>>.Coordinator(
-            preset: .balanced,
-            mode: .bufferedModules
+            configuration: makeConfiguration()
         )
 
         coordinator.subscribe(to: stream, onError: { _ in })
@@ -109,8 +108,7 @@ struct QuillStreamViewTests {
     func coordinatorHandlesStreamError() async throws {
         let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
         let coordinator = QuillStreamView<AsyncThrowingStream<String, Error>>.Coordinator(
-            preset: .balanced,
-            mode: .bufferedModules
+            configuration: makeConfiguration()
         )
         let errorCapture = SignalCapture()
 
@@ -209,8 +207,16 @@ private enum TestStreamError: Error {
 private extension QuillStreamViewTests {
     func makeCoordinator() -> QuillStreamView<AsyncStream<String>>.Coordinator {
         QuillStreamView<AsyncStream<String>>.Coordinator(
-            preset: .balanced,
-            mode: .bufferedModules
+            configuration: makeConfiguration()
+        )
+    }
+
+    func makeConfiguration() -> QuillConfiguration {
+        QuillConfiguration(
+            streaming: .init(
+                mode: .bufferedModules,
+                preset: .balanced
+            )
         )
     }
 }

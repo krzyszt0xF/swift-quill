@@ -21,29 +21,54 @@ extension TableSurfaceContent {
     init(from attachment: TableAttachment) {
         self.init(
             columnAlignments: attachment.columnAlignments,
-            header: TableSurfaceRowContent(from: attachment.header, isHeader: true),
-            rows: attachment.rows.map { TableSurfaceRowContent(from: $0, isHeader: false) }
+            header: TableSurfaceRowContent(
+                from: attachment.header,
+                isHeader: true,
+                theme: attachment.theme
+            ),
+            rows: attachment.rows.map {
+                TableSurfaceRowContent(
+                    from: $0,
+                    isHeader: false,
+                    theme: attachment.theme
+                )
+            }
         )
     }
 }
 
 private extension TableSurfaceRowContent {
-    init(from row: Block.TableRow, isHeader: Bool) {
+    init(
+        from row: Block.TableRow,
+        isHeader: Bool,
+        theme: QuillTheme
+    ) {
         self.init(
-            cells: row.cells.map { TableSurfaceCellContent(from: $0, isHeader: isHeader) }
+            cells: row.cells.map {
+                TableSurfaceCellContent(
+                    from: $0,
+                    isHeader: isHeader,
+                    theme: theme
+                )
+            }
         )
     }
 }
 
 private extension TableSurfaceCellContent {
-    init(from cell: Block.TableCell, isHeader: Bool) {
+    init(
+        from cell: Block.TableCell,
+        isHeader: Bool,
+        theme: QuillTheme
+    ) {
         let baseFont = isHeader
-            ? UIFont.monospacedSystemFont(ofSize: 14, weight: .semibold)
-            : UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+            ? theme.table.headerFont
+            : theme.table.bodyFont
         self.init(
             attributedText: InlineContentRenderer.attributedString(
                 for: cell.content,
-                baseFont: baseFont
+                baseFont: baseFont,
+                theme: theme
             ),
             plainText: InlineContentRenderer.plainText(from: cell.content)
         )

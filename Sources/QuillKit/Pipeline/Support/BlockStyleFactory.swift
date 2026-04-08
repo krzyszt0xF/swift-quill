@@ -1,64 +1,54 @@
 import UIKit
 
 enum BlockStyleFactory {
-    static func bodyFont() -> UIFont {
-        UIFont.systemFont(ofSize: 16)
+    static func bodyFont(theme: QuillTheme) -> UIFont {
+        theme.body.font
     }
 
-    static func headingFont(level: Int) -> UIFont {
-        switch level {
-        case 1:
-            return .systemFont(ofSize: 28, weight: .bold)
-        case 2:
-            return .systemFont(ofSize: 24, weight: .bold)
-        case 3:
-            return .systemFont(ofSize: 20, weight: .semibold)
-        case 4:
-            return .systemFont(ofSize: 18, weight: .semibold)
-        case 5:
-            return .systemFont(ofSize: 16, weight: .medium)
-        case 6:
-            return .systemFont(ofSize: 14, weight: .medium)
-        default:
-            return .systemFont(ofSize: 16)
-        }
+    static func headingFont(level: Int, theme: QuillTheme) -> UIFont {
+        theme.headingFontScaled(level: level)
     }
 
     static func makeAlignedListItemParagraphStyle(
         bodyFont: UIFont,
         marker: String,
-        nestingContext: NestingContext
+        nestingContext: NestingContext,
+        theme: QuillTheme
     ) -> NSMutableParagraphStyle {
         let style = makeListParagraphStyle(
             bodyFont: bodyFont,
             level: nestingContext.listLevel,
-            marker: marker
+            marker: marker,
+            theme: theme
         )
         style.firstLineHeadIndent = style.headIndent
-        applyBlockquoteIndent(to: style, nestingContext: nestingContext)
+        applyBlockquoteIndent(to: style, nestingContext: nestingContext, theme: theme)
         return style
     }
 
     static func makeListItemMarkerParagraphStyle(
         bodyFont: UIFont,
         marker: String,
-        nestingContext: NestingContext
+        nestingContext: NestingContext,
+        theme: QuillTheme
     ) -> NSMutableParagraphStyle {
         let style = makeListParagraphStyle(
             bodyFont: bodyFont,
             level: nestingContext.listLevel,
-            marker: marker
+            marker: marker,
+            theme: theme
         )
-        applyBlockquoteIndent(to: style, nestingContext: nestingContext)
+        applyBlockquoteIndent(to: style, nestingContext: nestingContext, theme: theme)
         return style
     }
 
     static func makeListParagraphStyle(
         bodyFont: UIFont,
         level: Int,
-        marker: String
+        marker: String,
+        theme: QuillTheme
     ) -> NSMutableParagraphStyle {
-        let baseIndent = CGFloat(level) * 24
+        let baseIndent = CGFloat(level) * theme.listIndentPerLevelScaled
         let markerWidth = (marker as NSString).size(withAttributes: [.font: bodyFont]).width
         let indent = baseIndent + markerWidth
 
@@ -67,68 +57,74 @@ enum BlockStyleFactory {
         style.headIndent = indent
         style.tabStops = [NSTextTab(textAlignment: .left, location: indent)]
         style.defaultTabInterval = indent
-        style.paragraphSpacingBefore = 4
+        style.paragraphSpacingBefore = theme.listItemSpacingScaled
         return style
     }
 
     static func makeParagraphStyle(
         nestingContext: NestingContext,
-        paragraphSpacingBefore: CGFloat
+        paragraphSpacingBefore: CGFloat,
+        theme: QuillTheme
     ) -> NSMutableParagraphStyle {
         let style = NSMutableParagraphStyle()
         style.paragraphSpacingBefore = paragraphSpacingBefore
-        applyBlockquoteIndent(to: style, nestingContext: nestingContext)
+        applyBlockquoteIndent(to: style, nestingContext: nestingContext, theme: theme)
         return style
     }
 
     static func makePresentationRoleParagraphStyle(
         nestingContext: NestingContext,
         paragraphSpacingBefore: CGFloat,
-        presentationRole: RenderFragment.PresentationRole
+        presentationRole: RenderFragment.PresentationRole,
+        theme: QuillTheme
     ) -> NSMutableParagraphStyle {
         let style = NSMutableParagraphStyle()
         style.paragraphSpacingBefore = paragraphSpacingBefore
         applyPresentationRoleIndent(
             to: style,
             nestingContext: nestingContext,
-            presentationRole: presentationRole
+            presentationRole: presentationRole,
+            theme: theme
         )
         return style
     }
 
-    static func makeThematicBreakParagraphStyle() -> NSMutableParagraphStyle {
+    static func makeThematicBreakParagraphStyle(theme: QuillTheme) -> NSMutableParagraphStyle {
         let style = NSMutableParagraphStyle()
         style.alignment = .center
-        style.paragraphSpacingBefore = 8
+        style.paragraphSpacingBefore = theme.thematicBreakSpacingScaled
         return style
     }
 
-    static func monospaceFont() -> UIFont {
-        UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+    static func monospaceFont(theme: QuillTheme) -> UIFont {
+        theme.codeBlock.font
     }
 }
 
 private extension BlockStyleFactory {
     static func applyBlockquoteIndent(
         to style: NSMutableParagraphStyle,
-        nestingContext: NestingContext
+        nestingContext: NestingContext,
+        theme: QuillTheme
     ) {
         guard nestingContext.blockquoteDepth > 0 else { return }
 
-        let indent = CGFloat(nestingContext.blockquoteDepth) * BlockquoteStyle.levelSpacing
+        let indent = CGFloat(nestingContext.blockquoteDepth) * theme.blockquoteLevelSpacingScaled
         style.headIndent += indent
         style.firstLineHeadIndent += indent
     }
 
     static func applyNestedBlockIndent(
         to style: NSMutableParagraphStyle,
-        nestingContext: NestingContext
+        nestingContext: NestingContext,
+        theme: QuillTheme
     ) {
-        applyBlockquoteIndent(to: style, nestingContext: nestingContext)
+        applyBlockquoteIndent(to: style, nestingContext: nestingContext, theme: theme)
 
         guard nestingContext.listLevel > 0 else { return }
 
-        let indent = CGFloat(nestingContext.listLevel) * 24 + 12
+        let indent = CGFloat(nestingContext.listLevel) * theme.listIndentPerLevelScaled
+            + theme.body.font.pointSize * 0.75
         style.headIndent += indent
         style.firstLineHeadIndent += indent
     }
@@ -136,13 +132,14 @@ private extension BlockStyleFactory {
     static func applyPresentationRoleIndent(
         to style: NSMutableParagraphStyle,
         nestingContext: NestingContext,
-        presentationRole: RenderFragment.PresentationRole
+        presentationRole: RenderFragment.PresentationRole,
+        theme: QuillTheme
     ) {
         switch presentationRole {
         case .fullWidthEmbeddedBlock, .regularBlock, .standaloneListMarker:
-            applyBlockquoteIndent(to: style, nestingContext: nestingContext)
+            applyBlockquoteIndent(to: style, nestingContext: nestingContext, theme: theme)
         case .indentedListBlock, .indentedListText:
-            applyNestedBlockIndent(to: style, nestingContext: nestingContext)
+            applyNestedBlockIndent(to: style, nestingContext: nestingContext, theme: theme)
         }
     }
 }

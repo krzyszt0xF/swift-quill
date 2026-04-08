@@ -7,16 +7,16 @@ enum RenderFragmentBuilder {
         frozenCount: Int,
         highlightStore: (any CodeBlockHighlightStore)? = nil,
         imageLoadStore: (any ImageLoadStore)? = nil,
-        imageAppearance: ImageAppearance = .default
+        theme: QuillTheme = .default
     ) -> [RenderFragment] {
         var fragments: [RenderFragment] = []
 
         for (index, node) in nodes.enumerated() {
             let renderContext = RenderContext(
                 highlightStore: highlightStore,
-                imageAppearance: imageAppearance,
                 imageLoadStore: imageLoadStore,
-                rendersAttachments: index < frozenCount
+                rendersAttachments: index < frozenCount,
+                theme: theme
             )
             let nodeFragments = makeRenderFragments(
                 for: node,
@@ -126,25 +126,29 @@ private extension RenderFragmentBuilder {
                     highlightStore: renderContext.highlightStore,
                     language: language,
                     nestingContext: nestingContext,
-                    presentationRole: presentationRole
+                    presentationRole: presentationRole,
+                    theme: renderContext.theme
                 )
             } else {
                 attributedString = EmbeddedBlockRenderer.makeOpenCodeFenceAttributedString(
                     code: code,
                     nestingContext: nestingContext,
-                    presentationRole: presentationRole
+                    presentationRole: presentationRole,
+                    theme: renderContext.theme
                 )
             }
         case let .heading(level, content):
             attributedString = TextBlockAttributedStringRenderer.makeHeadingAttributedString(
                 content: content,
                 level: level,
-                nestingContext: nestingContext
+                nestingContext: nestingContext,
+                theme: renderContext.theme
             )
         case let .htmlBlock(rawHTML):
             attributedString = TextBlockAttributedStringRenderer.makeHTMLBlockAttributedString(
                 nestingContext: nestingContext,
-                rawHTML: rawHTML
+                rawHTML: rawHTML,
+                theme: renderContext.theme
             )
         case let .paragraph(content):
             if renderContext.rendersAttachments,
@@ -155,14 +159,15 @@ private extension RenderFragmentBuilder {
                     source: source,
                     alt: InlineContentRenderer.plainText(from: alt),
                     imageLoadStore: renderContext.imageLoadStore,
-                    appearance: renderContext.imageAppearance,
                     nestingContext: nestingContext,
-                    presentationRole: presentationRole
+                    presentationRole: presentationRole,
+                    theme: renderContext.theme
                 )
             } else {
                 attributedString = TextBlockAttributedStringRenderer.makeParagraphAttributedString(
                     content: content,
-                    nestingContext: nestingContext
+                    nestingContext: nestingContext,
+                    theme: renderContext.theme
                 )
             }
         case let .table(columnAlignments, header, rows):
@@ -173,18 +178,22 @@ private extension RenderFragmentBuilder {
                     header: header,
                     nestingContext: nestingContext,
                     presentationRole: presentationRole,
-                    rows: rows
+                    rows: rows,
+                    theme: renderContext.theme
                 )
             } else {
                 attributedString = EmbeddedBlockRenderer.makeTableFallbackAttributedString(
                     header: header,
                     rows: rows,
                     nestingContext: nestingContext,
-                    presentationRole: presentationRole
+                    presentationRole: presentationRole,
+                    theme: renderContext.theme
                 )
             }
         case .thematicBreak:
-            attributedString = EmbeddedBlockRenderer.makeThematicBreakAttributedString()
+            attributedString = EmbeddedBlockRenderer.makeThematicBreakAttributedString(
+                theme: renderContext.theme
+            )
         case .blockquote, .orderedList, .unorderedList:
             preconditionFailure("Lists and blockquotes are rendered through makeRenderFragments")
         }

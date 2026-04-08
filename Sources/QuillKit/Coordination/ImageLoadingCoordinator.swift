@@ -4,9 +4,8 @@ import UIKit
 @MainActor
 final class ImageLoadingCoordinator {
     var onAspectRatioChanged: (() -> Void)?
-    var imageAppearance: ImageAppearance { appearance }
 
-    private var appearance: ImageAppearance
+    private var theme = QuillTheme.default.image
     private let cache: NSCache<NSURL, UIImage>
     private var loader: (any ImageLoading)?
     private var pendingURLTasks: [URL: Task<Void, Never>]
@@ -14,8 +13,7 @@ final class ImageLoadingCoordinator {
     private let storeState: ImageStoreState
     private var waitingBlockIDsByURL: [URL: Set<BlockIdentity>]
 
-    init(cacheLimit: Int = 50, appearance: ImageAppearance = .default) {
-        self.appearance = appearance
+    init(cacheLimit: Int = 50) {
         self.cache = NSCache<NSURL, UIImage>()
         self.loader = nil
         self.pendingURLTasks = [:]
@@ -85,9 +83,9 @@ final class ImageLoadingCoordinator {
         cancelAll()
     }
 
-    func set(options: ImageOptions) {
-        appearance = options.appearance
-        storeState.setRetryEnabled(options.retryEnabled)
+    func apply(theme: QuillTheme.Image, retryEnabled: Bool) {
+        self.theme = theme
+        storeState.setRetryEnabled(retryEnabled)
     }
 }
 
@@ -200,7 +198,7 @@ private extension ImageLoadingCoordinator {
         }
         sink?.apply(imageLoadResult: result)
         guard let aspectRatio else { return false }
-        return abs(aspectRatio - appearance.fallbackAspectRatio) > .ulpOfOne
+        return abs(aspectRatio - theme.fallbackAspectRatio) > .ulpOfOne
     }
 
     final class ImageStoreState: @unchecked Sendable {

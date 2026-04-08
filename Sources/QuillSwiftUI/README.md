@@ -12,7 +12,12 @@ SwiftUI wrapper over QuillKit's UIKit rendering layer.
 `QuillStreamView` does not diff `AsyncSequence` values (they are not `Equatable`). Use `.id(streamID)` with a value that changes each time you start a new stream. SwiftUI will tear down the old view and create a fresh one.
 
 ```swift
-QuillStreamView(chunks: myStream, preset: .balanced)
+QuillStreamView(
+    chunks: myStream,
+    configuration: .init(
+        streaming: .init(preset: .balanced)
+    )
+)
     .id(streamID)
 ```
 

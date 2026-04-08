@@ -12,15 +12,20 @@ struct QuillViewHeightCoalescingTests {
         let heightSleepController = ControlledSleepController()
         let schedulerTimeController = TestTimeController()
         var measuredHeight: CGFloat = 0
-        let configuration = RenderConfiguration(
+        let renderConfiguration = RenderConfiguration(
             streamingMode: .smoothedTail,
             performanceProfile: .balanced,
             tailReveal: .balanced,
             layout: .init(heightMeasurementCoalescingInterval: 0.05),
             bufferedStream: .default
         )
+        let configuration = QuillConfiguration(
+            streaming: .init(mode: .smoothedTail, preset: .balanced),
+            renderConfiguration: renderConfiguration
+        )
         let view = makeHeightCoalescingQuillView(
             configuration: configuration,
+            renderConfiguration: renderConfiguration,
             heightSleepController: heightSleepController,
             schedulerTimeController: schedulerTimeController,
             measuredHeight: { measuredHeight }
@@ -83,15 +88,20 @@ struct QuillViewHeightCoalescingTests {
         let heightSleepController = ControlledSleepController()
         let schedulerTimeController = TestTimeController()
         var measuredHeight: CGFloat = 0
-        let configuration = RenderConfiguration(
+        let renderConfiguration = RenderConfiguration(
             streamingMode: .smoothedTail,
             performanceProfile: .balanced,
             tailReveal: .balanced,
             layout: .init(heightMeasurementCoalescingInterval: 0.05),
             bufferedStream: .default
         )
+        let configuration = QuillConfiguration(
+            streaming: .init(mode: .smoothedTail, preset: .balanced),
+            renderConfiguration: renderConfiguration
+        )
         let view = makeHeightCoalescingQuillView(
             configuration: configuration,
+            renderConfiguration: renderConfiguration,
             heightSleepController: heightSleepController,
             schedulerTimeController: schedulerTimeController,
             measuredHeight: { measuredHeight }
@@ -160,7 +170,8 @@ private extension QuillViewHeightCoalescingTests {
     }
 
     func makeHeightCoalescingQuillView(
-        configuration: RenderConfiguration,
+        configuration: QuillConfiguration,
+        renderConfiguration: RenderConfiguration,
         heightSleepController: ControlledSleepController,
         schedulerTimeController: TestTimeController,
         measuredHeight: @escaping () -> CGFloat
@@ -185,7 +196,7 @@ private extension QuillViewHeightCoalescingTests {
             markdownParser: .live,
             streamCoordinator: StreamCoordinator(
                 renderer: renderer,
-                renderConfiguration: configuration,
+                renderConfiguration: renderConfiguration,
                 bufferedStreamCommitScheduler: scheduler,
                 bufferedVisualFeeder: .init(),
                 streamController: MarkdownStreamController.init

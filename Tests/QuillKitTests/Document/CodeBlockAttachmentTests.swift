@@ -11,7 +11,12 @@ struct CodeBlockAttachmentTests {
     @Test("Attachment stores blockID, language, and code")
     func identityAndPayload() {
         let id = BlockIdentity(rawValue: 1)
-        let attachment = CodeBlockAttachment(blockID: id, language: "swift", code: "let x = 1")
+        let attachment = CodeBlockAttachment(
+            blockID: id,
+            language: "swift",
+            code: "let x = 1",
+            theme: .default
+        )
 
         #expect(attachment.blockID == id)
         #expect(attachment.language == "swift")
@@ -20,7 +25,12 @@ struct CodeBlockAttachmentTests {
 
     @Test("Attachment with nil language stores nil")
     func nilLanguage() {
-        let attachment = CodeBlockAttachment(blockID: BlockIdentity(rawValue: 2), language: nil, code: "plain")
+        let attachment = CodeBlockAttachment(
+            blockID: BlockIdentity(rawValue: 2),
+            language: nil,
+            code: "plain",
+            theme: .default
+        )
 
         #expect(attachment.language == nil)
         #expect(attachment.code == "plain")
@@ -28,14 +38,24 @@ struct CodeBlockAttachmentTests {
 
     @Test("Attachment allows text attachment view")
     func allowsViewProvider() {
-        let attachment = CodeBlockAttachment(blockID: BlockIdentity(rawValue: 2), language: "swift", code: "code")
+        let attachment = CodeBlockAttachment(
+            blockID: BlockIdentity(rawValue: 2),
+            language: "swift",
+            code: "code",
+            theme: .default
+        )
 
         #expect(attachment.allowsTextAttachmentView == true)
     }
 
     @Test("Provider sets tracksTextAttachmentViewBounds")
     func providerConfiguration() {
-        let attachment = CodeBlockAttachment(blockID: BlockIdentity(rawValue: 2), language: "swift", code: "let x = 1")
+        let attachment = CodeBlockAttachment(
+            blockID: BlockIdentity(rawValue: 2),
+            language: "swift",
+            code: "let x = 1",
+            theme: .default
+        )
         let layoutManager = NSTextLayoutManager()
         let location = layoutManager.documentRange.location
 
@@ -51,7 +71,12 @@ struct CodeBlockAttachmentTests {
 
     @Test("Provider returns width-driven bounds from proposed line fragment")
     func widthDrivenBounds() {
-        let attachment = CodeBlockAttachment(blockID: BlockIdentity(rawValue: 2), language: "swift", code: "let x = 1")
+        let attachment = CodeBlockAttachment(
+            blockID: BlockIdentity(rawValue: 2),
+            language: "swift",
+            code: "let x = 1",
+            theme: .default
+        )
         let layoutManager = NSTextLayoutManager()
         let location = layoutManager.documentRange.location
 
@@ -68,9 +93,9 @@ struct CodeBlockAttachmentTests {
         let bounds = provider.attachmentBounds(
             for: [:],
             location: location,
-            textContainer: nil,
+            textContainer: nil as NSTextContainer?,
             proposedLineFragment: proposedFragment,
-            position: .zero
+            position: CGPoint.zero
         )
 
         #expect(bounds.width == 300)
@@ -79,7 +104,12 @@ struct CodeBlockAttachmentTests {
 
     @Test("Provider returns safe bounds before loadView")
     func safeBoundsBeforeLoadView() {
-        let attachment = CodeBlockAttachment(blockID: BlockIdentity(rawValue: 2), language: "swift", code: "let x = 1")
+        let attachment = CodeBlockAttachment(
+            blockID: BlockIdentity(rawValue: 2),
+            language: "swift",
+            code: "let x = 1",
+            theme: .default
+        )
         let layoutManager = NSTextLayoutManager()
         let location = layoutManager.documentRange.location
 
@@ -94,9 +124,9 @@ struct CodeBlockAttachmentTests {
         let bounds = provider.attachmentBounds(
             for: [:],
             location: location,
-            textContainer: nil,
+            textContainer: nil as NSTextContainer?,
             proposedLineFragment: proposedFragment,
-            position: .zero
+            position: CGPoint.zero
         )
 
         #expect(bounds.width == 300)
@@ -105,7 +135,12 @@ struct CodeBlockAttachmentTests {
 
     @Test("Provider returns fallback bounds for zero-width proposed fragment")
     func fallbackBoundsForZeroWidth() {
-        let attachment = CodeBlockAttachment(blockID: BlockIdentity(rawValue: 2), language: "swift", code: "code")
+        let attachment = CodeBlockAttachment(
+            blockID: BlockIdentity(rawValue: 2),
+            language: "swift",
+            code: "code",
+            theme: .default
+        )
         let layoutManager = NSTextLayoutManager()
         let location = layoutManager.documentRange.location
 
@@ -120,9 +155,9 @@ struct CodeBlockAttachmentTests {
         let bounds = provider.attachmentBounds(
             for: [:],
             location: location,
-            textContainer: nil,
+            textContainer: nil as NSTextContainer?,
             proposedLineFragment: proposedFragment,
-            position: .zero
+            position: CGPoint.zero
         )
 
         #expect(bounds.width > 0)

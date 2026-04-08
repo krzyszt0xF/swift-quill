@@ -11,6 +11,7 @@ final class CodeBlockView: UIView {
     private var copyRevertTask: Task<Void, Never>?
     private var currentLanguage: String?
     private var metricsCache: Metrics?
+    private let theme: QuillTheme
 
     private(set) var currentCode: String = ""
 
@@ -21,14 +22,18 @@ final class CodeBlockView: UIView {
         )
     }
 
-    override init(frame: CGRect) {
+    init(
+        theme: QuillTheme = .default,
+        frame: CGRect = .zero
+    ) {
+        self.theme = theme
         super.init(frame: frame)
 
-        backgroundColor = .systemBackground
+        backgroundColor = theme.codeBlock.backgroundColor
         clipsToBounds = true
-        layer.borderColor = UIColor.separator.withAlphaComponent(0.14).cgColor
-        layer.borderWidth = 1
-        layer.cornerRadius = 20
+        layer.borderColor = theme.codeBlock.borderColor.cgColor
+        layer.borderWidth = theme.codeBlock.borderWidth
+        layer.cornerRadius = theme.codeBlock.cornerRadius
 
         setupHeaderView()
         setupCopyButton()
@@ -50,8 +55,16 @@ final class CodeBlockView: UIView {
         )
     }
 
-    static func measureHeight(of code: String, in language: String?) -> CGFloat {
-        makeMetrics(code: code, language: language).height
+    static func measureHeight(
+        of code: String,
+        in language: String?,
+        theme: QuillTheme
+    ) -> CGFloat {
+        makeMetrics(
+            code: code,
+            language: language,
+            theme: theme
+        ).height
     }
 
     func apply(highlightedCode: HighlightedCodeSnapshot) {
@@ -59,7 +72,8 @@ final class CodeBlockView: UIView {
         let contentOffset = scrollView.contentOffset
         let displayCode = CodeBlockDisplayRenderer.makeAttributedString(
             from: highlightedCode,
-            code: currentCode
+            code: currentCode,
+            theme: theme
         )
 
         codeTextView.attributedText = displayCode
@@ -73,7 +87,10 @@ final class CodeBlockView: UIView {
         currentLanguage = normalizedLanguage(language)
         currentCode = code
         metricsCache = nil
-        codeTextView.attributedText = CodeBlockDisplayRenderer.makeAttributedString(from: currentCode)
+        codeTextView.attributedText = CodeBlockDisplayRenderer.makeAttributedString(
+            from: currentCode,
+            theme: theme
+        )
         updateCodeWidth()
 
         if let currentLanguage {
@@ -109,7 +126,11 @@ private extension CodeBlockView {
             return metricsCache
         }
 
-        let metrics = Self.makeMetrics(code: currentCode, language: currentLanguage)
+        let metrics = Self.makeMetrics(
+            code: currentCode,
+            language: currentLanguage,
+            theme: theme
+        )
         metricsCache = metrics
         return metrics
     }
@@ -118,7 +139,7 @@ private extension CodeBlockView {
         UIPasteboard.general.string = currentCode
 
         copyButton.setImage(UIImage(systemName: "checkmark"), for: .normal)
-        copyButton.tintColor = .label
+        copyButton.tintColor = theme.codeBlock.copyButtonTint
 
         copyRevertTask?.cancel()
         copyRevertTask = Task { [weak self] in
@@ -127,7 +148,7 @@ private extension CodeBlockView {
             guard !Task.isCancelled, let self else { return }
 
             self.copyButton.setImage(UIImage(systemName: "doc.on.doc"), for: .normal)
-            self.copyButton.tintColor = .label
+            self.copyButton.tintColor = self.theme.codeBlock.copyButtonTint
         }
     }
 
@@ -161,11 +182,15 @@ private extension CodeBlockView {
     }
 
     func setupCopyButton() {
-        copyButton.tintColor = .label
+        copyButton.tintColor = theme.codeBlock.copyButtonTint
         copyButton.setImage(UIImage(systemName: "doc.on.doc"), for: .normal)
         copyButton.setPreferredSymbolConfiguration(
-            UIImage.SymbolConfiguration(pointSize: 12, weight: .regular),
-            forImageIn: .normal)
+            UIImage.SymbolConfiguration(
+                pointSize: theme.codeBlock.headerFont.pointSize,
+                weight: .regular
+            ),
+            forImageIn: .normal
+        )
         copyButton.addTarget(self, action: #selector(copyTapped), for: .touchUpInside)
 
         headerView.addSubview(copyButton)
@@ -175,8 +200,8 @@ private extension CodeBlockView {
             copyButton.topAnchor.constraint(equalTo: headerView.topAnchor),
             copyButton.trailingAnchor.constraint(equalTo: headerView.trailingAnchor),
             copyButton.bottomAnchor.constraint(equalTo: headerView.bottomAnchor),
-            copyButton.widthAnchor.constraint(equalToConstant: Layout.copyButtonSize),
-            copyButton.heightAnchor.constraint(equalToConstant: Layout.copyButtonSize),
+            copyButton.widthAnchor.constraint(equalToConstant: Layout.copyButtonSize(theme: theme)),
+            copyButton.heightAnchor.constraint(equalToConstant: Layout.copyButtonSize(theme: theme)),
         ])
     }
 
@@ -185,15 +210,21 @@ private extension CodeBlockView {
         addSubview(headerView)
 
         NSLayoutConstraint.activate([
-            headerView.topAnchor.constraint(equalTo: topAnchor, constant: Layout.Inset.vertical),
-            headerView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Layout.Inset.horizontal),
-            headerView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Layout.Inset.horizontal)
+            headerView.topAnchor.constraint(
+                equalTo: topAnchor,
+                constant: Layout.insetVertical(theme: theme)),
+            headerView.leadingAnchor.constraint(
+                equalTo: leadingAnchor,
+                constant: Layout.insetHorizontal(theme: theme)),
+            headerView.trailingAnchor.constraint(
+                equalTo: trailingAnchor,
+                constant: -Layout.insetHorizontal(theme: theme)),
         ])
     }
 
     func setupLanguageLabel() {
-        languageLabel.font = .systemFont(ofSize: 12, weight: .semibold)
-        languageLabel.textColor = .label
+        languageLabel.font = theme.codeBlock.headerFont
+        languageLabel.textColor = theme.codeBlock.languageLabelColor
         languageLabel.isHidden = true
 
         headerView.addSubview(languageLabel)
@@ -201,8 +232,11 @@ private extension CodeBlockView {
         NSLayoutConstraint.activate([
             languageLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor),
             languageLabel.topAnchor.constraint(equalTo: headerView.topAnchor),
-            languageLabel.trailingAnchor.constraint(lessThanOrEqualTo: copyButton.leadingAnchor, constant: -12),
-            languageLabel.bottomAnchor.constraint(equalTo: headerView.bottomAnchor)
+            languageLabel.trailingAnchor.constraint(
+                lessThanOrEqualTo: copyButton.leadingAnchor,
+                constant: -theme.codeBlock.padding
+            ),
+            languageLabel.bottomAnchor.constraint(equalTo: headerView.bottomAnchor),
         ])
     }
 
@@ -213,30 +247,43 @@ private extension CodeBlockView {
         addSubview(scrollView)
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: Layout.headerToCodeSpacing),
-            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Layout.Inset.horizontal),
-            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Layout.Inset.horizontal),
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Layout.Inset.vertical),
-            scrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.minimumVisibleCodeHeight),
+            scrollView.topAnchor.constraint(
+                equalTo: headerView.bottomAnchor,
+                constant: Layout.headerToCodeSpacing),
+            scrollView.leadingAnchor.constraint(
+                equalTo: leadingAnchor,
+                constant: Layout.insetHorizontal(theme: theme)),
+            scrollView.trailingAnchor.constraint(
+                equalTo: trailingAnchor,
+                constant: -Layout.insetHorizontal(theme: theme)),
+            scrollView.bottomAnchor.constraint(
+                equalTo: bottomAnchor,
+                constant: -Layout.insetVertical(theme: theme)),
+            scrollView.heightAnchor.constraint(
+                greaterThanOrEqualToConstant: Layout.minimumVisibleCodeHeight),
         ])
     }
 }
 
 private extension CodeBlockView {
-    static func makeMetrics(code: String, language: String?) -> Metrics {
+    static func makeMetrics(
+        code: String,
+        language: String?,
+        theme: QuillTheme
+    ) -> Metrics {
         let lineCount = max(1, code.components(separatedBy: "\n").count)
-        let codeLineHeight = CodeBlockTextStyle.font.lineHeight
+        let codeLineHeight = theme.codeBlock.font.lineHeight
         let codeHeight = CGFloat(lineCount) * codeLineHeight
-            + CGFloat(max(0, lineCount - 1)) * Layout.codeLineSpacing
+            + CGFloat(max(0, lineCount - 1)) * theme.codeBlock.lineSpacing
         let lines = code.isEmpty ? [""] : code.components(separatedBy: "\n")
         let widestLine = lines.map { line in
-            ceil((line as NSString).size(withAttributes: [.font: CodeBlockTextStyle.font]).width)
+            ceil((line as NSString).size(withAttributes: [.font: theme.codeBlock.font]).width)
         }.max() ?? 0
-        let height = Layout.Inset.vertical
-            + Layout.headerHeight(language: language)
+        let height = Layout.insetVertical(theme: theme)
+            + Layout.headerHeight(language: language, theme: theme)
             + Layout.headerToCodeSpacing
             + max(Layout.minimumVisibleCodeHeight, ceil(codeHeight))
-            + Layout.Inset.vertical
+            + Layout.insetVertical(theme: theme)
 
         return Metrics(
             code: code,
@@ -252,19 +299,24 @@ private extension CodeBlockView {
     }
 
     enum Layout {
-        enum Inset {
-            static let vertical: CGFloat = 12
-            static let horizontal: CGFloat = 12
-        }
-
-        static let codeLineSpacing: CGFloat = 2
-        static let copyButtonSize: CGFloat = 20
         static let headerToCodeSpacing: CGFloat = 12
         static let minimumVisibleCodeHeight: CGFloat = 18
 
-        static func headerHeight(language: String?) -> CGFloat {
-            let labelHeight = language == nil ? 0 : UIFont.systemFont(ofSize: 12, weight: .semibold).lineHeight
-            return max(copyButtonSize, ceil(labelHeight))
+        static func copyButtonSize(theme: QuillTheme) -> CGFloat {
+            theme.codeBlock.headerFont.pointSize + 8
+        }
+
+        static func headerHeight(language: String?, theme: QuillTheme) -> CGFloat {
+            let labelHeight = language == nil ? 0 : theme.codeBlock.headerFont.lineHeight
+            return max(copyButtonSize(theme: theme), ceil(labelHeight))
+        }
+
+        static func insetHorizontal(theme: QuillTheme) -> CGFloat {
+            theme.codeBlock.padding
+        }
+
+        static func insetVertical(theme: QuillTheme) -> CGFloat {
+            theme.codeBlock.padding
         }
     }
 }

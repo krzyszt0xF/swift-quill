@@ -1,5 +1,6 @@
 import UIKit
 
+@MainActor
 final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
     override init(
         textAttachment: NSTextAttachment,
@@ -21,11 +22,14 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
         guard let attachment = textAttachment as? CodeBlockAttachment else { return }
 
         let content = CodeBlockContent(from: attachment)
-        let store = attachment.highlightStore
-
-        assert(Thread.isMainThread)
-        view = MainActor.assumeIsolated {
-            Self.makeBlockView(from: content, highlightStore: store)
+        let highlightStore = attachment.highlightStore
+        let theme = attachment.theme
+        view = executeIsolated {
+            Self.makeBlockView(
+                from: content,
+                highlightStore: highlightStore,
+                theme: theme
+            )
         }
     }
 
@@ -36,22 +40,27 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
         proposedLineFragment: CGRect,
         position: CGPoint
     ) -> CGRect {
-        guard let attachment = textAttachment as? CodeBlockAttachment else {
-            return CGRect(origin: .zero, size: Layout.fallbackSize)
-        }
-
         let width = proposedLineFragment.width
         guard width > 0 else {
             return CGRect(origin: .zero, size: Layout.fallbackSize)
         }
 
+        guard let attachment = textAttachment as? CodeBlockAttachment else {
+            return CGRect(origin: .zero, size: Layout.fallbackSize)
+        }
+
         let code = attachment.code
         let language = attachment.language
-        assert(Thread.isMainThread)
-        return MainActor.assumeIsolated {
-            let height = CodeBlockView.measureHeight(of: code, in: language)
-            return CGRect(origin: .zero, size: CGSize(width: width, height: height))
+        let theme = attachment.theme
+        let height = executeIsolated {
+            CodeBlockView.measureHeight(
+                of: code,
+                in: language,
+                theme: theme
+            )
         }
+
+        return CGRect(origin: .zero, size: CGSize(width: width, height: height))
     }
 }
 
@@ -60,12 +69,12 @@ private extension CodeBlockAttachmentProvider {
         static let fallbackSize = CGSize(width: 320, height: 80)
     }
 
-    @MainActor
     static func makeBlockView(
         from content: CodeBlockContent,
-        highlightStore: CodeBlockHighlightStore?
+        highlightStore: CodeBlockHighlightStore?,
+        theme: QuillTheme
     ) -> CodeBlockView {
-        let view = CodeBlockView()
+        let view = CodeBlockView(theme: theme)
         view.configure(language: content.language, code: content.code)
 
         let highlighted = highlightStore?.highlightedResult(for: content.blockID)

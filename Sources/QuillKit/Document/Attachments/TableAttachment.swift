@@ -6,17 +6,20 @@ final class TableAttachment: NSTextAttachment {
     let columnAlignments: [Block.ColumnAlignment?]
     let header: Block.TableRow
     let rows: [Block.TableRow]
+    let theme: QuillTheme
 
     init(
         blockID: BlockIdentity,
         columnAlignments: [Block.ColumnAlignment?],
         header: Block.TableRow,
-        rows: [Block.TableRow]
+        rows: [Block.TableRow],
+        theme: QuillTheme
     ) {
         self.blockID = blockID
         self.columnAlignments = columnAlignments
         self.header = header
         self.rows = rows
+        self.theme = theme
         super.init(data: nil, ofType: nil)
 
         allowsTextAttachmentView = true

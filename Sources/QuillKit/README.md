@@ -11,13 +11,14 @@ QuillKit provides the UIKit rendering layer with a unified document renderer. Al
 The public surface is intentionally minimal:
 
 - `QuillView` -- Main view for both static and streaming markdown rendering
+  - `configuration` -- Product-facing configuration for streaming behavior, images, and theme
   - `markdown` -- Set static markdown content
   - `append(_:)` / `finish()` / `cancelStreaming()` / `reset()` -- Streaming lifecycle
   - `currentMarkdown` -- Read-only snapshot of raw input
-  - `streamingPreset` -- Preset-based configuration
   - `onHeightChange` -- Height change callback
+- `QuillConfiguration` -- Shared configuration model used by UIKit and SwiftUI surfaces
 - `QuillStreamingPreset` -- Named presets (`.balanced`, `.snappy`, `.longForm`) and `.custom(...)`
-- `TailAggressiveness` -- Custom preset parameter (`.aggressive`, `.balanced`, `.conservative`)
+- `QuillTheme` -- Visual theme presets and token groups
 
 ## Pipeline
 

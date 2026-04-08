@@ -4,7 +4,8 @@ import UIKit
 enum TableSurfaceLayoutBuilder {
     static func makeLayout(
         content: TableSurfaceContent,
-        viewportWidth: CGFloat
+        viewportWidth: CGFloat,
+        theme: QuillTheme = .default
     ) -> TableSurfaceLayout {
         let rows = [content.header] + content.rows
         let columnCount = max(
@@ -17,11 +18,13 @@ enum TableSurfaceLayoutBuilder {
         let naturalColumnWidths = makeNaturalColumnWidths(
             columnAlignments: content.columnAlignments,
             columnCount: columnCount,
-            rows: rows
+            rows: rows,
+            theme: theme
         )
         let columnWidths = makeColumnWidths(
             naturalWidths: naturalColumnWidths,
-            viewportWidth: viewportWidth
+            viewportWidth: viewportWidth,
+            theme: theme
         )
 
         var xOffsets: [CGFloat] = []
@@ -30,7 +33,7 @@ enum TableSurfaceLayoutBuilder {
             xOffsets.append(runningX)
             runningX += width
             if index < columnWidths.count - 1 {
-                runningX += Layout.separatorWidth
+                runningX += theme.table.separatorWidth
             }
         }
 
@@ -46,22 +49,30 @@ enum TableSurfaceLayoutBuilder {
                 columnWidths: columnWidths,
                 row: row,
                 rowIndex: rowIndex,
-                xOffsets: xOffsets
+                xOffsets: xOffsets,
+                theme: theme
             )
-            let rowHeight = cellLayouts.reduce(Layout.minimumRowHeight) { partialResult, cell in
-                max(partialResult, cell.textLayout.usedHeight + Layout.cellInsets.top + Layout.cellInsets.bottom)
+            let rowHeight = cellLayouts.reduce(theme.table.minimumRowHeight) { partialResult, cell in
+                max(
+                    partialResult,
+                    cell.textLayout.usedHeight + theme.table.cellPadding.top + theme.table.cellPadding.bottom)
             }
 
-            cells.append(contentsOf: positionRowLayouts(cellLayouts, rowHeight: rowHeight, yOffset: yOffset))
+            cells.append(contentsOf: positionRowLayouts(
+                cellLayouts,
+                rowHeight: rowHeight,
+                yOffset: yOffset,
+                theme: theme
+            ))
 
             yOffset += rowHeight
             if rowIndex < rows.count - 1 {
                 horizontalSeparatorYPositions.append(yOffset)
-                yOffset += Layout.separatorWidth
+                yOffset += theme.table.separatorWidth
             }
         }
 
-        let verticalSeparatorXPositions = xOffsets.dropFirst().map { $0 - Layout.separatorWidth / 2 }
+        let verticalSeparatorXPositions = xOffsets.dropFirst().map { $0 - theme.table.separatorWidth / 2 }
 
         return TableSurfaceLayout(
             cells: cells,
@@ -74,11 +85,8 @@ enum TableSurfaceLayoutBuilder {
 
 private extension TableSurfaceLayoutBuilder {
     enum Layout {
-        static let cellInsets = UIEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
         static let maximumColumnWidth: CGFloat = 320
         static let minimumColumnWidth: CGFloat = 96
-        static let minimumRowHeight: CGFloat = 44
-        static let separatorWidth: CGFloat = 1
     }
 
     static func makeAlignedText(
@@ -101,12 +109,13 @@ private extension TableSurfaceLayoutBuilder {
         columnIndex: Int,
         rowIndex: Int,
         width: CGFloat,
-        xOffset: CGFloat
+        xOffset: CGFloat,
+        theme: QuillTheme
     ) -> TableSurfaceCellLayout {
         let textFrame = CGRect(
-            x: xOffset + Layout.cellInsets.left,
+            x: xOffset + theme.table.cellPadding.left,
             y: 0,
-            width: max(1, width - Layout.cellInsets.left - Layout.cellInsets.right),
+            width: max(1, width - theme.table.cellPadding.left - theme.table.cellPadding.right),
             height: 0
         )
         let textLayout = TableSurfaceTextLayout(
@@ -136,9 +145,11 @@ private extension TableSurfaceLayoutBuilder {
 
     static func makeColumnWidths(
         naturalWidths: [CGFloat],
-        viewportWidth: CGFloat
+        viewportWidth: CGFloat,
+        theme: QuillTheme
     ) -> [CGFloat] {
-        let naturalTotal = naturalWidths.reduce(0, +) + CGFloat(max(0, naturalWidths.count - 1)) * Layout.separatorWidth
+        let naturalTotal = naturalWidths.reduce(0, +)
+            + CGFloat(max(0, naturalWidths.count - 1)) * theme.table.separatorWidth
         guard naturalTotal < viewportWidth else { return naturalWidths }
 
         let extra = (viewportWidth - naturalTotal) / CGFloat(max(naturalWidths.count, 1))
@@ -148,7 +159,8 @@ private extension TableSurfaceLayoutBuilder {
     static func makeNaturalColumnWidths(
         columnAlignments: [Block.ColumnAlignment?],
         columnCount: Int,
-        rows: [TableSurfaceRowContent]
+        rows: [TableSurfaceRowContent],
+        theme: QuillTheme
     ) -> [CGFloat] {
         (0..<columnCount).map { columnIndex in
             let widest = rows.map { row -> CGFloat in
@@ -158,7 +170,7 @@ private extension TableSurfaceLayoutBuilder {
                     alignment: columnIndex < columnAlignments.count ? columnAlignments[columnIndex] : nil
                 )
                 let rawWidth = TableSurfaceTextLayout.measureSingleLineWidth(attributedText: attributedText)
-                return rawWidth + Layout.cellInsets.left + Layout.cellInsets.right
+                return rawWidth + theme.table.cellPadding.left + theme.table.cellPadding.right
             }.max() ?? Layout.minimumColumnWidth
 
             return min(max(widest, Layout.minimumColumnWidth), Layout.maximumColumnWidth)
@@ -171,7 +183,8 @@ private extension TableSurfaceLayoutBuilder {
         columnWidths: [CGFloat],
         row: TableSurfaceRowContent,
         rowIndex: Int,
-        xOffsets: [CGFloat]
+        xOffsets: [CGFloat],
+        theme: QuillTheme
     ) -> [TableSurfaceCellLayout] {
         (0..<columnCount).map { columnIndex in
             let cell = columnIndex < row.cells.count
@@ -184,7 +197,8 @@ private extension TableSurfaceLayoutBuilder {
                 columnIndex: columnIndex,
                 rowIndex: rowIndex,
                 width: columnWidths[columnIndex],
-                xOffset: xOffsets[columnIndex]
+                xOffset: xOffsets[columnIndex],
+                theme: theme
             )
         }
     }
@@ -192,7 +206,8 @@ private extension TableSurfaceLayoutBuilder {
     static func positionRowLayouts(
         _ cellLayouts: [TableSurfaceCellLayout],
         rowHeight: CGFloat,
-        yOffset: CGFloat
+        yOffset: CGFloat,
+        theme: QuillTheme
     ) -> [TableSurfaceCellLayout] {
         cellLayouts.map { cell in
             let cellFrame = CGRect(
@@ -203,7 +218,7 @@ private extension TableSurfaceLayoutBuilder {
             )
             let textHeight = min(
                 cell.textLayout.usedHeight,
-                max(1, rowHeight - Layout.cellInsets.top - Layout.cellInsets.bottom)
+                max(1, rowHeight - theme.table.cellPadding.top - theme.table.cellPadding.bottom)
             )
             let textFrame = CGRect(
                 x: cell.textFrame.minX,

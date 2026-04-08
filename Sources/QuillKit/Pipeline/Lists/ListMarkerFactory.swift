@@ -4,45 +4,42 @@ enum ListMarkerFactory {
     static func makeOrderedListMarker(
         checkbox: Block.Checkbox?,
         itemIndex: Int,
-        startIndex: UInt
+        startIndex: UInt,
+        theme: QuillTheme
     ) -> String {
-        let prefix = "\(Int(startIndex) + itemIndex)."
-
         guard let checkbox else {
+            let prefix = "\(Int(startIndex) + itemIndex)."
             return "\(prefix)\t"
         }
 
-        return "\(prefix) \(makeTaskListMarker(for: checkbox))\t"
+        return "\(makeTaskListMarker(for: checkbox, theme: theme))\t"
     }
 
-    static func makeTaskListMarker(for checkbox: Block.Checkbox) -> String {
+    static func makeTaskListMarker(
+        for checkbox: Block.Checkbox,
+        theme: QuillTheme
+    ) -> String {
         switch checkbox {
         case .checked:
-            return "[x]"
+            return theme.list.checkedMarker
         case .unchecked:
-            return "[ ]"
+            return theme.list.uncheckedMarker
         }
     }
 
-    static func makeUnorderedBullet(for listLevel: Int) -> String {
-        switch listLevel {
-        case 0:
-            return "+"
-        case 1:
-            return "-"
-        default:
-            return "*"
-        }
+    static func makeUnorderedBullet(theme: QuillTheme) -> String {
+        theme.list.bulletMarker
     }
 
     static func makeUnorderedListMarker(
         bullet: String,
-        checkbox: Block.Checkbox?
+        checkbox: Block.Checkbox?,
+        theme: QuillTheme
     ) -> String {
         guard let checkbox else {
             return "\(bullet)\t"
         }
 
-        return "\(makeTaskListMarker(for: checkbox))\t"
+        return "\(makeTaskListMarker(for: checkbox, theme: theme))\t"
     }
 }

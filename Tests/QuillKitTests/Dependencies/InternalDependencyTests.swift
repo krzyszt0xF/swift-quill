@@ -24,12 +24,15 @@ struct InternalDependencyTests {
                 return MarkdownStreamController()
             }
         )
-        let configuration = RenderConfiguration(
-            streamingMode: .smoothedTail,
-            performanceProfile: .balanced,
-            tailReveal: .balanced,
-            layout: .default,
-            bufferedStream: .default
+        let configuration = QuillConfiguration(
+            streaming: .init(mode: .smoothedTail, preset: .balanced),
+            renderConfiguration: RenderConfiguration(
+                streamingMode: .smoothedTail,
+                performanceProfile: .balanced,
+                tailReveal: .balanced,
+                layout: .default,
+                bufferedStream: .default
+            )
         )
 
         coordinator.append(
@@ -71,12 +74,15 @@ struct InternalDependencyTests {
     @Test("QuillView dependencies use injected stream coordinator")
     func quillViewDependenciesUseInjectedStreamCoordinator() {
         let streamControllerFactory = Counter()
-        let configuration = RenderConfiguration(
-            streamingMode: .smoothedTail,
-            performanceProfile: .balanced,
-            tailReveal: .balanced,
-            layout: .default,
-            bufferedStream: .default
+        let configuration = QuillConfiguration(
+            streaming: .init(mode: .smoothedTail, preset: .balanced),
+            renderConfiguration: RenderConfiguration(
+                streamingMode: .smoothedTail,
+                performanceProfile: .balanced,
+                tailReveal: .balanced,
+                layout: .default,
+                bufferedStream: .default
+            )
         )
         let dependencies = QuillView.Dependencies(
             heightCoordinator: HeightCoordinator(),

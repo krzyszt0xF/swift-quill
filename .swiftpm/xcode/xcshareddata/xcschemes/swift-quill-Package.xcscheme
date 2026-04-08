@@ -63,6 +63,20 @@
                ReferencedContainer = "container:">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "QuillImageLoader"
+               BuildableName = "QuillImageLoader"
+               BlueprintName = "QuillImageLoader"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -81,7 +95,8 @@
             reference = "container:Integration.xctestplan">
          </TestPlanReference>
          <TestPlanReference
-            reference = "container:AllTests.xctestplan">
+            reference = "container:AllTests.xctestplan"
+            default = "YES">
          </TestPlanReference>
          <TestPlanReference
             reference = "container:Core.xctestplan">

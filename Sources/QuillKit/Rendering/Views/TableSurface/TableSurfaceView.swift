@@ -2,9 +2,10 @@ import UIKit
 
 @MainActor
 final class TableSurfaceView: UIView {
-    private let canvasView = TableSurfaceCanvasView()
+    private let canvasView: TableSurfaceCanvasView
     private lazy var editMenuInteraction = UIEditMenuInteraction(delegate: self)
     private let scrollView = UIScrollView()
+    private let theme: QuillTheme
 
     private var contentVersion = 0
     private var currentLayoutCacheKey: LayoutCacheKey?
@@ -15,7 +16,12 @@ final class TableSurfaceView: UIView {
         rows: []
     )
 
-    override init(frame: CGRect) {
+    init(
+        theme: QuillTheme = .default,
+        frame: CGRect = .zero
+    ) {
+        self.theme = theme
+        canvasView = TableSurfaceCanvasView(theme: theme)
         super.init(frame: frame)
 
         addInteraction(editMenuInteraction)
@@ -127,7 +133,8 @@ private extension TableSurfaceView {
 
         let layout = TableSurfaceLayoutBuilder.makeLayout(
             content: content,
-            viewportWidth: viewportWidth
+            viewportWidth: viewportWidth,
+            theme: theme
         )
         layoutCache[cacheKey] = layout
         canvasView.layoutModel = layout

@@ -125,7 +125,7 @@ struct StreamCoordinatorTests {
     @Test("Finish flushes pending buffered content into the stream")
     func finishFlushesPendingBufferedContent() async throws {
         let renderer = makeDocumentRenderer()
-        let configuration = RenderConfiguration(
+        let renderConfiguration = RenderConfiguration(
             streamingMode: .bufferedModules,
             performanceProfile: .balanced,
             tailReveal: .balanced,
@@ -135,9 +135,13 @@ struct StreamCoordinatorTests {
                 maxBufferingDelay: 10
             )
         )
+        let configuration = QuillConfiguration(
+            streaming: .init(mode: .bufferedModules, preset: .balanced),
+            renderConfiguration: renderConfiguration
+        )
         let coordinator = StreamCoordinator(
             renderer: renderer,
-            renderConfiguration: configuration,
+            renderConfiguration: renderConfiguration,
             bufferedStreamCommitScheduler: BufferedStreamCommitScheduler(
                 moduleStreamGate: .init(),
                 now: { 0 },
