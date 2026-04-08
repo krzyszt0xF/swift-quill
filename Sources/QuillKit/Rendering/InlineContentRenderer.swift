@@ -182,7 +182,7 @@ private extension InlineContentRenderer {
 
         return result
     }
-    
+
     static func plainText(from inline: Inline) -> String {
         switch inline {
         case let .emphasis(children),

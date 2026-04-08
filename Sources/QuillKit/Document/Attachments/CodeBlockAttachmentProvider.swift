@@ -21,11 +21,16 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
     override func loadView() {
         guard let attachment = textAttachment as? CodeBlockAttachment else { return }
 
-        view = Self.makeBlockView(
-            from: CodeBlockContent(from: attachment),
-            highlightStore: attachment.highlightStore,
-            theme: attachment.theme
-        )
+        let content = CodeBlockContent(from: attachment)
+        let highlightStore = attachment.highlightStore
+        let theme = attachment.theme
+        view = executeIsolated {
+            Self.makeBlockView(
+                from: content,
+                highlightStore: highlightStore,
+                theme: theme
+            )
+        }
     }
 
     override func attachmentBounds(
@@ -35,20 +40,26 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
         proposedLineFragment: CGRect,
         position: CGPoint
     ) -> CGRect {
-        guard let attachment = textAttachment as? CodeBlockAttachment else {
-            return CGRect(origin: .zero, size: Layout.fallbackSize)
-        }
-
         let width = proposedLineFragment.width
         guard width > 0 else {
             return CGRect(origin: .zero, size: Layout.fallbackSize)
         }
 
-        let height = CodeBlockView.measureHeight(
-            of: attachment.code,
-            in: attachment.language,
-            theme: attachment.theme
-        )
+        guard let attachment = textAttachment as? CodeBlockAttachment else {
+            return CGRect(origin: .zero, size: Layout.fallbackSize)
+        }
+
+        let code = attachment.code
+        let language = attachment.language
+        let theme = attachment.theme
+        let height = executeIsolated {
+            CodeBlockView.measureHeight(
+                of: code,
+                in: language,
+                theme: theme
+            )
+        }
+
         return CGRect(origin: .zero, size: CGSize(width: width, height: height))
     }
 }

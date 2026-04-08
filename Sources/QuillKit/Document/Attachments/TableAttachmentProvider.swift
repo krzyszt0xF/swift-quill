@@ -23,10 +23,12 @@ final class TableAttachmentProvider: NSTextAttachmentViewProvider {
         guard let attachment = textAttachment as? TableAttachment else { return }
 
         let content = TableSurfaceContent(from: attachment)
-        view = Self.makeSurfaceView(
-            content: content,
-            theme: attachment.theme
-        )
+        let theme = attachment.theme
+        view = executeIsolated {
+            let surfaceView = TableSurfaceView(theme: theme)
+            surfaceView.configure(content: content)
+            return surfaceView
+        }
     }
 
     override func attachmentBounds(
@@ -36,13 +38,14 @@ final class TableAttachmentProvider: NSTextAttachmentViewProvider {
         proposedLineFragment: CGRect,
         position: CGPoint
     ) -> CGRect {
+        let fallbackSize = CGSize(width: 320, height: 120)
         guard let attachment = textAttachment as? TableAttachment else {
-            return CGRect(origin: .zero, size: Layout.fallbackSize)
+            return CGRect(origin: .zero, size: fallbackSize)
         }
 
         let width = proposedLineFragment.width
         guard width > 0 else {
-            return CGRect(origin: .zero, size: Layout.fallbackSize)
+            return CGRect(origin: .zero, size: fallbackSize)
         }
 
         let content = TableSurfaceContent(from: attachment)
@@ -52,20 +55,5 @@ final class TableAttachmentProvider: NSTextAttachmentViewProvider {
             theme: attachment.theme
         ).contentSize.height
         return CGRect(origin: .zero, size: CGSize(width: width, height: height))
-    }
-}
-
-private extension TableAttachmentProvider {
-    enum Layout {
-        static let fallbackSize = CGSize(width: 320, height: 120)
-    }
-
-    static func makeSurfaceView(
-        content: TableSurfaceContent,
-        theme: QuillTheme
-    ) -> TableSurfaceView {
-        let surfaceView = TableSurfaceView(theme: theme)
-        surfaceView.configure(content: content)
-        return surfaceView
     }
 }

@@ -17,9 +17,7 @@ final class BufferedVisualFeeder {
 
     deinit {
         drainTask?.cancel()
-        MainActor.assumeIsolated {
-            resumeDrainContinuations()
-        }
+        executeIsolated(resumeDrainContinuations)
     }
 
     func cancel() {
@@ -52,7 +50,7 @@ final class BufferedVisualFeeder {
         to streamController: MarkdownStreamController
     ) {
         enqueue(
-            visualChunks:Self.makeImmediateFeedChunks(
+            visualChunks: Self.makeImmediateFeedChunks(
                 from: immediateChunk,
                 policy: policy
             ),
@@ -232,7 +230,7 @@ private extension BufferedVisualFeeder {
                         policy: policy
                     )
                 )
-            
+
             pendingChunks.append(QueuedChunk(delay: delay, text: chunk))
         }
 
@@ -268,7 +266,7 @@ private extension BufferedVisualFeeder {
 
     func startDrainingIfNeeded(to streamController: MarkdownStreamController) {
         guard drainTask == nil, nextPendingChunkIndex < pendingChunks.count else { return }
-        
+
         drainTask = Task { [weak self] in
             guard let self else { return }
             await self.drainPendingChunks(to: streamController)

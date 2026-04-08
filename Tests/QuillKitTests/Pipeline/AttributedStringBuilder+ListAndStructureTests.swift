@@ -14,7 +14,7 @@ struct AttributedStringBuilderListTests {
             Block.ListItem(blocks: .paragraph(content: [.text("beta")])),
         ]
         let result = makePipelineDocument(.unorderedList(items: items))
-        #expect(result.string.contains("+"))
+        #expect(result.string.contains(unorderedListMarker))
         #expect(result.string.contains("alpha"))
         #expect(result.string.contains("beta"))
     }
@@ -111,8 +111,8 @@ struct AttributedStringBuilderListTests {
         ]
         let result = makePipelineDocument(.unorderedList(items: items))
 
-        #expect(result.string.contains("[x]\t"))
-        #expect(result.string.contains("[ ]\t"))
+        #expect(result.string.contains(checkedTaskListMarker))
+        #expect(result.string.contains(uncheckedTaskListMarker))
     }
 
     @Test("Unfrozen ordered list preserves nested code block text")
@@ -210,8 +210,8 @@ struct AttributedStringBuilderListTests {
         ])
         let result = makePipelineDocument(quotedList, plainList)
 
-        #expect(result.string.contains("+\tquoted item"))
-        #expect(result.string.contains("+\tplain item"))
+        #expect(result.string.contains("\(unorderedListMarker)quoted item"))
+        #expect(result.string.contains("\(unorderedListMarker)plain item"))
 
         let quotedRange = (result.string as NSString).range(of: "quoted item")
         let plainRange = (result.string as NSString).range(of: "plain item")
@@ -231,7 +231,7 @@ struct AttributedStringBuilderListTests {
         ]
         let result = makePipelineDocument(.unorderedList(items: items))
 
-        let markerString = "+\t"
+        let markerString = unorderedListMarker
         let markerRange = NSRange(location: 0, length: markerString.count)
         let hasMarker = result.attribute(.structuralMarker, at: 0, effectiveRange: nil) as? Bool
         #expect(hasMarker == true)
@@ -274,7 +274,7 @@ struct AttributedStringBuilderListTests {
         ]
         let result = makePipelineDocument(.unorderedList(items: items))
 
-        let markerString = "[x]\t"
+        let markerString = checkedTaskListMarker
         let hasMarker = result.attribute(.structuralMarker, at: 0, effectiveRange: nil) as? Bool
         #expect(hasMarker == true)
 
@@ -321,5 +321,19 @@ struct AttributedStringBuilderListTests {
             if value is NSTextAttachment { hasAttachment = true }
         }
         #expect(hasAttachment)
+    }
+}
+
+private extension AttributedStringBuilderListTests {
+    var checkedTaskListMarker: String {
+        "\(QuillTheme.default.list.checkedMarker)\t"
+    }
+
+    var uncheckedTaskListMarker: String {
+        "\(QuillTheme.default.list.uncheckedMarker)\t"
+    }
+
+    var unorderedListMarker: String {
+        "\(QuillTheme.default.list.bulletMarker)\t"
     }
 }

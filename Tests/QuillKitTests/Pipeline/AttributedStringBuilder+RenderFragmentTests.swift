@@ -525,7 +525,7 @@ struct AttributedStringBuilderFragmentTests {
 
         #expect(fragments.count == 2)
         #expect(fragments[0].presentationRole == .standaloneListMarker)
-        #expect(fragments[0].attributedString.string.contains("[x]"))
+        #expect(fragments[0].attributedString.string.contains(QuillTheme.default.list.checkedMarker))
         #expect(fragments[1].presentationRole == .fullWidthEmbeddedBlock)
     }
 

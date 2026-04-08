@@ -192,8 +192,7 @@ struct ImageAttachmentTests {
 
         provider.loadView()
         let view = provider.view as? ImageBlockView
-        let errorControl: UIControl? = view?.firstSubview()
-        errorControl?.sendActions(for: .touchUpInside)
+        view?.onRetry?()
 
         #expect(store.retryCalls.count == 1)
         #expect(store.retryCalls.first?.blockID == BlockIdentity(rawValue: 9))

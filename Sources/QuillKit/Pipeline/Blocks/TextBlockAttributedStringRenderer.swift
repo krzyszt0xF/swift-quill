@@ -21,10 +21,10 @@ enum TextBlockAttributedStringRenderer {
             paragraphSpacingBefore: theme.headingSpacingScaled,
             theme: theme
         )
-        result.addAttribute(
-            .foregroundColor,
-            value: makeTextColor(nestingContext: nestingContext, theme: theme),
-            range: NSRange(location: 0, length: result.length)
+        applyBlockquoteTextColorIfNeeded(
+            to: result,
+            nestingContext: nestingContext,
+            theme: theme
         )
         result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
         return result
@@ -67,10 +67,10 @@ enum TextBlockAttributedStringRenderer {
             paragraphSpacingBefore: theme.blockSpacingScaled,
             theme: theme
         )
-        result.addAttribute(
-            .foregroundColor,
-            value: makeTextColor(nestingContext: nestingContext, theme: theme),
-            range: NSRange(location: 0, length: result.length)
+        applyBlockquoteTextColorIfNeeded(
+            to: result,
+            nestingContext: nestingContext,
+            theme: theme
         )
         result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
         return result
@@ -78,6 +78,26 @@ enum TextBlockAttributedStringRenderer {
 }
 
 private extension TextBlockAttributedStringRenderer {
+    static func applyBlockquoteTextColorIfNeeded(
+        to attributedString: NSMutableAttributedString,
+        nestingContext: NestingContext,
+        theme: QuillTheme
+    ) {
+        guard nestingContext.blockquoteDepth > 0 else { return }
+
+        let range = NSRange(location: 0, length: attributedString.length)
+        attributedString.enumerateAttribute(.foregroundColor, in: range) { value, effectiveRange, _ in
+            let textColor = value as? UIColor
+            guard textColor?.isEqual(theme.body.textColor) != false else { return }
+
+            attributedString.addAttribute(
+                .foregroundColor,
+                value: theme.blockquote.textColor,
+                range: effectiveRange
+            )
+        }
+    }
+
     static func makeTextColor(
         nestingContext: NestingContext,
         theme: QuillTheme
