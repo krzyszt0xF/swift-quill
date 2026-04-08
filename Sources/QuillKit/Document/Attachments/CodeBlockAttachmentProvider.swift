@@ -40,13 +40,14 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
         proposedLineFragment: CGRect,
         position: CGPoint
     ) -> CGRect {
+        let fallbackSize = CGSize(width: 320, height: 80)
         let width = proposedLineFragment.width
         guard width > 0 else {
-            return CGRect(origin: .zero, size: Layout.fallbackSize)
+            return CGRect(origin: .zero, size: fallbackSize)
         }
 
         guard let attachment = textAttachment as? CodeBlockAttachment else {
-            return CGRect(origin: .zero, size: Layout.fallbackSize)
+            return CGRect(origin: .zero, size: fallbackSize)
         }
 
         let code = attachment.code
@@ -65,10 +66,6 @@ final class CodeBlockAttachmentProvider: NSTextAttachmentViewProvider {
 }
 
 private extension CodeBlockAttachmentProvider {
-    enum Layout {
-        static let fallbackSize = CGSize(width: 320, height: 80)
-    }
-
     static func makeBlockView(
         from content: CodeBlockContent,
         highlightStore: CodeBlockHighlightStore?,

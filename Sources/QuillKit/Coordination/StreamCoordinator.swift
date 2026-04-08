@@ -86,6 +86,7 @@ extension StreamCoordinator {
 
     func cancelStreaming() {
         cancelAllTasks()
+        renderer.updateSelectionGate(isStreaming: false)
         invalidateHeight(for: .streamReset)
     }
 
@@ -117,6 +118,7 @@ extension StreamCoordinator {
             await streamController.finish()
             await task?.value
             guard self.streamGeneration == generation else { return }
+            self.renderer.updateSelectionGate(isStreaming: false)
             self.invalidateHeight(for: .streamFinished)
             self.onStreamFinished?()
         }
@@ -128,6 +130,7 @@ extension StreamCoordinator {
     ) {
         cancelActiveWork()
         apply(configuration: configuration)
+        renderer.updateSelectionGate(isStreaming: false)
         let outcome = renderer.render(blocks: blocks, frozenCount: blocks.count)
         guard outcome.invalidatedHeight else { return }
 
@@ -136,7 +139,9 @@ extension StreamCoordinator {
 
     func reset() {
         cancelActiveWork()
+        renderer.textView.selectedRange = NSRange(location: 0, length: 0)
         renderer.reset()
+        renderer.updateSelectionGate(isStreaming: false)
     }
 }
 

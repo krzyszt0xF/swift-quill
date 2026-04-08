@@ -7,6 +7,7 @@ extension StreamCoordinator {
             blocks: snapshot.blocks,
             frozenCount: snapshot.frozenCount
         )
+        renderer.updateSelectionGate(isStreaming: true)
 
         guard outcome.invalidatedHeight else { return }
         invalidateHeight(for: .rendererSnapshotApplied)

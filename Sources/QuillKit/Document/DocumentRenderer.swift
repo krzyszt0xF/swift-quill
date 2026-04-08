@@ -123,6 +123,19 @@ final class DocumentRenderer {
         textView.handleDocumentContentChange()
     }
 
+    func updateSelectionGate(isStreaming: Bool) {
+        if isStreaming {
+            let documentLength = textView.contentStorage?.attributedString?.length ?? 0
+            let tailStart = blockIndexer.tailRange(
+                after: renderState.frozenBlockCount,
+                documentLength: documentLength
+            )?.location ?? documentLength
+            textView.frozenContentLength = tailStart
+        } else {
+            textView.frozenContentLength = nil
+        }
+    }
+
     func set(highlighter: (any SyntaxHighlighting)?) {
         highlightCoordinator.set(highlighter: highlighter)
     }

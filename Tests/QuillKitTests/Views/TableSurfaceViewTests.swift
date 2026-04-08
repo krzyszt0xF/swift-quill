@@ -9,12 +9,16 @@ import UIKit
 struct TableSurfaceViewTests {
     @Test("copy clears custom selection after writing TSV")
     func copyClearsSelectionAfterWritingTSV() {
-        let view = makeView()
+        var copiedText: String?
+        let view = makeView {
+            copiedText = $0
+        }
 
         #expect(view.canPerformAction(#selector(UIResponderStandardEditActions.copy(_:)), withSender: nil))
 
         view.copy(nil)
 
+        #expect(copiedText == "Streaming tail\tlive")
         #expect(hasSelection(view) == false)
         #expect(view.canPerformAction(#selector(UIResponderStandardEditActions.copy(_:)), withSender: nil) == false)
     }
@@ -69,8 +73,9 @@ private extension TableSurfaceViewTests {
         return false
     }
 
-    func makeView() -> TableSurfaceView {
+    func makeView(onCopy: @escaping OnCopy = { _ in }) -> TableSurfaceView {
         let view = TableSurfaceView(frame: CGRect(x: 0, y: 0, width: 320, height: 180))
+        view.onCopy = onCopy
         view.configure(
             content: makeContent(
                 header: ["Feature", "State"],

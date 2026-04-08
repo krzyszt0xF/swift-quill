@@ -11,6 +11,7 @@ final class CodeBlockView: UIView {
     private var copyRevertTask: Task<Void, Never>?
     private var currentLanguage: String?
     private var metricsCache: Metrics?
+    var onCopy: OnCopy? = CopyAction.live
     private let theme: QuillTheme
 
     private(set) var currentCode: String = ""
@@ -136,7 +137,7 @@ private extension CodeBlockView {
     }
 
     @objc func copyTapped() {
-        UIPasteboard.general.string = currentCode
+        onCopy?(currentCode)
 
         copyButton.setImage(UIImage(systemName: "checkmark"), for: .normal)
         copyButton.tintColor = theme.codeBlock.copyButtonTint
