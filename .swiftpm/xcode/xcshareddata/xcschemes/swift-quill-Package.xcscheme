@@ -101,6 +101,9 @@
          <TestPlanReference
             reference = "container:Core.xctestplan">
          </TestPlanReference>
+         <TestPlanReference
+            reference = "container:Performance.xctestplan">
+         </TestPlanReference>
       </TestPlans>
       <Testables>
          <TestableReference
