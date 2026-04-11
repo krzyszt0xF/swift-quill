@@ -34,13 +34,20 @@ extension StreamCoordinator {
         _ event: ParserEvent,
         state: inout BlockReducer.ReducerState
     ) {
+        let reduceID = QuillSignpost.reduce.makeSignpostID()
+        let reduceSignpost = QuillSignpost.reduce.beginInterval("reduce", id: reduceID)
         BlockReducer.apply(event, to: &state)
+        QuillSignpost.reduce.endInterval("reduce", reduceSignpost)
 
         let snapshot = StreamingSnapshot(
             blocks: state.blocks,
             frozenCount: state.frozenCount
         )
+
+        let snapshotID = QuillSignpost.render.makeSignpostID()
+        let snapshotSignpost = QuillSignpost.render.beginInterval("applySnapshot", id: snapshotID)
         applyStreamingSnapshot(snapshot)
+        QuillSignpost.render.endInterval("applySnapshot", snapshotSignpost)
     }
 
     func startStream(

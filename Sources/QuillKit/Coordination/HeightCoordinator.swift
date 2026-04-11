@@ -102,7 +102,10 @@ private extension HeightCoordinator {
             return
         }
 
+        let signpostID = QuillSignpost.height.makeSignpostID()
+        let signpostState = QuillSignpost.height.beginInterval("measureHeight", id: signpostID)
         let newHeight = measureHeight(documentTextView)
+        QuillSignpost.height.endInterval("measureHeight", signpostState)
         let oldHeight = lastNotifiedHeight
         lastMeasuredContentRevision = contentRevision
         lastMeasuredWidth = currentWidth
