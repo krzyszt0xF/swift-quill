@@ -55,11 +55,13 @@ let package = Package(
         ),
         .testTarget(
             name: "QuillCoreTests",
-            dependencies: ["QuillCore", "QuillCoreTestSupport", "QuillSharedTestSupport"]
+            dependencies: ["QuillCore", "QuillCoreTestSupport", "QuillSharedTestSupport"],
+            resources: [.copy("Fixtures")]
         ),
         .testTarget(
             name: "QuillKitTests",
-            dependencies: ["QuillKit", "QuillCore", "QuillCoreTestSupport", "QuillSharedTestSupport"]
+            dependencies: ["QuillKit", "QuillCore", "QuillCoreTestSupport", "QuillSharedTestSupport"],
+            resources: [.copy("Fixtures")]
         ),
         .testTarget(
             name: "QuillSwiftUITests",
