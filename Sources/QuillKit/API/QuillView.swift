@@ -47,7 +47,12 @@ public final class QuillView: UIView {
     private var activeConfiguration = QuillConfiguration.default
     private let heightCoordinator: HeightCoordinator
     private let markdownParser: MarkdownParser
+    private var staticParseTask: Task<Void, Never>?
     private let streamCoordinator: StreamCoordinator
+
+    deinit {
+        staticParseTask?.cancel()
+    }
 
     public convenience init(
         frame: CGRect = .zero,
@@ -92,6 +97,8 @@ public final class QuillView: UIView {
     }
 
     public func append(_ chunk: String) {
+        staticParseTask?.cancel()
+        staticParseTask = nil
         let needsRestart = !streamCoordinator.hasActiveController
         let previousContent = needsRestart ? currentMarkdown : nil
         if needsRestart {
@@ -117,6 +124,8 @@ public final class QuillView: UIView {
     }
 
     public func reset() {
+        staticParseTask?.cancel()
+        staticParseTask = nil
         currentMarkdown = nil
         streamCoordinator.reset()
         heightCoordinator.resetLastNotifiedHeight()
@@ -131,7 +140,20 @@ public final class QuillView: UIView {
 }
 
 private extension QuillView {
+    nonisolated static func makeStaticBlocks(
+        from source: String,
+        parser: MarkdownParser
+    ) async -> [BlockNode] {
+        let signpostID = QuillSignpost.parse.makeSignpostID()
+        let signpostState = QuillSignpost.parse.beginInterval("parseStatic", id: signpostID)
+        let blocks = parser.parse(source)
+        QuillSignpost.parse.endInterval("parseStatic", signpostState)
+        return blocks
+    }
+
     func renderStatic(source: String?) {
+        staticParseTask?.cancel()
+        staticParseTask = nil
         currentMarkdown = source
         activeConfiguration = configuration
 
@@ -141,11 +163,17 @@ private extension QuillView {
             return
         }
 
-        let blocks = markdownParser.parse(source)
-        streamCoordinator.renderStatic(
-            blocks: blocks,
-            configuration: activeConfiguration
-        )
+        let parser = markdownParser
+        let config = activeConfiguration
+        staticParseTask = Task {
+            let blocks = await Self.makeStaticBlocks(from: source, parser: parser)
+
+            guard !Task.isCancelled else { return }
+            streamCoordinator.renderStatic(
+                blocks: blocks,
+                configuration: config
+            )
+        }
     }
 
     func scheduleHeightUpdate() {
