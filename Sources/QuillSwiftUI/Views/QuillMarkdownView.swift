@@ -5,27 +5,13 @@ import SwiftUI
 public struct QuillMarkdownView: UIViewRepresentable {
     let configuration: QuillConfiguration
     let markdown: String
-    let linkTapHandler: ((URL) -> Void)?
 
     public init(
         markdown: String,
         configuration: QuillConfiguration = .default
     ) {
-        self.init(
-            markdown: markdown,
-            configuration: configuration,
-            linkTapHandler: nil
-        )
-    }
-
-    private init(
-        markdown: String,
-        configuration: QuillConfiguration,
-        linkTapHandler: ((URL) -> Void)?
-    ) {
         self.configuration = configuration
         self.markdown = markdown
-        self.linkTapHandler = linkTapHandler
     }
 
     public func makeUIView(context: Context) -> QuillView {
@@ -33,6 +19,7 @@ public struct QuillMarkdownView: UIViewRepresentable {
         applyConfiguration(
             to: view,
             imageLoader: context.environment.quillImageLoader,
+            linkTapHandler: context.environment.quillLinkTapHandler,
             syntaxHighlighter: context.environment.quillSyntaxHighlighter
         )
 
@@ -50,17 +37,8 @@ public struct QuillMarkdownView: UIViewRepresentable {
         applyConfiguration(
             to: uiView,
             imageLoader: context.environment.quillImageLoader,
+            linkTapHandler: context.environment.quillLinkTapHandler,
             syntaxHighlighter: context.environment.quillSyntaxHighlighter
-        )
-    }
-}
-
-public extension QuillMarkdownView {
-    func onQuillLinkTap(_ handler: @escaping (URL) -> Void) -> Self {
-        Self(
-            markdown: markdown,
-            configuration: configuration,
-            linkTapHandler: handler
         )
     }
 }
@@ -69,6 +47,7 @@ extension QuillMarkdownView {
     func applyConfiguration(
         to view: QuillView,
         imageLoader: (any ImageLoading)? = nil,
+        linkTapHandler: (@Sendable (URL) -> Void)? = nil,
         syntaxHighlighter: (any SyntaxHighlighting)? = nil
     ) {
         view.imageLoader = imageLoader

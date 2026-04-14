@@ -5,35 +5,15 @@ import SwiftUI
 public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable where S.Element == String {
     let chunks: S
     let configuration: QuillConfiguration
-    let linkTapHandler: ((URL) -> Void)?
-    let onFinished: (@MainActor () -> Void)?
     let onError: (@Sendable (Error) -> Void)?
 
     public init(
         chunks: S,
         configuration: QuillConfiguration = .default,
-        onFinished: (@MainActor () -> Void)? = nil,
         onError: (@Sendable (Error) -> Void)? = nil
-    ) {
-            self.init(
-                chunks: chunks,
-                configuration: configuration,
-                linkTapHandler: nil,
-                onFinished: onFinished,
-                onError: onError)
-        }
-
-    private init(
-        chunks: S,
-        configuration: QuillConfiguration,
-        linkTapHandler: ((URL) -> Void)?,
-        onFinished: (@MainActor () -> Void)?,
-        onError: (@Sendable (Error) -> Void)?
     ) {
         self.chunks = chunks
         self.configuration = configuration
-        self.linkTapHandler = linkTapHandler
-        self.onFinished = onFinished
         self.onError = onError
     }
 
@@ -46,9 +26,10 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
         applyConfiguration(
             to: coordinator.quillView,
             imageLoader: context.environment.quillImageLoader,
+            linkTapHandler: context.environment.quillLinkTapHandler,
             syntaxHighlighter: context.environment.quillSyntaxHighlighter
         )
-        coordinator.setOnStreamFinished(onFinished)
+        coordinator.setOnStreamFinished(context.environment.quillStreamFinishedHandler)
         coordinator.subscribe(to: chunks, onError: onError)
 
         return coordinator.quillView
@@ -66,9 +47,10 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
         applyConfiguration(
             to: context.coordinator.quillView,
             imageLoader: context.environment.quillImageLoader,
+            linkTapHandler: context.environment.quillLinkTapHandler,
             syntaxHighlighter: context.environment.quillSyntaxHighlighter
         )
-        context.coordinator.setOnStreamFinished(onFinished)
+        context.coordinator.setOnStreamFinished(context.environment.quillStreamFinishedHandler)
     }
 
     public static func dismantleUIView(_ uiView: QuillView, coordinator: Coordinator) {
@@ -76,32 +58,11 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
     }
 }
 
-public extension QuillStreamView {
-    func onQuillLinkTap(_ handler: @escaping (URL) -> Void) -> Self {
-        Self(
-            chunks: chunks,
-            configuration: configuration,
-            linkTapHandler: handler,
-            onFinished: onFinished,
-            onError: onError
-        )
-    }
-
-    func onQuillStreamFinished(_ handler: @escaping @MainActor () -> Void) -> Self {
-        Self(
-            chunks: chunks,
-            configuration: configuration,
-            linkTapHandler: linkTapHandler,
-            onFinished: handler,
-            onError: onError
-        )
-    }
-}
-
 extension QuillStreamView {
     func applyConfiguration(
         to view: QuillView,
         imageLoader: (any ImageLoading)? = nil,
+        linkTapHandler: (@Sendable (URL) -> Void)? = nil,
         syntaxHighlighter: (any SyntaxHighlighting)? = nil
     ) {
         view.imageLoader = imageLoader
@@ -131,7 +92,7 @@ public extension QuillStreamView {
             quillView.cancelStreaming()
         }
 
-        func setOnStreamFinished(_ handler: (@MainActor () -> Void)?) {
+        func setOnStreamFinished(_ handler: (@MainActor @Sendable () -> Void)?) {
             quillView.onStreamFinished = handler
         }
 
