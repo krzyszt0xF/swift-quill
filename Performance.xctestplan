@@ -1,0 +1,44 @@
+{
+  "configurations" : [
+    {
+      "id" : "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "selectedTests" : [
+        "ParsePerformanceTests",
+        "ModuleStreamGateValidationTests"
+      ],
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "QuillCoreTests",
+        "name" : "QuillCoreTests"
+      }
+    },
+    {
+      "selectedTests" : [
+        "HeightMeasurementPerformanceTests",
+        "HeightRedundancyTests",
+        "MemoryBoundedStreamingTests",
+        "OffMainParseRegressionTests",
+        "RenderPerformanceTests",
+        "StreamingFinishDrainTests",
+        "StreamingPerformanceTests"
+      ],
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "QuillKitTests",
+        "name" : "QuillKitTests"
+      }
+    }
+  ],
+  "version" : 1
+}

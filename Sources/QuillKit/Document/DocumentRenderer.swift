@@ -73,6 +73,9 @@ final class DocumentRenderer {
         blocks: [BlockNode],
         frozenCount: Int
     ) -> RenderOutcome {
+        let renderSignpostID = QuillSignpost.render.makeSignpostID()
+        let renderSignpostState = QuillSignpost.render.beginInterval("render", id: renderSignpostID)
+
         let fragments = AttributedStringBuilder.buildRenderFragments(
             from: blocks,
             frozenCount: frozenCount,
@@ -99,6 +102,7 @@ final class DocumentRenderer {
             newFrozenCount: frozenCount
         )
 
+        QuillSignpost.render.endInterval("render", renderSignpostState)
         return renderOutcome
     }
 
