@@ -66,4 +66,9 @@ fastlane/test_output
 .claude
 AGENTS.md
 CLAUDE.md
-Docs
+Docs/*
+!Docs/CompetitiveResearch.md
+!Docs/Performance.md
+!Docs/Assets/
+Docs/Assets/*
+!Docs/Assets/quill-wordmark.svg
