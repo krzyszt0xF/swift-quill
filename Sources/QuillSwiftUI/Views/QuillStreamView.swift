@@ -6,15 +6,18 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
     let chunks: S
     let configuration: QuillConfiguration
     let onError: (@Sendable (Error) -> Void)?
+    let streamID: AnyHashable?
 
     public init(
         chunks: S,
+        streamID: AnyHashable? = nil,
         configuration: QuillConfiguration = .default,
         onError: (@Sendable (Error) -> Void)? = nil
     ) {
         self.chunks = chunks
         self.configuration = configuration
         self.onError = onError
+        self.streamID = streamID
     }
 
     public func makeCoordinator() -> Coordinator {
@@ -30,7 +33,7 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
             syntaxHighlighter: context.environment.quillSyntaxHighlighter
         )
         coordinator.setOnStreamFinished(context.environment.quillStreamFinishedHandler)
-        coordinator.subscribe(to: chunks, onError: onError)
+        coordinator.subscribe(to: chunks, streamID: streamID, onError: onError)
 
         return coordinator.quillView
     }
@@ -51,6 +54,7 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
             syntaxHighlighter: context.environment.quillSyntaxHighlighter
         )
         context.coordinator.setOnStreamFinished(context.environment.quillStreamFinishedHandler)
+        context.coordinator.subscribeIfNeeded(to: chunks, streamID: streamID, onError: onError)
     }
 
     public static func dismantleUIView(_ uiView: QuillView, coordinator: Coordinator) {
@@ -75,8 +79,12 @@ extension QuillStreamView {
 public extension QuillStreamView {
     @MainActor
     final class Coordinator {
-        let quillView: QuillView
+        // Internal to block SwiftUI consumers from reaching into the underlying UIKit view and
+        // bypassing the streamID-based lifecycle managed by subscribe(_:) / subscribeIfNeeded(_:).
+        // Tests use `@testable import QuillSwiftUI` and continue to have access.
+        internal let quillView: QuillView
         private var generation = 0
+        private var subscribedStreamID: AnyHashable?
         private var subscriptionTask: Task<Void, Never>?
 
         init(configuration: QuillConfiguration) {
@@ -89,6 +97,7 @@ public extension QuillStreamView {
         func cancel() {
             subscriptionTask?.cancel()
             subscriptionTask = nil
+            subscribedStreamID = nil
             quillView.cancelStreaming()
         }
 
@@ -97,8 +106,26 @@ public extension QuillStreamView {
         }
 
         func subscribe(to chunks: S, onError: (@Sendable (Error) -> Void)?) {
+            subscribe(to: chunks, streamID: nil, onError: onError)
+        }
+
+        internal func subscribeIfNeeded(
+            to chunks: S,
+            streamID: AnyHashable?,
+            onError: (@Sendable (Error) -> Void)?
+        ) {
+            guard subscribedStreamID != streamID else { return }
+            subscribe(to: chunks, streamID: streamID, onError: onError)
+        }
+
+        internal func subscribe(
+            to chunks: S,
+            streamID: AnyHashable?,
+            onError: (@Sendable (Error) -> Void)?
+        ) {
             cancel()
             generation += 1
+            subscribedStreamID = streamID
 
             let currentGeneration = generation
             quillView.reset()
