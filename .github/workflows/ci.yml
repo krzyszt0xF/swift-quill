@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Test
+        run: |
+          xcodebuild test \
+            -scheme swift-quill-Package \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.2'
+
+  docc-build:
+    name: DocC Build
+    runs-on: macos-15
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Uses xcodebuild docbuild (native Xcode, no swift-docc-plugin dependency).
+      # Plugin was intentionally omitted from Package.swift to keep iOS-only platform scope.
+      - name: Build documentation
+        run: |
+          set -o pipefail
+          xcodebuild docbuild \
+            -scheme QuillKit \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            | tee docbuild.log
+
+      - name: Fail on DocC warnings
+        run: |
+          if grep -Ei "warning:.*(docc|documentation|unresolved|does not resolve|doesn't resolve|could not resolve|couldn't resolve|could not be resolved|couldn't be resolved|cannot resolve|unable to resolve|unknown symbol|no symbol matched|broken reference)" docbuild.log; then
+            echo "DocC emitted warnings (broken references or syntax issues)"
+            exit 1
+          fi
+
+  lint:
+    name: SwiftLint
+    runs-on: macos-15
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Run SwiftLint
+        run: swiftlint lint --strict --reporter github-actions-logging
+
+  spi-validate:
+    name: SPI Config Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify .spi.yml present
+        run: test -f .spi.yml
+
+      - name: Validate YAML syntax
+        run: python3 -c "import yaml; yaml.safe_load(open('.spi.yml'))"
