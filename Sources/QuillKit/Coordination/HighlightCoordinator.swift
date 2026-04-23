@@ -109,7 +109,9 @@ private extension HighlightCoordinator {
         sink?.apply(highlightedCode: snapshot)
     }
 
-    // Safety: all mutable state serialized through NSLock.
+    // @unchecked Sendable: all mutable state (pendingResults, sinks) is serialized through `lock: NSLock`
+    // via `lock.withLock { ... }` on every read and write — see every method on this class for the pattern.
+    // The invariant to preserve in future edits is: never touch `pendingResults` or `sinks` outside a `lock.withLock` block.
     final class HighlightStoreState: @unchecked Sendable {
         private let lock = NSLock()
         private var pendingResults: [BlockIdentity: HighlightedCodeSnapshot] = [:]

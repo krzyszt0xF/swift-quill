@@ -12,6 +12,9 @@ struct TableSurfaceRowContent: Sendable {
     let cells: [TableSurfaceCellContent]
 }
 
+// @unchecked Sendable: NSAttributedString is not Sendable. Cell content is built once by
+// InlineContentRenderer and treated as an immutable value thereafter; the stored reference is never
+// mutated or shared outside the owning TableSurfaceContent snapshot.
 struct TableSurfaceCellContent: @unchecked Sendable {
     let attributedText: NSAttributedString
     let plainText: String

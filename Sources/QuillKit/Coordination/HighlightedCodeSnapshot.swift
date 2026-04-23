@@ -1,7 +1,8 @@
 import UIKit
 
-// Safety invariant: the snapshot stores an immutable copy and only exposes
-// fresh copies back to main-actor UI code.
+// @unchecked Sendable: NSAttributedString is not Sendable. The snapshot stores a defensive immutable copy
+// at init and hands back fresh copies to main-actor callers via makeAttributedString(); the stored reference
+// is never mutated and never shared directly.
 final class HighlightedCodeSnapshot: @unchecked Sendable {
     private let storage: NSAttributedString
 
