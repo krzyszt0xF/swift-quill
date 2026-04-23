@@ -104,13 +104,16 @@ These signposts are available in any Debug or Release build and have negligible 
 
 ## Reproducing these benchmarks
 
-All measurements in this document can be reproduced locally. The benchmark fixtures live in `Tests/QuillKitBenchmarks/` and can be run with:
+All measurements in this document can be reproduced locally from the performance test plan. Benchmark fixtures live under `Tests/QuillKitTests/Fixtures/` and `Tests/QuillCoreTests/Fixtures/`; benchmark test cases live under `Tests/QuillKitTests/Performance/` and `Tests/QuillCoreTests/Performance/`.
 
 ```bash
-swift test --filter QuillKitBenchmarks
+xcodebuild test \
+  -testPlan Performance \
+  -scheme swift-quill-Package \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.2'
 ```
 
-To profile with Instruments, open `Examples/BasicIntegration/BasicIntegration.xcodeproj` in Xcode, build in Release configuration, and run with Product → Profile (⌘I). Select the **Points of Interest** template and look for the `com.quill.pipeline` signpost category.
+To profile with Instruments, open your integrating app's Xcode project, build in Release configuration, and run with Product → Profile (⌘I). Select the **Points of Interest** template and look for the `com.quill.pipeline` signpost category.
 
 ### Device matters
 

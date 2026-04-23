@@ -1,14 +1,10 @@
-![Quill wordmark](Docs/Assets/quill-wordmark.svg)
+![Quill wordmark](Docs/Assets/quill-wordmark.png)
 
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org) ![Platform](https://img.shields.io/badge/platform-iOS%2017+-blue.svg) ![SPM](https://img.shields.io/badge/SPM-compatible-brightgreen.svg) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![CI](https://github.com/krzyszt0xF/swift-quill/actions/workflows/ci.yml/badge.svg) [![SPI](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fkrzyszt0xF%2Fswift-quill%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/krzyszt0xF/swift-quill) [![SPI Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fkrzyszt0xF%2Fswift-quill%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/krzyszt0xF/swift-quill)
 
 **Render streaming Markdown in iOS chat UIs without rebuilding the document on every token.**
 
 Quill is a streaming-first Markdown renderer for iOS, built for AI chat, assistants, coding tools, and any UI where Markdown arrives one chunk at a time. Native TextKit 2 rendering, no WebKit fallback.
-
-<!-- TODO before 1.0.0 release: Replace with real streaming demo GIF. Spec: Docs/Assets/README.md -->
-
-> **Streaming demo** -- production recording coming with 1.0.0. See `Docs/Assets/README.md` for the GIF spec.
 
 ## Table of Contents
 
@@ -47,7 +43,7 @@ For UIKit, full setup, and more advanced usage, see [Quick Start](#quick-start) 
 | Strength | What it means in an app |
 |----------|-------------------------|
 | Streaming-first pipeline | Incoming chunks render progressively without rebuilding the whole document. Only the active tail of the stream mutates on each chunk; complete blocks stay frozen. |
-| Native iOS rendering | TextKit 2, UIKit selection, VoiceOver behavior, and Dynamic Type. No WebKit fallback, no JavaScript. |
+| Native iOS rendering | TextKit 2, UIKit selection, VoiceOver behavior, and Dynamic Type through customizable theme fonts. No WebKit fallback, no JavaScript. |
 | Small integration surface | `QuillView` in UIKit, `QuillStreamView` in SwiftUI. Four methods for streaming: `append`, `finish`, `reset`, `cancelStreaming`. |
 | Custom where it matters | Themes, link handling, syntax highlighting, image loading, and streaming presets. Bring your own or use the bundled defaults. |
 | Evidence-backed performance | README numbers link to methodology, not marketing. Sub-millisecond main-thread work, zero dropped frames in extended streaming. |
@@ -72,7 +68,7 @@ dependencies: [
 ]
 ```
 
-Products: **QuillKit** (UIKit renderer), **QuillSwiftUI** (SwiftUI views), **QuillHighlight** (optional syntax highlighter), **QuillImageLoader** (optional image loader), **QuillCore** (internal -- not consumed directly). Most apps use **QuillSwiftUI** or **QuillKit**.
+Products: **QuillKit** (UIKit renderer), **QuillSwiftUI** (SwiftUI views), **QuillHighlight** (optional syntax highlighter), and **QuillImageLoader** (optional image loader). Most apps use **QuillSwiftUI** or **QuillKit**.
 
 ```swift
 .target(name: "YourApp", dependencies: [
@@ -86,12 +82,13 @@ Products: **QuillKit** (UIKit renderer), **QuillSwiftUI** (SwiftUI views), **Qui
 
 ### SwiftUI
 
-```swift
+```swift compile
+import SwiftUI
 import QuillSwiftUI
 
 struct ChatView: View {
     let chunks: AsyncStream<String>
-    let messageID: Message.ID
+    let messageID: UUID
 
     var body: some View {
         QuillStreamView(
@@ -108,7 +105,8 @@ Use `streamID` when a fresh response starts -- QuillSwiftUI cancels the old subs
 
 ### UIKit
 
-```swift
+```swift compile
+import UIKit
 import QuillKit
 
 let quillView = QuillView(configuration: .init(streaming: .init(preset: .balanced), theme: .github))
@@ -139,21 +137,25 @@ Quill renders only the active tail of the stream; complete blocks stay frozen. T
 
 ## Customization
 
-```swift
+```swift compile
+import UIKit
+import QuillKit
+
 // Token-based themes
 var theme = QuillTheme.github
 theme.body.font = .preferredFont(forTextStyle: .body)
 theme.link.color = .systemBlue
 
-// Streaming presets
-.balanced    // default
-.snappy      // faster tail updates
-.longForm    // slower, more stable on large outputs
-.custom(speedMultiplier: 1.2, tailAggressiveness: .balanced, bufferingDelay: 1.0)
-
-// App-owned link handling
-.quill.onLinkTap { url in UIApplication.shared.open(url) }
+// Streaming presets: .balanced (default), .snappy, .longForm,
+// .custom(speedMultiplier:bufferingDelay:),
+// .bufferedCustom(speedMultiplier:bufferingDelay:minModuleLength:)
+let configuration = QuillConfiguration(
+    streaming: .init(preset: .snappy),
+    theme: theme
+)
 ```
+
+App-owned link handling via `.quill.onLinkTap { url in UIApplication.shared.open(url) }` (SwiftUI) or `quillView.onLinkSelection = { url in ... }` (UIKit).
 
 [Theming guide](https://swiftpackageindex.com/krzyszt0xF/swift-quill/documentation/quillkit/customizingtheme) &#183; [Streaming presets](https://swiftpackageindex.com/krzyszt0xF/swift-quill/documentation/quillkit/streamingpresets)
 
@@ -182,8 +184,7 @@ Measured on iPhone 15 Pro Max, iOS 26.4, Release build. Static render: under 1ms
 
 ## Documentation
 
-<!-- TODO: DocC links resolve after Phase 3 merge -->
-[API reference and guides](https://swiftpackageindex.com/krzyszt0xF/swift-quill/documentation/quillkit) on Swift Package Index. [Examples/BasicIntegration](Examples/BasicIntegration/) &#183; [ROADMAP.md](ROADMAP.md)
+[API reference and guides](https://swiftpackageindex.com/krzyszt0xF/swift-quill/documentation/quillkit) on Swift Package Index. Roadmap: [ROADMAP.md](ROADMAP.md)
 
 ## Non-Goals
 

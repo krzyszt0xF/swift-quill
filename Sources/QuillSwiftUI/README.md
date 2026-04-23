@@ -1,26 +1,72 @@
 # QuillSwiftUI
 
-SwiftUI wrapper over QuillKit's UIKit rendering layer.
+SwiftUI views backed by QuillKit's native TextKit 2 renderer.
+
+## Streaming
+
+```swift
+import QuillSwiftUI
+
+QuillStreamView(
+    chunks: viewModel.markdownChunks,
+    streamID: viewModel.responseID,
+    configuration: .init(
+        streaming: .init(preset: .balanced),
+        theme: .github
+    )
+)
+.quill.onLinkTap { url in
+    UIApplication.shared.open(url)
+}
+.quill.onStreamFinished {
+    viewModel.markResponseComplete()
+}
+```
+
+`streamID` is the identity of the current response, run, or message. When it changes, QuillSwiftUI cancels the old subscription, resets the renderer, and starts consuming the new `AsyncSequence<String>`. No `.id(UUID())` workaround is needed.
+
+## Static Markdown
+
+```swift
+QuillMarkdownView(
+    markdown: "# Hello\n\nThis is **static** Markdown.",
+    configuration: .init(theme: .github)
+)
+.quill.onLinkTap { url in
+    UIApplication.shared.open(url)
+}
+```
+
+## Optional Modifiers
+
+All modifiers live under the `.quill` namespace and can be placed on or above the Quill view.
+
+| Modifier | Required | Description |
+|----------|----------|-------------|
+| `.quill.onLinkTap { url in }` | No | Handles tapped Markdown links. |
+| `.quill.onStreamFinished { }` | No | Runs when a stream finishes. |
+| `.quill.setHighlighter(_:)` | No | Adds syntax highlighting for complete code blocks. |
+| `.quill.setImageLoader(_:)` | No | Adds remote loading for standalone image blocks. |
+
+Without a highlighter, code blocks render as styled plain text. Without an image loader, image blocks keep their loading placeholder.
+
+```swift
+import QuillHighlight
+import QuillImageLoader
+
+QuillStreamView(
+    chunks: viewModel.markdownChunks,
+    streamID: viewModel.responseID
+)
+.quill.setHighlighter(SyntaxHighlighter.default)
+.quill.setImageLoader(ImageLoader.default)
+```
 
 ## Views
 
-- **`QuillMarkdownView`** -- Static rendering. Pass a markdown string; updates when the string changes.
-- **`QuillStreamView`** -- Streaming rendering. Consumes any `AsyncSequence<String>` and drives `QuillView` append/finish/error lifecycle.
+| View | Description |
+|------|-------------|
+| `QuillMarkdownView` | Static Markdown rendering. Re-renders when the Markdown string changes. |
+| `QuillStreamView` | Streaming Markdown rendering from any `AsyncSequence<String>`. |
 
-## Stream identity
-
-`QuillStreamView` does not diff `AsyncSequence` values (they are not `Equatable`). Use `.id(streamID)` with a value that changes each time you start a new stream. SwiftUI will tear down the old view and create a fresh one.
-
-```swift
-QuillStreamView(
-    chunks: myStream,
-    configuration: .init(
-        streaming: .init(preset: .balanced)
-    )
-)
-    .id(streamID)
-```
-
-## Dependencies
-
-- **QuillKit** -- wraps `QuillView` via `UIViewRepresentable`
+See the [root README](../../README.md) for installation, UIKit integration, performance notes, and examples.

@@ -11,6 +11,8 @@ First public release. Quill is a streaming-capable markdown renderer for iOS, bu
 - Added smooth incremental rendering as streamed Markdown chunks arrive
 - Added streaming presets: balanced (default), snappy, and long-form
 - Added custom preset tuning with speed multiplier and buffering delay
+- Added `QuillStreamingPreset.bufferedCustom(speedMultiplier:bufferingDelay:minModuleLength:)` for fine-grained tuning of module-buffered streaming (use alongside `StreamingMode.bufferedModules` for streams that emit very small chunks)
+- Added `StreamingMode` enum exposing `.smoothedTail` (default) and `.bufferedModules`, selectable via `QuillConfiguration.Streaming.mode` for low-level streaming pipeline mode selection
 - Added block-aware streaming with frozen prefix and active tail separation
 - Added cancellation support for active streams
 

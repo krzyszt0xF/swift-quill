@@ -33,28 +33,29 @@ cd swift-quill
 open Package.swift
 ```
 
-Build the package:
+Build and test on iOS Simulator:
 
 ```
-swift build
+xcodebuild test \
+  -scheme swift-quill-Package \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.2'
 ```
 
-Run tests:
+Build without running tests:
 
 ```
-swift test
+xcodebuild build-for-testing \
+  -scheme swift-quill-Package \
+  -destination 'generic/platform=iOS Simulator'
 ```
 
 Run tests for a specific target:
 
 ```
-swift test --filter QuillCoreTests
-```
-
-Run the example app:
-
-```
-open Examples/BasicIntegration/BasicIntegration.xcodeproj
+xcodebuild test \
+  -scheme swift-quill-Package \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.2' \
+  -only-testing:QuillCoreTests
 ```
 
 The project includes a [SwiftLint](.swiftlint.yml) configuration. If you have SwiftLint installed, run it before opening a PR:
