@@ -48,7 +48,7 @@ public final class QuillView: UIView {
     private let heightCoordinator: HeightCoordinator
     private let markdownParser: MarkdownParser
     private var staticParseTask: Task<Void, Never>?
-    private let streamCoordinator: StreamCoordinator
+    let streamCoordinator: StreamCoordinator
 
     deinit {
         staticParseTask?.cancel()

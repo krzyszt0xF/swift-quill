@@ -89,9 +89,7 @@ public extension QuillStreamView {
 
         init(configuration: QuillConfiguration) {
             quillView = QuillView(configuration: configuration)
-            quillView.onHeightChange = { [weak quillView] _, _ in
-                quillView?.invalidateIntrinsicContentSize()
-            }
+            quillView.configureHeightInvalidation()
         }
 
         func cancel() {

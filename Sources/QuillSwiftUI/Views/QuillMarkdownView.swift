@@ -16,6 +16,7 @@ public struct QuillMarkdownView: UIViewRepresentable {
 
     public func makeUIView(context: Context) -> QuillView {
         let view = QuillView(configuration: configuration)
+        view.configureHeightInvalidation()
         applyConfiguration(
             to: view,
             imageLoader: context.environment.quillImageLoader,
