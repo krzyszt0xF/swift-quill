@@ -30,12 +30,12 @@ final class ImageLoadingCoordinator {
 
         pendingURLTasks.removeAll()
         sourceURLByBlockID.removeAll()
-        storeState.removeAll()
         waitingBlockIDsByURL.removeAll()
     }
 
     func reset() {
         cancelAll()
+        storeState.removeAll()
         cache.removeAllObjects()
     }
 
@@ -79,8 +79,6 @@ final class ImageLoadingCoordinator {
 
     func set(loader: (any ImageLoading)?) {
         self.loader = loader
-        cache.removeAllObjects()
-        cancelAll()
     }
 
     func apply(theme: QuillTheme.Image, retryEnabled: Bool) {
@@ -201,6 +199,10 @@ private extension ImageLoadingCoordinator {
         return abs(aspectRatio - theme.fallbackAspectRatio) > .ulpOfOne
     }
 
+    // @unchecked Sendable: all mutable state (aspectRatios, results, retryEnabledValue, sinks) is serialized
+    // through `lock: NSLock` via `lock.withLock { ... }` on every read and write — see every method and the
+    // `retryEnabled` computed property for the pattern. The invariant to preserve in future edits is: never
+    // touch the stored dictionaries or `retryEnabledValue` outside a `lock.withLock` block.
     final class ImageStoreState: @unchecked Sendable {
         private let lock = NSLock()
         private var aspectRatios: [BlockIdentity: CGFloat] = [:]

@@ -116,6 +116,65 @@ struct ImageLoadingCoordinatorTests {
         #expect(coordinator.loadResult(for: blockID) == nil)
     }
 
+    @Test("cancelAll keeps loaded image result and clears pending bookkeeping")
+    func cancelAllKeepsLoadedImageResult() async {
+        let coordinator = ImageLoadingCoordinator()
+        let loader = MockImageLoader()
+        let loadedBlockID = BlockIdentity(rawValue: 200)
+        let pendingBlockID = BlockIdentity(rawValue: 201)
+        let loadedSink = MockImageLoadSink()
+        let pendingSink = MockImageLoadSink()
+        let loadedURL = URL(string: "https://example.com/keep-loaded.png")!
+        let pendingURL = URL(string: "https://example.com/still-pending.png")!
+        let image = makeImage(width: 50, height: 50)
+
+        coordinator.set(loader: loader)
+        coordinator.register(sink: loadedSink, for: loadedBlockID)
+        await loader.resolve(.success(image), for: loadedURL)
+        coordinator.scheduleLoad(blockID: loadedBlockID, source: loadedURL.absoluteString)
+
+        let loaded = await eventually { loadedSink.loadedImageSize == image.size }
+        #expect(loaded)
+
+        coordinator.register(sink: pendingSink, for: pendingBlockID)
+        coordinator.scheduleLoad(blockID: pendingBlockID, source: pendingURL.absoluteString)
+
+        let pendingStarted = await eventually { await loader.callCount(for: pendingURL) == 1 }
+        #expect(pendingStarted)
+
+        coordinator.cancelAll()
+
+        #expect(coordinator.loadResult(for: loadedBlockID).isLoadedImage)
+
+        await loader.resolve(.success(image), for: pendingURL)
+        await wait(for: .milliseconds(50))
+
+        #expect(pendingSink.results.isEmpty)
+        #expect(coordinator.loadResult(for: pendingBlockID) == nil)
+    }
+
+    @Test("reset clears loaded image result and pending bookkeeping")
+    func resetClearsLoadedImageResult() async {
+        let coordinator = ImageLoadingCoordinator()
+        let loader = MockImageLoader()
+        let blockID = BlockIdentity(rawValue: 210)
+        let sink = MockImageLoadSink()
+        let url = URL(string: "https://example.com/reset-clear.png")!
+        let image = makeImage(width: 50, height: 50)
+
+        coordinator.set(loader: loader)
+        coordinator.register(sink: sink, for: blockID)
+        await loader.resolve(.success(image), for: url)
+        coordinator.scheduleLoad(blockID: blockID, source: url.absoluteString)
+
+        let loaded = await eventually { sink.loadedImageSize == image.size }
+        #expect(loaded)
+
+        coordinator.reset()
+
+        #expect(coordinator.loadResult(for: blockID) == nil)
+    }
+
     @Test("reset clears cache so subsequent load re-invokes loader")
     func resetClearsCache() async {
         let coordinator = ImageLoadingCoordinator()
@@ -179,6 +238,39 @@ struct ImageLoadingCoordinatorTests {
         #expect(await loader.callCount(for: url) == 2)
     }
 
+    @Test("failed URL is not cached and next schedule retries")
+    func failedURLIsNotCached() async {
+        let coordinator = ImageLoadingCoordinator()
+        let loader = MockImageLoader()
+        let firstBlockID = BlockIdentity(rawValue: 81)
+        let secondBlockID = BlockIdentity(rawValue: 82)
+        let firstSink = MockImageLoadSink()
+        let secondSink = MockImageLoadSink()
+        let url = URL(string: "https://example.com/retry-next.png")!
+        let image = makeImage(width: 110, height: 55)
+
+        coordinator.set(loader: loader)
+        coordinator.register(sink: firstSink, for: firstBlockID)
+        await loader.resolve(.failure(MockError.failed), for: url)
+        coordinator.scheduleLoad(blockID: firstBlockID, source: url.absoluteString)
+
+        let firstFailed = await eventually {
+            firstSink.failureCount == 1
+        }
+        #expect(firstFailed)
+        #expect(await loader.callCount(for: url) == 1)
+
+        coordinator.register(sink: secondSink, for: secondBlockID)
+        await loader.resolve(.success(image), for: url)
+        coordinator.scheduleLoad(blockID: secondBlockID, source: url.absoluteString)
+
+        let retried = await eventually {
+            secondSink.loadedImageSize == image.size
+        }
+        #expect(retried)
+        #expect(await loader.callCount(for: url) == 2)
+    }
+
     @Test("dedup shares one underlying load for multiple block IDs")
     func dedupSharesUnderlyingLoad() async {
         let coordinator = ImageLoadingCoordinator()
@@ -209,6 +301,66 @@ struct ImageLoadingCoordinatorTests {
         }
         #expect(delivered)
         #expect(await loader.callCount(for: url) == 1)
+    }
+
+    @Test("set loader preserves cached image results")
+    func setLoaderPreservesCachedImageResults() async {
+        let coordinator = ImageLoadingCoordinator()
+        let firstLoader = MockImageLoader()
+        let secondLoader = MockImageLoader()
+        let firstBlockID = BlockIdentity(rawValue: 101)
+        let secondBlockID = BlockIdentity(rawValue: 102)
+        let firstSink = MockImageLoadSink()
+        let secondSink = MockImageLoadSink()
+        let url = URL(string: "https://example.com/preserve-cache.png")!
+        let image = makeImage(width: 300, height: 150)
+
+        coordinator.set(loader: firstLoader)
+        coordinator.register(sink: firstSink, for: firstBlockID)
+        await firstLoader.resolve(.success(image), for: url)
+        coordinator.scheduleLoad(blockID: firstBlockID, source: url.absoluteString)
+
+        let firstRendered = await eventually {
+            firstSink.loadedImageSize == image.size
+        }
+        #expect(firstRendered)
+        #expect(await firstLoader.callCount(for: url) == 1)
+
+        coordinator.set(loader: secondLoader)
+        coordinator.register(sink: secondSink, for: secondBlockID)
+        coordinator.scheduleLoad(blockID: secondBlockID, source: url.absoluteString)
+
+        #expect(secondSink.loadedImageSize == image.size)
+        #expect(await secondLoader.callCount(for: url) == 0)
+    }
+
+    @Test("set loader leaves in flight request on original loader")
+    func setLoaderLeavesInFlightRequestOnOriginalLoader() async {
+        let coordinator = ImageLoadingCoordinator()
+        let firstLoader = MockImageLoader()
+        let secondLoader = MockImageLoader()
+        let blockID = BlockIdentity(rawValue: 103)
+        let sink = MockImageLoadSink()
+        let url = URL(string: "https://example.com/in-flight.png")!
+        let image = makeImage(width: 80, height: 40)
+
+        coordinator.set(loader: firstLoader)
+        coordinator.register(sink: sink, for: blockID)
+        coordinator.scheduleLoad(blockID: blockID, source: url.absoluteString)
+
+        let started = await eventually {
+            await firstLoader.callCount(for: url) == 1
+        }
+        #expect(started)
+
+        coordinator.set(loader: secondLoader)
+        await firstLoader.resolve(.success(image), for: url)
+
+        let delivered = await eventually {
+            sink.loadedImageSize == image.size
+        }
+        #expect(delivered)
+        #expect(await secondLoader.callCount(for: url) == 0)
     }
 
     @Test("same block ID rescheduled with different URL keeps only latest result")

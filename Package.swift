@@ -5,7 +5,6 @@ let package = Package(
     name: "swift-quill",
     platforms: [.iOS(.v17)],
     products: [
-        .library(name: "QuillCore", targets: ["QuillCore"]),
         .library(name: "QuillKit", targets: ["QuillKit"]),
         .library(name: "QuillSwiftUI", targets: ["QuillSwiftUI"]),
         .library(name: "QuillHighlight", targets: ["QuillHighlight"]),

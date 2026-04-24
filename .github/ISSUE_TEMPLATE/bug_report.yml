@@ -1,0 +1,119 @@
+name: "Bug report"
+description: "Report a bug in Quill's rendering, streaming, or API"
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Before filing, please check that a similar issue doesn't already exist.
+
+        For security vulnerabilities, do not file here — see [SECURITY.md](https://github.com/krzyszt0xF/swift-quill/blob/main/SECURITY.md).
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "What happened?"
+      description: "A clear and concise description of the bug."
+      placeholder: "When I call `quillView.append(...)` with a streaming code block, the fence close triggers a layout jump..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: "Reproduction steps"
+      description: "Minimal steps to reproduce. A failing test case or minimal project is ideal."
+      placeholder: |
+        1. Create a QuillView with default config
+        2. Append chunk `"```swift\nfunc foo()"`
+        3. Append chunk `"\n```"`
+        4. Observe layout jump
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Expected behavior"
+      placeholder: "The code block should render with monospaced font and no layout shift."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: "Actual behavior"
+      placeholder: "Layout jumps ~40pt downward, then back up."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: quill-version
+    attributes:
+      label: "Quill version"
+      options:
+        - "1.0.0"
+        - "main (latest commit)"
+        - "Other (specify in description)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ios-version
+    attributes:
+      label: "iOS version"
+      options:
+        - "iOS 17"
+        - "iOS 18"
+        - "iOS 26"
+        - "Other (specify in description)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: "Device"
+      options:
+        - "iPhone"
+        - "iPad"
+        - "iPhone Simulator"
+        - "iPad Simulator"
+        - "Mac Catalyst"
+        - "Other"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: integration-surface
+    attributes:
+      label: "Integration surface"
+      options:
+        - "QuillKit (UIKit)"
+        - "QuillSwiftUI"
+        - "QuillHighlight"
+        - "QuillImageLoader"
+        - "Multiple / Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: "Additional context, logs, screenshots, videos"
+      description: "Attach Instruments traces if the bug is performance-related. Attach screen recordings if the bug is visual."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: "Acknowledgements"
+      options:
+        - label: "I have checked existing issues and this is not a duplicate"
+          required: true
+        - label: "This is not a security vulnerability (if it is, see SECURITY.md)"
+          required: true

@@ -1,0 +1,59 @@
+name: "Feature request"
+description: "Propose a new feature or API for Quill"
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a feature. Before filing, please check Quill's [Non-Goals](https://github.com/krzyszt0xF/swift-quill/blob/main/README.md#non-goals) in the README — some categories of features are explicitly out of scope.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "What problem does this solve?"
+      description: "Describe the use case. What are you trying to do that Quill doesn't currently support?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: "Proposed solution"
+      description: "What API or behavior would solve this? A code sketch is helpful."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives considered"
+      description: "What workarounds or alternative approaches have you tried?"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: "Which module would this affect?"
+      options:
+        - "QuillKit"
+        - "QuillSwiftUI"
+        - "QuillHighlight"
+        - "QuillImageLoader"
+        - "QuillCore (internal)"
+        - "New module"
+        - "Cross-module"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: non-goals-check
+    attributes:
+      label: "Non-Goals check"
+      options:
+        - label: "I have read the Non-Goals section in README.md and confirmed this feature is not explicitly out of scope"
+          required: true
+        - label: "I understand this is a proposal — implementation discussion happens before a PR"
+          required: true

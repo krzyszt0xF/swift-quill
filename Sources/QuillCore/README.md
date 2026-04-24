@@ -1,26 +1,20 @@
 # QuillCore
 
-Platform-agnostic markdown parsing and streaming infrastructure.
+QuillCore is Quill's parsing and streaming engine. It exists to keep the package architecture layered, testable, and UIKit-free.
 
-## Purpose
+Most apps should not depend on QuillCore directly. Use:
 
-QuillCore provides the foundation layer of swift-quill. It parses markdown input into a structured Block AST that downstream renderers consume. All types are package-scoped and have zero UIKit or AppKit dependencies.
+| Need | Product |
+|------|---------|
+| UIKit rendering | [QuillKit](../QuillKit/README.md) |
+| SwiftUI rendering | [QuillSwiftUI](../QuillSwiftUI/README.md) |
 
-## Key Types
+QuillCore sits at the front of the internal Markdown pipeline:
 
-- `Block` / `Inline` -- Recursive AST representing parsed markdown
-- `MarkdownParser` -- Converts raw markdown strings to `[Block]`
-- `MarkdownStreamController` -- Actor-based streaming coordinator for chunk-at-a-time input
-- `BlockReducer` -- Reduces parser events into an incrementally-updated block array
-
-## Dependencies
-
-- [swift-markdown](https://github.com/swiftlang/swift-markdown) (fully encapsulated -- consumers never see the Markdown module)
-
-## Testing
-
-QuillCore is testable via `swift test` on the command line without requiring a simulator:
-
-```bash
-swift test --filter QuillCoreTests
+```text
+Markdown -> Block AST -> FlowSegmentBuilder -> RenderTree -> Renderer
 ```
+
+It wraps swift-markdown, reduces streaming chunks into Quill's block model, and exposes only the internals needed by QuillKit. Rendering stays in QuillKit. QuillCore is not a consumer extension API and should not be treated as a plugin surface.
+
+See the [root README](../../README.md) for installation and product-level usage.

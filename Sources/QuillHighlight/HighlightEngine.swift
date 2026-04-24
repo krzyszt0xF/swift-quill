@@ -1,6 +1,10 @@
 import Highlighter
 import UIKit
 
+// @unchecked Sendable: the wrapped `Highlighter` instance from HighlighterSwift is not Sendable. All
+// access to `instance` is serialized through `queue: DispatchQueue` via `queue.sync { ... }` in both
+// `init` and `highlight(code:language:)`. The invariant to preserve in future edits is: never read or
+// mutate `instance` outside a `queue.sync` block.
 final class HighlightEngine: @unchecked Sendable {
     private let queue: DispatchQueue
     private var instance: Highlighter?

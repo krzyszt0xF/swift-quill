@@ -5,36 +5,19 @@ import SwiftUI
 public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable where S.Element == String {
     let chunks: S
     let configuration: QuillConfiguration
-    let linkTapHandler: ((URL) -> Void)?
-    let onFinished: (@MainActor () -> Void)?
     let onError: (@Sendable (Error) -> Void)?
+    let streamID: AnyHashable?
 
     public init(
         chunks: S,
+        streamID: AnyHashable? = nil,
         configuration: QuillConfiguration = .default,
-        onFinished: (@MainActor () -> Void)? = nil,
         onError: (@Sendable (Error) -> Void)? = nil
-    ) {
-            self.init(
-                chunks: chunks,
-                configuration: configuration,
-                linkTapHandler: nil,
-                onFinished: onFinished,
-                onError: onError)
-        }
-
-    private init(
-        chunks: S,
-        configuration: QuillConfiguration,
-        linkTapHandler: ((URL) -> Void)?,
-        onFinished: (@MainActor () -> Void)?,
-        onError: (@Sendable (Error) -> Void)?
     ) {
         self.chunks = chunks
         self.configuration = configuration
-        self.linkTapHandler = linkTapHandler
-        self.onFinished = onFinished
         self.onError = onError
+        self.streamID = streamID
     }
 
     public func makeCoordinator() -> Coordinator {
@@ -46,10 +29,11 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
         applyConfiguration(
             to: coordinator.quillView,
             imageLoader: context.environment.quillImageLoader,
+            linkTapHandler: context.environment.quillLinkTapHandler,
             syntaxHighlighter: context.environment.quillSyntaxHighlighter
         )
-        coordinator.setOnStreamFinished(onFinished)
-        coordinator.subscribe(to: chunks, onError: onError)
+        coordinator.setOnStreamFinished(context.environment.quillStreamFinishedHandler)
+        coordinator.subscribe(to: chunks, streamID: streamID, onError: onError)
 
         return coordinator.quillView
     }
@@ -66,9 +50,11 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
         applyConfiguration(
             to: context.coordinator.quillView,
             imageLoader: context.environment.quillImageLoader,
+            linkTapHandler: context.environment.quillLinkTapHandler,
             syntaxHighlighter: context.environment.quillSyntaxHighlighter
         )
-        context.coordinator.setOnStreamFinished(onFinished)
+        context.coordinator.setOnStreamFinished(context.environment.quillStreamFinishedHandler)
+        context.coordinator.subscribeIfNeeded(to: chunks, streamID: streamID, onError: onError)
     }
 
     public static func dismantleUIView(_ uiView: QuillView, coordinator: Coordinator) {
@@ -76,32 +62,11 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
     }
 }
 
-public extension QuillStreamView {
-    func onQuillLinkTap(_ handler: @escaping (URL) -> Void) -> Self {
-        Self(
-            chunks: chunks,
-            configuration: configuration,
-            linkTapHandler: handler,
-            onFinished: onFinished,
-            onError: onError
-        )
-    }
-
-    func onQuillStreamFinished(_ handler: @escaping @MainActor () -> Void) -> Self {
-        Self(
-            chunks: chunks,
-            configuration: configuration,
-            linkTapHandler: linkTapHandler,
-            onFinished: handler,
-            onError: onError
-        )
-    }
-}
-
 extension QuillStreamView {
     func applyConfiguration(
         to view: QuillView,
         imageLoader: (any ImageLoading)? = nil,
+        linkTapHandler: (@Sendable (URL) -> Void)? = nil,
         syntaxHighlighter: (any SyntaxHighlighting)? = nil
     ) {
         view.imageLoader = imageLoader
@@ -114,8 +79,12 @@ extension QuillStreamView {
 public extension QuillStreamView {
     @MainActor
     final class Coordinator {
-        let quillView: QuillView
+        // Internal to block SwiftUI consumers from reaching into the underlying UIKit view and
+        // bypassing the streamID-based lifecycle managed by subscribe(_:) / subscribeIfNeeded(_:).
+        // Tests use `@testable import QuillSwiftUI` and continue to have access.
+        internal let quillView: QuillView
         private var generation = 0
+        private var subscribedStreamID: AnyHashable?
         private var subscriptionTask: Task<Void, Never>?
 
         init(configuration: QuillConfiguration) {
@@ -128,16 +97,35 @@ public extension QuillStreamView {
         func cancel() {
             subscriptionTask?.cancel()
             subscriptionTask = nil
+            subscribedStreamID = nil
             quillView.cancelStreaming()
         }
 
-        func setOnStreamFinished(_ handler: (@MainActor () -> Void)?) {
+        func setOnStreamFinished(_ handler: (@MainActor @Sendable () -> Void)?) {
             quillView.onStreamFinished = handler
         }
 
         func subscribe(to chunks: S, onError: (@Sendable (Error) -> Void)?) {
+            subscribe(to: chunks, streamID: nil, onError: onError)
+        }
+
+        internal func subscribeIfNeeded(
+            to chunks: S,
+            streamID: AnyHashable?,
+            onError: (@Sendable (Error) -> Void)?
+        ) {
+            guard subscribedStreamID != streamID else { return }
+            subscribe(to: chunks, streamID: streamID, onError: onError)
+        }
+
+        internal func subscribe(
+            to chunks: S,
+            streamID: AnyHashable?,
+            onError: (@Sendable (Error) -> Void)?
+        ) {
             cancel()
             generation += 1
+            subscribedStreamID = streamID
 
             let currentGeneration = generation
             quillView.reset()

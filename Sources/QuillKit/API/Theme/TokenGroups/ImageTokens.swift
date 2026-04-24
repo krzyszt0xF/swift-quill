@@ -1,6 +1,7 @@
 import UIKit
 
 public extension QuillTheme {
+    // @unchecked Sendable: UIColor is not Sendable; Image values are immutable snapshots once constructed and carried across actor boundaries without mutation.
     /// Image is a mutable value treated as read-only after cross-actor handoff.
     struct Image: @unchecked Sendable {
         public var altTextColor: UIColor

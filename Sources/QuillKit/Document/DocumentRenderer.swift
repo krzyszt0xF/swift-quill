@@ -109,7 +109,7 @@ final class DocumentRenderer {
     func reset() {
         cancelStreaming()
         blockIndexer.removeAll()
-        highlightCoordinator.cancelAll()
+        highlightCoordinator.reset()
         imageLoadingCoordinator.reset()
         renderState.reset()
 

@@ -19,11 +19,11 @@ final class HighlightCoordinator {
 
     func cancelAll() {
         pendingBlockRequests.removeAll()
-        highlightStoreState.removeAll()
     }
 
     func reset() {
         cancelAll()
+        highlightStoreState.removeAll()
         cache.removeAllObjects()
     }
 
@@ -57,8 +57,8 @@ final class HighlightCoordinator {
 
     func set(highlighter: (any SyntaxHighlighting)?) {
         self.highlighter = highlighter
-        cache.removeAllObjects()
-        cancelAll()
+        highlightStoreState.setPresentationEnabled(highlighter != nil)
+        pendingBlockRequests.removeAll()
     }
 }
 
@@ -109,21 +109,32 @@ private extension HighlightCoordinator {
         sink?.apply(highlightedCode: snapshot)
     }
 
-    // Safety: all mutable state serialized through NSLock.
+    // @unchecked Sendable: all mutable state (pendingResults, sinks) is serialized through `lock: NSLock`
+    // via `lock.withLock { ... }` on every read and write — see every method on this class for the pattern.
+    // The invariant to preserve in future edits is: never touch `pendingResults` or `sinks` outside a `lock.withLock` block.
     final class HighlightStoreState: @unchecked Sendable {
         private let lock = NSLock()
         private var pendingResults: [BlockIdentity: HighlightedCodeSnapshot] = [:]
+        private var presentationEnabled = false
         private var sinks: [BlockIdentity: WeakSinkBox] = [:]
 
         func highlightedResult(for blockID: BlockIdentity) -> HighlightedCodeSnapshot? {
             lock.withLock {
-                pendingResults[blockID]
+                guard presentationEnabled else { return nil }
+
+                return pendingResults[blockID]
             }
         }
 
         func registerSink(_ sink: any CodeBlockHighlightSink, for blockID: BlockIdentity) {
             lock.withLock {
                 sinks[blockID] = WeakSinkBox(sink: sink)
+            }
+        }
+
+        func setPresentationEnabled(_ enabled: Bool) {
+            lock.withLock {
+                presentationEnabled = enabled
             }
         }
 

@@ -1,6 +1,7 @@
 import UIKit
 
 public extension QuillTheme {
+    // @unchecked Sendable: UIFont, UIColor, and UIEdgeInsets are not Sendable; Table values are immutable snapshots once constructed and carried across actor boundaries without mutation.
     /// Table is a mutable value treated as read-only after cross-actor handoff.
     struct Table: @unchecked Sendable {
         public var bodyFont: UIFont

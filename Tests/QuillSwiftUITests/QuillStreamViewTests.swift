@@ -158,19 +158,19 @@ struct QuillStreamViewTests {
         #expect(replacedContentRendered)
     }
 
-    @Test("onQuillLinkTap stores handler and applies it to QuillView")
-    func linkTapModifierAppliesHandler() {
+    @Test("applyConfiguration wires link tap handler to QuillView")
+    func linkTapHandlerAppliedToView() {
         let (stream, _) = AsyncStream<String>.makeStream()
         var tappedURL: URL?
-        let streamView = QuillStreamView(chunks: stream).onQuillLinkTap { url in
-            tappedURL = url
-        }
+        let streamView = QuillStreamView(chunks: stream)
         let view = QuillView()
 
-        streamView.applyConfiguration(to: view)
+        streamView.applyConfiguration(
+            to: view,
+            linkTapHandler: { url in tappedURL = url }
+        )
         view.onLinkSelection?(URL(string: "https://example.com")!)
 
-        #expect(streamView.linkTapHandler != nil)
         #expect(tappedURL == URL(string: "https://example.com"))
     }
 

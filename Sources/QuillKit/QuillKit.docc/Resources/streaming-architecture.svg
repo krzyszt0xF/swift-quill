@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="title desc">
+  <title id="title">Quill streaming architecture: chunk flow from input through parser, diff, to TextKit 2 frozen prefix and active tail</title>
+  <desc id="desc">A left-to-right pipeline diagram. Incoming Markdown chunks flow into an off-main parser, then into a diff and promote stage, then into the rendered document. The rendered document is split into two stacked regions: a frozen prefix that stays stable, and an active tail that updates on every chunk. A side arrow connects the diff and promote stage back to the frozen prefix, labeled promote.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6E7781"/>
+    </marker>
+  </defs>
+
+  <rect x="20" y="70" width="130" height="60" rx="8" ry="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1.5"/>
+  <text x="85" y="105" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="14" fill="#24292F">Incoming chunks</text>
+
+  <rect x="180" y="70" width="150" height="60" rx="8" ry="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1.5"/>
+  <text x="255" y="102" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="14" fill="#24292F">Off-main parser</text>
+  <text x="255" y="150" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#57606A">background Task, nonisolated</text>
+
+  <rect x="360" y="70" width="140" height="60" rx="8" ry="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1.5"/>
+  <text x="430" y="102" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="14" fill="#24292F">Diff / promote</text>
+  <text x="430" y="150" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#57606A">tail-only mutation</text>
+
+  <rect x="530" y="40" width="250" height="420" rx="10" ry="10" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1.5"/>
+  <text x="655" y="65" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="14" fill="#24292F" font-weight="600">Rendered document</text>
+
+  <rect x="550" y="85" width="210" height="150" rx="6" ry="6" fill="#EAEEF2" stroke="#D0D7DE" stroke-width="1.5"/>
+  <text x="655" y="115" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="13" fill="#24292F" font-weight="600">Frozen prefix</text>
+  <text x="655" y="140" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#57606A">stable -- never re-renders</text>
+  <text x="655" y="205" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="10" fill="#57606A">TextKit 2 fragments stable</text>
+
+  <rect x="550" y="255" width="210" height="180" rx="6" ry="6" fill="#FFF8C5" stroke="#D0D7DE" stroke-width="1.5" stroke-dasharray="4,4"/>
+  <text x="655" y="285" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="13" fill="#24292F" font-weight="600">Active tail</text>
+  <text x="655" y="310" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#57606A">updates on every chunk</text>
+  <text x="655" y="405" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="10" fill="#57606A">re-renders per chunk</text>
+
+  <line x1="150" y1="100" x2="175" y2="100" stroke="#6E7781" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="330" y1="100" x2="355" y2="100" stroke="#6E7781" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="500" y1="100" x2="545" y2="260" stroke="#6E7781" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <path d="M 430 130 Q 430 180 490 180 Q 540 180 545 160" fill="none" stroke="#6E7781" stroke-width="1.5" stroke-dasharray="2,3" marker-end="url(#arrow)"/>
+  <text x="485" y="175" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#57606A" font-style="italic">promote</text>
+</svg>
