@@ -107,6 +107,36 @@ struct QuillViewStreamingContractTests {
         #expect(renderedContent)
     }
 
+    @Test("reapplying syntaxHighlighter after finish preserves highlighted code")
+    func reapplyingSyntaxHighlighterAfterFinishPreservesHighlighting() async {
+        let view = makeSmoothedTailQuillView()
+        let highlighter = StaticColorHighlighter()
+        let markdown = """
+        ```swift
+        let x = 1
+        ```
+        """
+
+        view.syntaxHighlighter = highlighter
+        view.append(markdown)
+        view.finish()
+
+        let highlightedInitially = await eventually(timeout: .milliseconds(1200)) {
+            highlightedKeywordColor(in: view) == UIColor.systemRed
+        }
+        #expect(highlightedInitially)
+        #expect(highlighter.callCount == 1)
+
+        view.syntaxHighlighter = highlighter
+        view.configuration = view.configuration
+
+        let highlightPreserved = await eventually(timeout: .milliseconds(1200)) {
+            highlightedKeywordColor(in: view) == UIColor.systemRed
+        }
+        #expect(highlightPreserved)
+        #expect(highlighter.callCount == 1)
+    }
+
     @Test("reset clears currentMarkdown to nil")
     func resetClearsMarkdown() {
         let view = makeSmoothedTailQuillView()
@@ -118,5 +148,42 @@ struct QuillViewStreamingContractTests {
 
         #expect(view.currentMarkdown == nil)
         #expect(view.hasDocumentContent == false)
+    }
+}
+
+private extension QuillViewStreamingContractTests {
+    func highlightedKeywordColor(in view: QuillView) -> UIColor? {
+        let codeBlockView = view.firstCodeBlockView()
+        let textView: UITextView? = codeBlockView?.firstSubview()
+        return textView?.attributedText?.attribute(
+            .foregroundColor,
+            at: 1,
+            effectiveRange: nil
+        ) as? UIColor
+    }
+
+    final class StaticColorHighlighter: SyntaxHighlighting, @unchecked Sendable {
+        private let lock = NSLock()
+        private var callCountValue = 0
+
+        var callCount: Int {
+            lock.withLock {
+                callCountValue
+            }
+        }
+
+        func highlight(code: String, language: String) -> NSAttributedString? {
+            lock.withLock {
+                callCountValue += 1
+            }
+
+            let highlighted = NSMutableAttributedString(string: code)
+            highlighted.addAttribute(
+                .foregroundColor,
+                value: UIColor.systemRed,
+                range: NSRange(location: 0, length: min(3, highlighted.length))
+            )
+            return highlighted
+        }
     }
 }

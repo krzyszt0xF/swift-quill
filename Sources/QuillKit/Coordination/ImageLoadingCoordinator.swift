@@ -30,12 +30,12 @@ final class ImageLoadingCoordinator {
 
         pendingURLTasks.removeAll()
         sourceURLByBlockID.removeAll()
-        storeState.removeAll()
         waitingBlockIDsByURL.removeAll()
     }
 
     func reset() {
         cancelAll()
+        storeState.removeAll()
         cache.removeAllObjects()
     }
 
@@ -79,8 +79,6 @@ final class ImageLoadingCoordinator {
 
     func set(loader: (any ImageLoading)?) {
         self.loader = loader
-        cache.removeAllObjects()
-        cancelAll()
     }
 
     func apply(theme: QuillTheme.Image, retryEnabled: Bool) {
