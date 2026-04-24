@@ -83,3 +83,7 @@ First public release. Quill is a streaming-capable markdown renderer for iOS, bu
 - Zero dropped frames in extended streaming sessions
 - Off-main parsing for non-blocking UI
 - Bounded memory with no growth during repeated streaming
+
+### Examples
+
+- Added `Examples/QuillDemo`, an interactive SwiftUI playground app wired to the package via local path. Covers scenario selection, streaming presets, theme switching, and optional `SyntaxHighlighter` / `ImageLoader` integrations. iPhone portrait, iOS 17+.

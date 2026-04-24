@@ -1,0 +1,460 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 70;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		BBBBBBBBBBBBBBBBBBBB0001 /* QuillDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA0001 /* QuillDemoApp.swift */; };
+		BBBBBBBBBBBBBBBBBBBB0002 /* ConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA0002 /* ConfigView.swift */; };
+		BBBBBBBBBBBBBBBBBBBB0003 /* StreamingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA0003 /* StreamingView.swift */; };
+		BBBBBBBBBBBBBBBBBBBB0004 /* InspectorOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA0004 /* InspectorOverlay.swift */; };
+		BBBBBBBBBBBBBBBBBBBB0005 /* PlaygroundConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA0005 /* PlaygroundConfig.swift */; };
+		BBBBBBBBBBBBBBBBBBBB0006 /* Scenario.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA0006 /* Scenario.swift */; };
+		BBBBBBBBBBBBBBBBBBBB0007 /* ChunkStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA0007 /* ChunkStream.swift */; };
+		BBBBBBBBBBBBBBBBBBBB0009 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA0009 /* LaunchScreen.storyboard */; };
+		BBBBBBBBBBBBBBBBBBBB000A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA000A /* Assets.xcassets */; };
+		BBBBBBBBBBBBBBBBBBBB000B /* QuickStart.md in Resources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA000B /* QuickStart.md */; };
+		BBBBBBBBBBBBBBBBBBBB000C /* CodeWalkthrough.md in Resources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA000C /* CodeWalkthrough.md */; };
+		BBBBBBBBBBBBBBBBBBBB000D /* LongForm.md in Resources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA000D /* LongForm.md */; };
+		BBBBBBBBBBBBBBBBBBBB000E /* KitchenSink.md in Resources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA000E /* KitchenSink.md */; };
+		BBBBBBBBBBBBBBBBBBBB000F /* ImageHeavy.md in Resources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA000F /* ImageHeavy.md */; };
+		BBBBBBBBBBBBBBBBBBBB0020 /* QuillKit in Frameworks */ = {isa = PBXBuildFile; productRef = CCCCCCCCCCCCCCCCCCCC0020 /* QuillKit */; };
+		BBBBBBBBBBBBBBBBBBBB0021 /* QuillSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = CCCCCCCCCCCCCCCCCCCC0021 /* QuillSwiftUI */; };
+		BBBBBBBBBBBBBBBBBBBB0022 /* QuillHighlight in Frameworks */ = {isa = PBXBuildFile; productRef = CCCCCCCCCCCCCCCCCCCC0022 /* QuillHighlight */; };
+		BBBBBBBBBBBBBBBBBBBB0023 /* QuillImageLoader in Frameworks */ = {isa = PBXBuildFile; productRef = CCCCCCCCCCCCCCCCCCCC0023 /* QuillImageLoader */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		AAAAAAAAAAAAAAAAAAAA0001 /* QuillDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuillDemoApp.swift; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA0002 /* ConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigView.swift; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA0003 /* StreamingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingView.swift; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA0004 /* InspectorOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorOverlay.swift; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA0005 /* PlaygroundConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaygroundConfig.swift; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA0006 /* Scenario.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scenario.swift; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA0007 /* ChunkStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChunkStream.swift; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA0008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA0009 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA000A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA000B /* QuickStart.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = QuickStart.md; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA000C /* CodeWalkthrough.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CodeWalkthrough.md; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA000D /* LongForm.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = LongForm.md; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA000E /* KitchenSink.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = KitchenSink.md; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA000F /* ImageHeavy.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ImageHeavy.md; sourceTree = "<group>"; };
+		AAAAAAAAAAAAAAAAAAAA0010 /* QuillDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QuillDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		EEEEEEEEEEEEEEEEEEEE0003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BBBBBBBBBBBBBBBBBBBB0020 /* QuillKit in Frameworks */,
+				BBBBBBBBBBBBBBBBBBBB0021 /* QuillSwiftUI in Frameworks */,
+				BBBBBBBBBBBBBBBBBBBB0022 /* QuillHighlight in Frameworks */,
+				BBBBBBBBBBBBBBBBBBBB0023 /* QuillImageLoader in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		CCCCCCCCCCCCCCCCCCCC0001 /* Root */ = {
+			isa = PBXGroup;
+			children = (
+				CCCCCCCCCCCCCCCCCCCC0002 /* QuillDemo */,
+				CCCCCCCCCCCCCCCCCCCC0007 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		CCCCCCCCCCCCCCCCCCCC0002 /* QuillDemo */ = {
+			isa = PBXGroup;
+			children = (
+				AAAAAAAAAAAAAAAAAAAA0001 /* QuillDemoApp.swift */,
+				CCCCCCCCCCCCCCCCCCCC0003 /* Views */,
+				CCCCCCCCCCCCCCCCCCCC0004 /* Model */,
+				CCCCCCCCCCCCCCCCCCCC0005 /* Resources */,
+				AAAAAAAAAAAAAAAAAAAA0008 /* Info.plist */,
+				AAAAAAAAAAAAAAAAAAAA0009 /* LaunchScreen.storyboard */,
+			);
+			path = QuillDemo;
+			sourceTree = "<group>";
+		};
+		CCCCCCCCCCCCCCCCCCCC0003 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				AAAAAAAAAAAAAAAAAAAA0002 /* ConfigView.swift */,
+				AAAAAAAAAAAAAAAAAAAA0003 /* StreamingView.swift */,
+				AAAAAAAAAAAAAAAAAAAA0004 /* InspectorOverlay.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		CCCCCCCCCCCCCCCCCCCC0004 /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				AAAAAAAAAAAAAAAAAAAA0005 /* PlaygroundConfig.swift */,
+				AAAAAAAAAAAAAAAAAAAA0006 /* Scenario.swift */,
+				AAAAAAAAAAAAAAAAAAAA0007 /* ChunkStream.swift */,
+			);
+			path = Model;
+			sourceTree = "<group>";
+		};
+		CCCCCCCCCCCCCCCCCCCC0005 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				AAAAAAAAAAAAAAAAAAAA000A /* Assets.xcassets */,
+				CCCCCCCCCCCCCCCCCCCC0006 /* Scenarios */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		CCCCCCCCCCCCCCCCCCCC0006 /* Scenarios */ = {
+			isa = PBXGroup;
+			children = (
+				AAAAAAAAAAAAAAAAAAAA000B /* QuickStart.md */,
+				AAAAAAAAAAAAAAAAAAAA000C /* CodeWalkthrough.md */,
+				AAAAAAAAAAAAAAAAAAAA000D /* LongForm.md */,
+				AAAAAAAAAAAAAAAAAAAA000E /* KitchenSink.md */,
+				AAAAAAAAAAAAAAAAAAAA000F /* ImageHeavy.md */,
+			);
+			path = Scenarios;
+			sourceTree = "<group>";
+		};
+		CCCCCCCCCCCCCCCCCCCC0007 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AAAAAAAAAAAAAAAAAAAA0010 /* QuillDemo.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		DDDDDDDDDDDDDDDDDDDD0002 /* QuillDemo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FFFFFFFFFFFFFFFFFFFF0004 /* Build configuration list for PBXNativeTarget "QuillDemo" */;
+			buildPhases = (
+				EEEEEEEEEEEEEEEEEEEE0001 /* Sources */,
+				EEEEEEEEEEEEEEEEEEEE0002 /* Resources */,
+				EEEEEEEEEEEEEEEEEEEE0003 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = QuillDemo;
+			packageProductDependencies = (
+				CCCCCCCCCCCCCCCCCCCC0020 /* QuillKit */,
+				CCCCCCCCCCCCCCCCCCCC0021 /* QuillSwiftUI */,
+				CCCCCCCCCCCCCCCCCCCC0022 /* QuillHighlight */,
+				CCCCCCCCCCCCCCCCCCCC0023 /* QuillImageLoader */,
+			);
+			productName = QuillDemo;
+			productReference = AAAAAAAAAAAAAAAAAAAA0010 /* QuillDemo.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		DDDDDDDDDDDDDDDDDDDD0001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					DDDDDDDDDDDDDDDDDDDD0002 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = FFFFFFFFFFFFFFFFFFFF0001 /* Build configuration list for PBXProject "QuillDemo" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = CCCCCCCCCCCCCCCCCCCC0001;
+			packageReferences = (
+				DDDDDDDDDDDDDDDDDDDD0010 /* XCLocalSwiftPackageReference "../.." */,
+			);
+			productRefGroup = CCCCCCCCCCCCCCCCCCCC0007 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DDDDDDDDDDDDDDDDDDDD0002 /* QuillDemo */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		EEEEEEEEEEEEEEEEEEEE0002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BBBBBBBBBBBBBBBBBBBB0009 /* LaunchScreen.storyboard in Resources */,
+				BBBBBBBBBBBBBBBBBBBB000A /* Assets.xcassets in Resources */,
+				BBBBBBBBBBBBBBBBBBBB000B /* QuickStart.md in Resources */,
+				BBBBBBBBBBBBBBBBBBBB000C /* CodeWalkthrough.md in Resources */,
+				BBBBBBBBBBBBBBBBBBBB000D /* LongForm.md in Resources */,
+				BBBBBBBBBBBBBBBBBBBB000E /* KitchenSink.md in Resources */,
+				BBBBBBBBBBBBBBBBBBBB000F /* ImageHeavy.md in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		EEEEEEEEEEEEEEEEEEEE0001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BBBBBBBBBBBBBBBBBBBB0001 /* QuillDemoApp.swift in Sources */,
+				BBBBBBBBBBBBBBBBBBBB0002 /* ConfigView.swift in Sources */,
+				BBBBBBBBBBBBBBBBBBBB0003 /* StreamingView.swift in Sources */,
+				BBBBBBBBBBBBBBBBBBBB0004 /* InspectorOverlay.swift in Sources */,
+				BBBBBBBBBBBBBBBBBBBB0005 /* PlaygroundConfig.swift in Sources */,
+				BBBBBBBBBBBBBBBBBBBB0006 /* Scenario.swift in Sources */,
+				BBBBBBBBBBBBBBBBBBBB0007 /* ChunkStream.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		FFFFFFFFFFFFFFFFFFFF0002 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		FFFFFFFFFFFFFFFFFFFF0003 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		FFFFFFFFFFFFFFFFFFFF0005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = QuillDemo/Info.plist;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.quill.QuillDemo;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		FFFFFFFFFFFFFFFFFFFF0006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = QuillDemo/Info.plist;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.quill.QuillDemo;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		FFFFFFFFFFFFFFFFFFFF0001 /* Build configuration list for PBXProject "QuillDemo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FFFFFFFFFFFFFFFFFFFF0002 /* Debug */,
+				FFFFFFFFFFFFFFFFFFFF0003 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FFFFFFFFFFFFFFFFFFFF0004 /* Build configuration list for PBXNativeTarget "QuillDemo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FFFFFFFFFFFFFFFFFFFF0005 /* Debug */,
+				FFFFFFFFFFFFFFFFFFFF0006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		DDDDDDDDDDDDDDDDDDDD0010 /* XCLocalSwiftPackageReference "../.." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../..";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CCCCCCCCCCCCCCCCCCCC0020 /* QuillKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = QuillKit;
+		};
+		CCCCCCCCCCCCCCCCCCCC0021 /* QuillSwiftUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = QuillSwiftUI;
+		};
+		CCCCCCCCCCCCCCCCCCCC0022 /* QuillHighlight */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = QuillHighlight;
+		};
+		CCCCCCCCCCCCCCCCCCCC0023 /* QuillImageLoader */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = QuillImageLoader;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = DDDDDDDDDDDDDDDDDDDD0001 /* Project object */;
+}

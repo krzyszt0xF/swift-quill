@@ -1,0 +1,2 @@
+# Reduce merge conflict noise in Xcode project files
+*.pbxproj merge=union

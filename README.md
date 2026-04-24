@@ -18,6 +18,7 @@ Quill is a streaming-first Markdown renderer for iOS, built for AI chat, assista
 - [Optional Integrations](#optional-integrations)
 - [Performance](#performance)
 - [Documentation](#documentation)
+- [Examples](#examples)
 - [Non-Goals](#non-goals)
 - [Requirements](#requirements)
 - [Contributing](#contributing)
@@ -185,6 +186,10 @@ Measured on iPhone 15 Pro Max, iOS 26.4, Release build. Static render: under 1ms
 ## Documentation
 
 [API reference and guides](https://swiftpackageindex.com/krzyszt0xF/swift-quill/documentation/quillkit) on Swift Package Index. Roadmap: [ROADMAP.md](ROADMAP.md)
+
+## Examples
+
+- **[QuillDemo](Examples/QuillDemo/)** — interactive playground app demonstrating configuration, streaming presets, themes, and integrations. Clone and run on iOS Simulator.
 
 ## Non-Goals
 
