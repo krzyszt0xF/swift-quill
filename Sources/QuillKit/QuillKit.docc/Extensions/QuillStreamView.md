@@ -86,6 +86,8 @@ The view handles the subscription lifetime automatically when `streamID` changes
 The `onError` parameter is invoked once if the sequence throws.
 It is not invoked for normal completion (non-throwing end of sequence) -- for completion signals, observe when the sequence finishes in your upstream code.
 
+For user-driven stop actions in SwiftUI, create a ``QuillStreamHandle``, pass it into the initializer, and call `cancelStreaming()` on the handle.
+
 ## ``Coordinator``
 
 The coordinator managing the underlying ``QuillView`` instance and stream subscription.

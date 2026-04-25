@@ -21,6 +21,7 @@ extension StreamCoordinator {
         streamTask = nil
         finishTask?.cancel()
         finishTask = nil
+        // Reset drops any text still buffered in ModuleStreamGate instead of flushing it.
         bufferedStreamCommitScheduler.reset()
         controller = nil
         streamGeneration += 1

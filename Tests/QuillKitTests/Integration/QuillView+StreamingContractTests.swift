@@ -73,6 +73,35 @@ struct QuillViewStreamingContractTests {
         #expect(view.currentMarkdown == "First chunk. Second chunk.\n\n")
     }
 
+    @Test("cancelStreaming does not flush buffered incomplete content or finish the stream")
+    func cancelDoesNotFlushBufferedIncompleteContentOrFinish() async {
+        let view = makeSmoothedTailQuillView()
+        let incompleteMarkdown = "# Title\n\n```swift\nlet x = 1"
+        let markdownChunks = incompleteMarkdown.chunked(sizes: [5, 8, 6])
+        var finished = false
+
+        view.onStreamFinished = {
+            finished = true
+        }
+
+        for chunk in markdownChunks {
+            view.append(chunk)
+        }
+
+        let renderedContentBeforeCancel = await eventually {
+            view.hasDocumentContent
+        }
+        #expect(renderedContentBeforeCancel)
+        #expect(view.hasCodeBlockAttachment == false)
+
+        view.cancelStreaming()
+        await wait(for: .milliseconds(200))
+
+        #expect(view.currentMarkdown == incompleteMarkdown)
+        #expect(view.hasCodeBlockAttachment == false)
+        #expect(finished == false)
+    }
+
     @Test("append after finish auto-restarts a new stream session")
     func appendAfterFinishRestartsStream() async {
         let view = makeSmoothedTailQuillView()
@@ -128,7 +157,8 @@ struct QuillViewStreamingContractTests {
         #expect(highlighter.callCount == 1)
 
         view.syntaxHighlighter = highlighter
-        view.configuration = view.configuration
+        let currentConfiguration = view.configuration
+        view.configuration = currentConfiguration
 
         let highlightPreserved = await eventually(timeout: .milliseconds(1200)) {
             highlightedKeywordColor(in: view) == UIColor.systemRed

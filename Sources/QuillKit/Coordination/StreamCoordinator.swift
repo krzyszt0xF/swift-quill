@@ -85,6 +85,7 @@ extension StreamCoordinator {
     }
 
     func cancelStreaming() {
+        // Cancellation is a hard stop: cancel active work and discard any pending buffered tail.
         cancelAllTasks()
         renderer.updateSelectionGate(isStreaming: false)
         invalidateHeight(for: .streamReset)
@@ -104,6 +105,7 @@ extension StreamCoordinator {
             guard let self else { return }
 
             if renderConfiguration.streamingMode == .bufferedModules {
+                // Normal completion is the only path that promotes buffered remainder into the final render.
                 let remaining = self.bufferedStreamCommitScheduler.flushRemaining()
                 if !remaining.isEmpty {
                     self.bufferedVisualFeeder.enqueue(

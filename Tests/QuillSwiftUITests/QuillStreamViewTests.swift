@@ -52,6 +52,37 @@ struct QuillStreamViewTests {
         #expect(coordinator.quillView.currentMarkdown == "Before")
     }
 
+    @Test("Handle cancels subscription without finishing the stream")
+    func handleCancelsSubscriptionWithoutFinishing() async throws {
+        let (stream, continuation) = AsyncStream<String>.makeStream()
+        let coordinator = makeCoordinator()
+        let handle = QuillStreamHandle()
+        let finishCapture = SignalCapture()
+
+        coordinator.attach(to: handle)
+        coordinator.setOnStreamFinished {
+            Task {
+                await finishCapture.markReceived()
+            }
+        }
+        coordinator.subscribe(to: stream, onError: nil)
+
+        continuation.yield("Before")
+        let initialContentRendered = await eventually {
+            coordinator.quillView.currentMarkdown == "Before"
+        }
+        #expect(initialContentRendered)
+
+        handle.cancelStreaming()
+
+        continuation.yield("After")
+        await wait(for: .milliseconds(50))
+        let didFinish = await finishCapture.didReceive()
+
+        #expect(coordinator.quillView.currentMarkdown == "Before")
+        #expect(didFinish == false)
+    }
+
     @Test("Coordinator subscribes to AsyncSequence and calls append per chunk")
     func coordinatorAppendsChunks() async throws {
         let (stream, continuation) = AsyncStream<String>.makeStream()
@@ -156,6 +187,63 @@ struct QuillStreamViewTests {
             coordinator.quillView.currentMarkdown == "Second"
         }
         #expect(replacedContentRendered)
+    }
+
+    @Test("Detaching handle leaves it as a no-op")
+    func detachedHandleBecomesNoOp() async throws {
+        let (stream, continuation) = AsyncStream<String>.makeStream()
+        let coordinator = makeCoordinator()
+        let handle = QuillStreamHandle()
+
+        coordinator.attach(to: handle)
+        coordinator.subscribe(to: stream, onError: nil)
+
+        continuation.yield("Before")
+        let initialContentRendered = await eventually {
+            coordinator.quillView.currentMarkdown == "Before"
+        }
+        #expect(initialContentRendered)
+
+        coordinator.detachHandle()
+        handle.cancelStreaming()
+        continuation.yield("After")
+
+        let updatedContentRendered = await eventually {
+            coordinator.quillView.currentMarkdown == "BeforeAfter"
+        }
+        #expect(updatedContentRendered)
+    }
+
+    @Test("Attaching a new handle detaches the previous one")
+    func attachingNewHandleDetachesPreviousOne() async throws {
+        let (stream, continuation) = AsyncStream<String>.makeStream()
+        let coordinator = makeCoordinator()
+        let firstHandle = QuillStreamHandle()
+        let secondHandle = QuillStreamHandle()
+
+        coordinator.attach(to: firstHandle)
+        coordinator.attach(to: secondHandle)
+        coordinator.subscribe(to: stream, onError: nil)
+
+        continuation.yield("Before")
+        let initialContentRendered = await eventually {
+            coordinator.quillView.currentMarkdown == "Before"
+        }
+        #expect(initialContentRendered)
+
+        firstHandle.cancelStreaming()
+        continuation.yield("Still ")
+
+        let firstHandleNoLongerControlsStream = await eventually {
+            coordinator.quillView.currentMarkdown == "BeforeStill "
+        }
+        #expect(firstHandleNoLongerControlsStream)
+
+        secondHandle.cancelStreaming()
+        continuation.yield("After")
+        await wait(for: .milliseconds(50))
+
+        #expect(coordinator.quillView.currentMarkdown == "BeforeStill ")
     }
 
     @Test("applyConfiguration wires link tap handler to QuillView")

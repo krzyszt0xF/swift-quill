@@ -5,6 +5,7 @@ import SwiftUI
 public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable where S.Element == String {
     let chunks: S
     let configuration: QuillConfiguration
+    let handle: QuillStreamHandle?
     let onError: (@Sendable (Error) -> Void)?
     let streamID: AnyHashable?
 
@@ -12,10 +13,12 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
         chunks: S,
         streamID: AnyHashable? = nil,
         configuration: QuillConfiguration = .default,
+        handle: QuillStreamHandle? = nil,
         onError: (@Sendable (Error) -> Void)? = nil
     ) {
         self.chunks = chunks
         self.configuration = configuration
+        self.handle = handle
         self.onError = onError
         self.streamID = streamID
     }
@@ -33,6 +36,7 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
             syntaxHighlighter: context.environment.quillSyntaxHighlighter
         )
         coordinator.setOnStreamFinished(context.environment.quillStreamFinishedHandler)
+        coordinator.attach(to: handle)
         coordinator.subscribe(to: chunks, streamID: streamID, onError: onError)
 
         return coordinator.quillView
@@ -54,10 +58,12 @@ public struct QuillStreamView<S: AsyncSequence & Sendable>: UIViewRepresentable 
             syntaxHighlighter: context.environment.quillSyntaxHighlighter
         )
         context.coordinator.setOnStreamFinished(context.environment.quillStreamFinishedHandler)
+        context.coordinator.attach(to: handle)
         context.coordinator.subscribeIfNeeded(to: chunks, streamID: streamID, onError: onError)
     }
 
     public static func dismantleUIView(_ uiView: QuillView, coordinator: Coordinator) {
+        coordinator.detachHandle()
         coordinator.cancel()
     }
 }
@@ -82,7 +88,9 @@ public extension QuillStreamView {
         // Internal to block SwiftUI consumers from reaching into the underlying UIKit view and
         // bypassing the streamID-based lifecycle managed by subscribe(_:) / subscribeIfNeeded(_:).
         // Tests use `@testable import QuillSwiftUI` and continue to have access.
+        private let handleAttachmentID = UUID()
         internal let quillView: QuillView
+        private weak var handle: QuillStreamHandle?
         private var generation = 0
         private var subscribedStreamID: AnyHashable?
         private var subscriptionTask: Task<Void, Never>?
@@ -92,11 +100,30 @@ public extension QuillStreamView {
             quillView.configureHeightInvalidation()
         }
 
+        func attach(to handle: QuillStreamHandle?) {
+            guard self.handle !== handle else { return }
+
+            self.handle?.detach(ownerID: handleAttachmentID)
+            self.handle = handle
+            handle?.attach(ownerID: handleAttachmentID) { [weak self] in
+                self?.cancelStreamingOnly()
+            }
+        }
+
         func cancel() {
+            cancelStreamingOnly()
+            subscribedStreamID = nil
+        }
+
+        func cancelStreamingOnly() {
             subscriptionTask?.cancel()
             subscriptionTask = nil
-            subscribedStreamID = nil
             quillView.cancelStreaming()
+        }
+
+        func detachHandle() {
+            handle?.detach(ownerID: handleAttachmentID)
+            handle = nil
         }
 
         func setOnStreamFinished(_ handler: (@MainActor @Sendable () -> Void)?) {
@@ -121,7 +148,7 @@ public extension QuillStreamView {
             streamID: AnyHashable?,
             onError: (@Sendable (Error) -> Void)?
         ) {
-            cancel()
+            cancelStreamingOnly()
             generation += 1
             subscribedStreamID = streamID
 
