@@ -64,6 +64,8 @@ struct StreamingView: View {
 }
 
 private extension StreamingView {
+    static let bottomAnchorID = "bottom"
+
     static var emptyStream: AsyncStream<String> {
         AsyncStream { $0.finish() }
     }
@@ -92,21 +94,31 @@ private extension StreamingView {
     }
 
     var renderedArea: some View {
-        ScrollView {
-            QuillStreamView(
-                chunks: chunkStream,
-                streamID: streamID,
-                configuration: config.makeQuillConfiguration(),
-                handle: streamHandle
-            )
-            .quill.setHighlighter(config.syntaxHighlightingEnabled ? SyntaxHighlighter.default : nil)
-            .quill.setImageLoader(config.imageLoadingEnabled ? ImageLoader.default : nil)
-            .quill.onStreamFinished {
-                if runState == .streaming {
-                    runState = .completed
+        ScrollViewReader { proxy in
+            ScrollView {
+                QuillStreamView(
+                    chunks: chunkStream,
+                    streamID: streamID,
+                    configuration: config.makeQuillConfiguration(),
+                    handle: streamHandle
+                )
+                .quill.setHighlighter(config.syntaxHighlightingEnabled ? SyntaxHighlighter.default : nil)
+                .quill.setImageLoader(config.imageLoadingEnabled ? ImageLoader.default : nil)
+                .quill.onStreamFinished {
+                    if runState == .streaming {
+                        runState = .completed
+                    }
                 }
+                .padding(.horizontal)
+
+                Color.clear
+                    .frame(height: 0)
+                    .id(Self.bottomAnchorID)
             }
-            .padding(.horizontal)
+            .onChange(of: elapsed) { _, _ in
+                guard runState == .streaming else { return }
+                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+            }
         }
     }
 }
