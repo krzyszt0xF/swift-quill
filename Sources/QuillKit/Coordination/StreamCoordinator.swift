@@ -70,12 +70,12 @@ extension StreamCoordinator {
 
     func append(
         _ chunk: String,
-        currentMarkdown: String?,
+        accumulatedMarkdown: String?,
         configuration: QuillConfiguration,
         needsRestart: Bool
     ) {
         startStreamIfNeeded(
-            currentMarkdown: currentMarkdown,
+            accumulatedMarkdown: accumulatedMarkdown,
             configuration: configuration,
             needsRestart: needsRestart
         )

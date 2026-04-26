@@ -37,7 +37,7 @@ struct InternalDependencyTests {
 
         coordinator.append(
             "hello",
-            currentMarkdown: nil,
+            accumulatedMarkdown: nil,
             configuration: configuration,
             needsRestart: true
         )
@@ -104,7 +104,7 @@ struct InternalDependencyTests {
         )
         dependencies.streamCoordinator.append(
             "hello",
-            currentMarkdown: nil,
+            accumulatedMarkdown: nil,
             configuration: configuration,
             needsRestart: true
         )

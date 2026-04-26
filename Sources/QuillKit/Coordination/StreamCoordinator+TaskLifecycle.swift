@@ -82,13 +82,13 @@ extension StreamCoordinator {
     }
 
     func startStreamIfNeeded(
-        currentMarkdown: String?,
+        accumulatedMarkdown: String?,
         configuration: QuillConfiguration,
         needsRestart: Bool
     ) {
         guard needsRestart else { return }
         startStream(
-            bootstrap: currentMarkdown,
+            bootstrap: accumulatedMarkdown,
             configuration: configuration
         )
     }

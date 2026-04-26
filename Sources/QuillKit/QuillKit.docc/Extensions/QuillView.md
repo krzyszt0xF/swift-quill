@@ -60,7 +60,7 @@ Parsing runs on a background task; visible rendering updates apply on the main a
 ### Static rendering
 
 - ``markdown``
-- ``currentMarkdown``
+- ``accumulatedMarkdown``
 
 ### Configuration
 
@@ -137,7 +137,7 @@ Assigning a value parses and renders the content in full. Setting ``markdown`` t
 
 Do not use ``markdown`` for streaming content. Use ``append(_:)`` and ``finish()`` instead.
 
-## ``currentMarkdown``
+## ``accumulatedMarkdown``
 
 The current Markdown content, read-only.
 

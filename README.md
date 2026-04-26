@@ -231,18 +231,16 @@ Frozen-prefix architecture keeps per-chunk work bounded to the active tail.
 
 ## Examples
 
-- **[QuillDemo](Examples/QuillDemo/)** — interactive playground app demonstrating configuration, streaming presets, themes, and integrations. Clone and run on iOS Simulator.
+**[QuillDemo](Examples/QuillDemo/)** — interactive playground app demonstrating configuration, streaming presets, themes, and integrations. Clone and run on iOS Simulator.
 
 ## Non-Goals
 
 In v1.x:
 
-- No Markdown editing -- Quill renders, it does not write.
+- No Markdown editing - Quill renders, it does not write.
 - No WebKit fallback.
 - No custom block plugin system.
 - No LaTeX or math rendering.
-- No row-by-row streamed tables (tables render after the closing row).
-- No incremental code highlighting before the closing fence.
 - No macOS, tvOS, watchOS, or visionOS support.
 
 These are deliberate scope decisions. If you need any of these, see [How Quill compares](#how-quill-compares) above, or [Docs/CompetitiveResearch.md](Docs/CompetitiveResearch.md) for the full comparison.

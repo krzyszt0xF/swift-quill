@@ -6,7 +6,7 @@ import UIKit
 @MainActor
 @Suite("QuillView Streaming Equivalence", .tags(.integration, .parity, .streaming))
 struct QuillViewStreamingEquivalenceTests {
-    @Test("same markdown produces identical currentMarkdown across modes", arguments: StreamingMode.allCases)
+    @Test("same markdown produces identical accumulatedMarkdown across modes", arguments: StreamingMode.allCases)
     func modeEquivalence(mode: StreamingMode) async {
         let view = makeQuillView(mode: mode)
         let fullMarkdown = quillIntegrationMixedMarkdownFixture
@@ -17,13 +17,13 @@ struct QuillViewStreamingEquivalenceTests {
         }
         view.finish()
 
-        let markdownMatched = await eventually { view.currentMarkdown == fullMarkdown }
+        let markdownMatched = await eventually { view.accumulatedMarkdown == fullMarkdown }
         #expect(markdownMatched)
-        #expect(view.currentMarkdown == fullMarkdown)
+        #expect(view.accumulatedMarkdown == fullMarkdown)
     }
 
     @Test(
-        "same markdown produces identical currentMarkdown across presets",
+        "same markdown produces identical accumulatedMarkdown across presets",
         arguments: [
             QuillStreamingPreset.balanced,
             .bufferedCustom(
@@ -48,8 +48,8 @@ struct QuillViewStreamingEquivalenceTests {
         }
         view.finish()
 
-        let markdownMatched = await eventually { view.currentMarkdown == fullMarkdown }
+        let markdownMatched = await eventually { view.accumulatedMarkdown == fullMarkdown }
         #expect(markdownMatched)
-        #expect(view.currentMarkdown == fullMarkdown)
+        #expect(view.accumulatedMarkdown == fullMarkdown)
     }
 }

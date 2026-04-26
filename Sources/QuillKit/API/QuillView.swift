@@ -3,15 +3,15 @@ import UIKit
 
 @MainActor
 public final class QuillView: UIView {
-    public private(set) var currentMarkdown: String?
+    public private(set) var accumulatedMarkdown: String?
     public var configuration = QuillConfiguration.default {
         didSet {
             guard
                 streamCoordinator.hasActiveController == false,
-                markdown != nil || currentMarkdown != nil
+                markdown != nil || accumulatedMarkdown != nil
             else { return }
 
-            renderStatic(source: markdown ?? currentMarkdown)
+            renderStatic(source: markdown ?? accumulatedMarkdown)
         }
     }
 
@@ -100,16 +100,16 @@ public final class QuillView: UIView {
         staticParseTask?.cancel()
         staticParseTask = nil
         let needsRestart = !streamCoordinator.hasActiveController
-        let previousContent = needsRestart ? currentMarkdown : nil
+        let previousContent = needsRestart ? accumulatedMarkdown : nil
         if needsRestart {
             activeConfiguration = configuration
         }
 
-        currentMarkdown = (currentMarkdown ?? "") + chunk
+        accumulatedMarkdown = (accumulatedMarkdown ?? "") + chunk
 
         streamCoordinator.append(
             chunk,
-            currentMarkdown: previousContent,
+            accumulatedMarkdown: previousContent,
             configuration: activeConfiguration,
             needsRestart: needsRestart
         )
@@ -126,7 +126,7 @@ public final class QuillView: UIView {
     public func reset() {
         staticParseTask?.cancel()
         staticParseTask = nil
-        currentMarkdown = nil
+        accumulatedMarkdown = nil
         streamCoordinator.reset()
         heightCoordinator.resetLastNotifiedHeight()
     }
@@ -154,7 +154,7 @@ private extension QuillView {
     func renderStatic(source: String?) {
         staticParseTask?.cancel()
         staticParseTask = nil
-        currentMarkdown = source
+        accumulatedMarkdown = source
         activeConfiguration = configuration
 
         guard let source, !source.isEmpty else {

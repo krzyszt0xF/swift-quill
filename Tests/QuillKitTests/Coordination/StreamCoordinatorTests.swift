@@ -154,7 +154,7 @@ struct StreamCoordinatorTests {
 
         coordinator.append(
             pendingChunk,
-            currentMarkdown: nil,
+            accumulatedMarkdown: nil,
             configuration: configuration,
             needsRestart: true
         )

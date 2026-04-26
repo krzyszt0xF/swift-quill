@@ -58,27 +58,27 @@ struct QuillMarkdownViewTests {
         let view = QuillView()
         view.markdown = "# Hello"
         #expect(view.markdown == "# Hello")
-        #expect(view.currentMarkdown == "# Hello")
+        #expect(view.accumulatedMarkdown == "# Hello")
     }
 
     @Test("QuillView.markdown preserves state on same value re-set")
     func markdownPreservesStateOnSameValue() {
         let view = QuillView()
         view.markdown = "# Same"
-        #expect(view.currentMarkdown == "# Same")
+        #expect(view.accumulatedMarkdown == "# Same")
 
         view.markdown = "# Same"
-        #expect(view.currentMarkdown == "# Same")
+        #expect(view.accumulatedMarkdown == "# Same")
     }
 
     @Test("QuillView.markdown updates when value differs")
     func markdownUpdatesWhenDifferent() {
         let view = QuillView()
         view.markdown = "# First"
-        #expect(view.currentMarkdown == "# First")
+        #expect(view.accumulatedMarkdown == "# First")
 
         view.markdown = "# Second"
-        #expect(view.currentMarkdown == "# Second")
+        #expect(view.accumulatedMarkdown == "# Second")
     }
 
     @Test("empty markdown does not crash")
@@ -86,7 +86,7 @@ struct QuillMarkdownViewTests {
         let view = QuillView()
         view.markdown = ""
         #expect(view.markdown?.isEmpty == true)
-        #expect(view.currentMarkdown?.isEmpty == true)
+        #expect(view.accumulatedMarkdown?.isEmpty == true)
     }
 
     @Test("applyConfiguration wires link tap handler to QuillView")

@@ -17,9 +17,9 @@ struct QuillViewStreamingEdgeCaseTests {
         }
         codeFenceView.finish()
 
-        let codeFenceMatched = await eventually { codeFenceView.currentMarkdown == codeFenceMarkdown }
+        let codeFenceMatched = await eventually { codeFenceView.accumulatedMarkdown == codeFenceMarkdown }
         #expect(codeFenceMatched)
-        #expect(codeFenceView.currentMarkdown == codeFenceMarkdown)
+        #expect(codeFenceView.accumulatedMarkdown == codeFenceMarkdown)
 
         let boldTextView = makeSmoothedTailQuillView()
         let boldMarkdown = "**bold text**\n\n"
@@ -30,12 +30,12 @@ struct QuillViewStreamingEdgeCaseTests {
         }
         boldTextView.finish()
 
-        let boldMarkdownMatched = await eventually { boldTextView.currentMarkdown == boldMarkdown }
+        let boldMarkdownMatched = await eventually { boldTextView.accumulatedMarkdown == boldMarkdown }
         #expect(boldMarkdownMatched)
-        #expect(boldTextView.currentMarkdown == boldMarkdown)
+        #expect(boldTextView.accumulatedMarkdown == boldMarkdown)
     }
 
-    @Test("empty chunks do not corrupt currentMarkdown")
+    @Test("empty chunks do not corrupt accumulatedMarkdown")
     func emptyChunksPreserveMarkdownOutput() async {
         let view = makeSmoothedTailQuillView()
         let appendedParts = ["# Title", "", "\n\n", "", "Body text.\n\n", ""]
@@ -46,12 +46,12 @@ struct QuillViewStreamingEdgeCaseTests {
         view.finish()
 
         let expectedMarkdown = "# Title\n\nBody text.\n\n"
-        let markdownMatched = await eventually { view.currentMarkdown == expectedMarkdown }
+        let markdownMatched = await eventually { view.accumulatedMarkdown == expectedMarkdown }
         #expect(markdownMatched)
-        #expect(view.currentMarkdown == expectedMarkdown)
+        #expect(view.accumulatedMarkdown == expectedMarkdown)
     }
 
-    @Test("large single chunk produces correct currentMarkdown")
+    @Test("large single chunk produces correct accumulatedMarkdown")
     func largeSingleChunkPreservesMarkdown() async {
         let view = makeSmoothedTailQuillView()
         let largeMarkdown = makeQuillIntegrationLargeMarkdown()
@@ -59,9 +59,9 @@ struct QuillViewStreamingEdgeCaseTests {
         view.append(largeMarkdown)
         view.finish()
 
-        let markdownMatched = await eventually { view.currentMarkdown == largeMarkdown }
+        let markdownMatched = await eventually { view.accumulatedMarkdown == largeMarkdown }
         #expect(markdownMatched)
-        #expect(view.currentMarkdown == largeMarkdown)
+        #expect(view.accumulatedMarkdown == largeMarkdown)
     }
 
     @Test("rapid successive appends produce correct cumulative result")
@@ -76,10 +76,10 @@ struct QuillViewStreamingEdgeCaseTests {
         view.finish()
 
         let markdownMatched = await eventually(timeout: .milliseconds(800)) {
-            view.currentMarkdown == fullMarkdown
+            view.accumulatedMarkdown == fullMarkdown
         }
         #expect(markdownMatched)
-        #expect(view.currentMarkdown == fullMarkdown)
+        #expect(view.accumulatedMarkdown == fullMarkdown)
     }
 
     @Test("Closed code block renders code block attachment")
@@ -95,7 +95,7 @@ struct QuillViewStreamingEdgeCaseTests {
         }
 
         #expect(rendered)
-        #expect(view.currentMarkdown == markdown)
+        #expect(view.accumulatedMarkdown == markdown)
     }
 
     @Test("Nested list code fence renders code block attachment")

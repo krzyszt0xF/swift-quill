@@ -19,13 +19,13 @@ struct QuillStreamViewTests {
 
         continuation.yield("Kept ")
         let partialContentRendered = await eventually {
-            coordinator.quillView.currentMarkdown == "Kept "
+            coordinator.quillView.accumulatedMarkdown == "Kept "
         }
         #expect(partialContentRendered)
 
         continuation.finish(throwing: TestStreamError.failed)
         let preservedContent = await eventually {
-            coordinator.quillView.currentMarkdown == "Kept "
+            coordinator.quillView.accumulatedMarkdown == "Kept "
         }
         #expect(preservedContent)
     }
@@ -38,18 +38,18 @@ struct QuillStreamViewTests {
 
         continuation.yield("Before")
         let initialContentRendered = await eventually {
-            coordinator.quillView.currentMarkdown == "Before"
+            coordinator.quillView.accumulatedMarkdown == "Before"
         }
         #expect(initialContentRendered)
 
-        let markdownBeforeCancel = coordinator.quillView.currentMarkdown
+        let markdownBeforeCancel = coordinator.quillView.accumulatedMarkdown
         coordinator.cancel()
 
         continuation.yield("After")
         await wait(for: .milliseconds(50))
 
         #expect(markdownBeforeCancel == "Before")
-        #expect(coordinator.quillView.currentMarkdown == "Before")
+        #expect(coordinator.quillView.accumulatedMarkdown == "Before")
     }
 
     @Test("Handle cancels subscription without finishing the stream")
@@ -69,7 +69,7 @@ struct QuillStreamViewTests {
 
         continuation.yield("Before")
         let initialContentRendered = await eventually {
-            coordinator.quillView.currentMarkdown == "Before"
+            coordinator.quillView.accumulatedMarkdown == "Before"
         }
         #expect(initialContentRendered)
 
@@ -79,7 +79,7 @@ struct QuillStreamViewTests {
         await wait(for: .milliseconds(50))
         let didFinish = await finishCapture.didReceive()
 
-        #expect(coordinator.quillView.currentMarkdown == "Before")
+        #expect(coordinator.quillView.accumulatedMarkdown == "Before")
         #expect(didFinish == false)
     }
 
@@ -94,7 +94,7 @@ struct QuillStreamViewTests {
         continuation.finish()
 
         let renderedCombinedMarkdown = await eventually {
-            coordinator.quillView.currentMarkdown == "Hello world"
+            coordinator.quillView.accumulatedMarkdown == "Hello world"
         }
         #expect(renderedCombinedMarkdown)
     }
@@ -109,7 +109,7 @@ struct QuillStreamViewTests {
         continuation.finish()
 
         let renderedMarkdown = await eventually {
-            coordinator.quillView.currentMarkdown == "Done"
+            coordinator.quillView.accumulatedMarkdown == "Done"
         }
         #expect(renderedMarkdown)
     }
@@ -152,7 +152,7 @@ struct QuillStreamViewTests {
 
         continuation.yield("Partial ")
         let partialContentRendered = await eventually {
-            coordinator.quillView.currentMarkdown == "Partial "
+            coordinator.quillView.accumulatedMarkdown == "Partial "
         }
         #expect(partialContentRendered)
 
@@ -162,7 +162,7 @@ struct QuillStreamViewTests {
             await errorCapture.didReceive()
         }
         #expect(recordedError)
-        #expect(coordinator.quillView.currentMarkdown == "Partial ")
+        #expect(coordinator.quillView.accumulatedMarkdown == "Partial ")
     }
 
     @Test("Generation counter prevents stale chunks from interleaving")
@@ -174,7 +174,7 @@ struct QuillStreamViewTests {
         coordinator.subscribe(to: firstStream, onError: nil)
         firstContinuation.yield("First ")
         let initialContentRendered = await eventually {
-            coordinator.quillView.currentMarkdown == "First "
+            coordinator.quillView.accumulatedMarkdown == "First "
         }
         #expect(initialContentRendered)
 
@@ -184,7 +184,7 @@ struct QuillStreamViewTests {
         secondContinuation.yield("Second")
 
         let replacedContentRendered = await eventually {
-            coordinator.quillView.currentMarkdown == "Second"
+            coordinator.quillView.accumulatedMarkdown == "Second"
         }
         #expect(replacedContentRendered)
     }
@@ -200,7 +200,7 @@ struct QuillStreamViewTests {
 
         continuation.yield("Before")
         let initialContentRendered = await eventually {
-            coordinator.quillView.currentMarkdown == "Before"
+            coordinator.quillView.accumulatedMarkdown == "Before"
         }
         #expect(initialContentRendered)
 
@@ -209,7 +209,7 @@ struct QuillStreamViewTests {
         continuation.yield("After")
 
         let updatedContentRendered = await eventually {
-            coordinator.quillView.currentMarkdown == "BeforeAfter"
+            coordinator.quillView.accumulatedMarkdown == "BeforeAfter"
         }
         #expect(updatedContentRendered)
     }
@@ -227,7 +227,7 @@ struct QuillStreamViewTests {
 
         continuation.yield("Before")
         let initialContentRendered = await eventually {
-            coordinator.quillView.currentMarkdown == "Before"
+            coordinator.quillView.accumulatedMarkdown == "Before"
         }
         #expect(initialContentRendered)
 
@@ -235,7 +235,7 @@ struct QuillStreamViewTests {
         continuation.yield("Still ")
 
         let firstHandleNoLongerControlsStream = await eventually {
-            coordinator.quillView.currentMarkdown == "BeforeStill "
+            coordinator.quillView.accumulatedMarkdown == "BeforeStill "
         }
         #expect(firstHandleNoLongerControlsStream)
 
@@ -243,7 +243,7 @@ struct QuillStreamViewTests {
         continuation.yield("After")
         await wait(for: .milliseconds(50))
 
-        #expect(coordinator.quillView.currentMarkdown == "BeforeStill ")
+        #expect(coordinator.quillView.accumulatedMarkdown == "BeforeStill ")
     }
 
     @Test("applyConfiguration wires link tap handler to QuillView")
