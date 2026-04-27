@@ -100,16 +100,23 @@ public final class QuillView: UIView {
         staticParseTask?.cancel()
         staticParseTask = nil
         let needsRestart = !streamCoordinator.hasActiveController
-        let previousContent = needsRestart ? accumulatedMarkdown : nil
+        let existingContent = accumulatedMarkdown ?? ""
         if needsRestart {
             activeConfiguration = configuration
         }
 
-        accumulatedMarkdown = (accumulatedMarkdown ?? "") + chunk
+        let nextContent = existingContent + chunk
+        let bootstrapContent: String? = if needsRestart, existingContent.isEmpty == false {
+            nextContent
+        } else {
+            nil
+        }
+        let streamedChunk = bootstrapContent == nil ? chunk : ""
+        accumulatedMarkdown = nextContent
 
         streamCoordinator.append(
-            chunk,
-            accumulatedMarkdown: previousContent,
+            streamedChunk,
+            accumulatedMarkdown: bootstrapContent,
             configuration: activeConfiguration,
             needsRestart: needsRestart
         )

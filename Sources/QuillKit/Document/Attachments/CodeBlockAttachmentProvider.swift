@@ -73,13 +73,12 @@ private extension CodeBlockAttachmentProvider {
     ) -> CodeBlockView {
         let view = CodeBlockView(theme: theme)
         view.configure(language: content.language, code: content.code)
+        highlightStore?.registerSink(view, for: content.blockID)
 
         let highlighted = highlightStore?.highlightedResult(for: content.blockID)
         if let highlighted {
             view.apply(highlightedCode: highlighted)
         }
-
-        highlightStore?.registerSink(view, for: content.blockID)
 
         return view
     }

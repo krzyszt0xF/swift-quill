@@ -81,6 +81,7 @@ extension StreamCoordinator {
         )
 
         guard let streamController = controller else { return }
+        guard chunk.isEmpty == false else { return }
         routeIncomingChunk(chunk, to: streamController)
     }
 
@@ -116,7 +117,7 @@ extension StreamCoordinator {
                 }
             }
 
-            await self.bufferedVisualFeeder.waitUntilDrained()
+            await self.bufferedVisualFeeder.flushRemaining(to: streamController)
             await streamController.finish()
             await task?.value
             guard self.streamGeneration == generation else { return }
