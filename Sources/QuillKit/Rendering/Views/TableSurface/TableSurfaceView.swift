@@ -191,7 +191,7 @@ private extension TableSurfaceView {
     }
 }
 
-extension TableSurfaceView: @MainActor UIEditMenuInteractionDelegate {
+extension TableSurfaceView: UIEditMenuInteractionDelegate {
     func editMenuInteraction(
         _ interaction: UIEditMenuInteraction,
         menuFor configuration: UIEditMenuConfiguration,
