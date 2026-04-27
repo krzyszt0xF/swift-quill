@@ -112,18 +112,20 @@ struct QuillMarkdownViewTests {
         after the asynchronous static render completes, instead of collapsing to a single line.
         """
         let host = UIHostingController(
-            rootView: ScrollView {
-                VStack(spacing: 16) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        QuillMarkdownView(markdown: markdown)
-                    }
+            rootView: VStack(spacing: 16) {
+                ForEach(0..<3, id: \.self) { _ in
+                    QuillMarkdownView(markdown: markdown)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(width: 375)
+            .frame(width: 375, height: 800, alignment: .topLeading)
         )
 
-        host.view.bounds = CGRect(x: 0, y: 0, width: 375, height: 800)
+        host.loadViewIfNeeded()
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 375, height: 800))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        host.view.frame = window.bounds
+        host.view.bounds = window.bounds
         host.view.setNeedsLayout()
         host.view.layoutIfNeeded()
 

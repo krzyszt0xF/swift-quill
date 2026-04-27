@@ -5,7 +5,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("Height measurement redundancy")
+@Suite("Height measurement redundancy", GloballySerialized())
 struct HeightRedundancyTests {
     @Test("Stable revision and width do not remeasure")
     func stableRevisionAndWidthDoNotRemeasure() async {

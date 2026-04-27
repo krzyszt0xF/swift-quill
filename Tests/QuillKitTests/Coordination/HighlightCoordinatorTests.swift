@@ -5,7 +5,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("HighlightCoordinator", .tags(.rendering))
+@Suite("HighlightCoordinator", GloballySerialized(), .tags(.rendering))
 struct HighlightCoordinatorTests {
     @Test("reapplying highlighter keeps stored results visible")
     func reapplyingHighlighterKeepsStoredResultsVisible() async {

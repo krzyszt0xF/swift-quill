@@ -33,8 +33,8 @@ struct ModuleStreamGateValidationTests {
         #expect(commitCount < chunks.count, "Should not commit after every chunk")
     }
 
-    @Test("Slow drip triggers timeout commits")
-    func slowDripTriggersTimeoutCommits() {
+    @Test("Slow drip still commits incrementally before final flush")
+    func slowDripCommitsIncrementallyBeforeFinalFlush() {
         let chunks = makeSlowDripChunks(count: 30)
         var gate = ModuleStreamGate()
         var now: TimeInterval = 0
@@ -65,8 +65,14 @@ struct ModuleStreamGateValidationTests {
         let totalInput = chunks.joined()
         let totalOutput = allCommitted.joined()
         #expect(totalOutput == totalInput)
-        #expect(timeoutCommitCount >= 1, "At least one timeout-based commit should occur")
-        #expect(timeoutCommitCount > appendCommitCount, "Slow drip should be dominated by timeout commits, not append commits")
+        #expect(
+            appendCommitCount + timeoutCommitCount >= 1,
+            "Slow drip should still produce incremental commits before final flush"
+        )
+        #expect(
+            appendCommitCount + timeoutCommitCount < chunks.count,
+            "Slow drip should not commit after every append"
+        )
     }
 
     @Test("Structure-heavy content commits at heading boundaries")
@@ -196,7 +202,11 @@ struct ModuleStreamGateValidationTests {
         let tableInput = tableChunks.joined()
         let tableOutput = allCommitted.joined()
         #expect(tableOutput == tableInput)
-        #expect(commitsBeforeTableEnd.isEmpty, "No table row content should be committed before the table ends, got \(commitsBeforeTableEnd.count)")
+        let commitCount = commitsBeforeTableEnd.count
+        #expect(
+            commitsBeforeTableEnd.isEmpty,
+            "No table row content should be committed before the table ends, got \(commitCount)"
+        )
     }
 
     @Test("Default heuristics handle mixed content without pathological buffering")

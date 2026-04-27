@@ -5,7 +5,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("Streaming Mode Consistency", .tags(.integration, .parity, .streaming))
+@Suite("Streaming Mode Consistency", GloballySerialized(), .tags(.integration, .parity, .streaming))
 struct StreamingModeConsistencyTests {
     @Test("Buffered and stable modes converge to identical final markdown")
     func bufferedMatchesStableAfterFinish() async throws {

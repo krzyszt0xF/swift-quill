@@ -5,7 +5,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("QuillView Height Coalescing", .tags(.integration, .rendering))
+@Suite("QuillView Height Coalescing", .serialized, GloballySerialized(), .tags(.integration, .rendering))
 struct QuillViewHeightCoalescingTests {
     @Test("Rapid updates coalesce into one height notification per burst")
     func rapidUpdatesCoalesceHeightCallbacks() async {

@@ -4,7 +4,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("HeightCoordinator", .tags(.rendering))
+@Suite("HeightCoordinator", GloballySerialized(), .tags(.rendering))
 struct HeightCoordinatorTests {
     private static let coalescingWindow: TimeInterval = 0.05
 

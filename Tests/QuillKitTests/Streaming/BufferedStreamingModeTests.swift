@@ -5,7 +5,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("Buffered Streaming Mode", .tags(.integration, .streaming))
+@Suite("Buffered Streaming Mode", .serialized, GloballySerialized(), .tags(.integration, .streaming))
 struct BufferedStreamingModeTests {
     @Test("Buffered mode avoids tiny first commit before safe threshold")
     func avoidsTinyFirstCommit() async throws {

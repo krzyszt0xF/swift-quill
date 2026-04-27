@@ -4,7 +4,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("QuillView Lifecycle", .tags(.integration, .streaming))
+@Suite("QuillView Lifecycle", GloballySerialized(), .tags(.integration, .streaming))
 struct QuillViewLifecycleTests {
     private static let timingTolerance: TimeInterval = 0.0001
 

@@ -4,7 +4,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("QuillView Links", .tags(.integration))
+@Suite("QuillView Links", GloballySerialized(), .tags(.integration))
 struct QuillViewLinkTests {
     @Test("onLinkSelection callback receives URL from static render")
     func onLinkSelectionReceivesURLFromStaticRender() async throws {

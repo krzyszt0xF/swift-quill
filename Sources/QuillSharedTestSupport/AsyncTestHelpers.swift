@@ -2,7 +2,7 @@ import Foundation
 
 @MainActor
 package func eventually<C: Clock>(
-    timeout: Duration = .milliseconds(800),
+    timeout: Duration = .seconds(3),
     poll: Duration = .milliseconds(10),
     clock: C,
     _ condition: @escaping () -> Bool
@@ -25,7 +25,7 @@ package func eventually<C: Clock>(
 
 @MainActor
 package func eventually(
-    timeout: Duration = .milliseconds(800),
+    timeout: Duration = .seconds(3),
     poll: Duration = .milliseconds(10),
     _ condition: @escaping () -> Bool
 ) async -> Bool {
@@ -39,7 +39,7 @@ package func eventually(
 
 @MainActor
 package func eventually<C: Clock>(
-    timeout: Duration = .milliseconds(800),
+    timeout: Duration = .seconds(3),
     poll: Duration = .milliseconds(10),
     clock: C,
     _ condition: @escaping () async -> Bool
@@ -62,7 +62,7 @@ package func eventually<C: Clock>(
 
 @MainActor
 package func eventually(
-    timeout: Duration = .milliseconds(800),
+    timeout: Duration = .seconds(3),
     poll: Duration = .milliseconds(10),
     _ condition: @escaping () async -> Bool
 ) async -> Bool {

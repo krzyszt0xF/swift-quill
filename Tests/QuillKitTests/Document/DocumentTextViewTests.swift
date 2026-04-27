@@ -5,7 +5,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("DocumentTextView", .tags(.rendering))
+@Suite("DocumentTextView", GloballySerialized(), .tags(.rendering))
 struct DocumentTextViewTests {
     @Test("Link selection action handler forwards URL")
     func linkSelectionActionHandlerForwardsURL() {

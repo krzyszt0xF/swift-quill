@@ -1,10 +1,11 @@
 @testable import QuillKit
 import QuillCore
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("Attachment plain text representation")
+@Suite("Attachment plain text representation", GloballySerialized())
 struct AttachmentPlainTextTests {
     @Test("Code block attachment carries raw source code as plain text")
     func codeBlockPlainText() {
@@ -65,7 +66,7 @@ struct AttachmentPlainTextTests {
             effectiveRange: nil
         ) as? String
 
-        #expect(plainText == "")
+        #expect(plainText?.isEmpty == true)
     }
 
     @Test("Table attachment carries TSV as plain text")

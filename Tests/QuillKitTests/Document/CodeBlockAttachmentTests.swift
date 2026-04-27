@@ -6,7 +6,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("CodeBlockAttachment", .tags(.rendering))
+@Suite("CodeBlockAttachment", GloballySerialized(), .tags(.rendering))
 struct CodeBlockAttachmentTests {
     @Test("Attachment stores blockID, language, and code")
     func identityAndPayload() {

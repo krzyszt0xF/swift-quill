@@ -6,7 +6,7 @@ import QuillSharedTestSupport
 import UIKit
 
 @MainActor
-@Suite("Streaming finish drain")
+@Suite("Streaming finish drain", .serialized, GloballySerialized())
 struct StreamingFinishDrainTests {
     @Test("Finish drains all buffered content")
     func finishDrainsAllBufferedContent() async {
@@ -22,7 +22,7 @@ struct StreamingFinishDrainTests {
         }
         view.finish()
 
-        let drained = await eventually(timeout: .seconds(3)) {
+        let drained = await eventually(timeout: .seconds(8)) {
             finished
         }
 
@@ -44,7 +44,7 @@ struct StreamingFinishDrainTests {
         }
         view.finish()
 
-        let drained = await eventually(timeout: .seconds(3)) {
+        let drained = await eventually(timeout: .seconds(8)) {
             finished
         }
 

@@ -6,7 +6,7 @@ import QuillSharedTestSupport
 import UIKit
 
 @MainActor
-@Suite("Off-main parse regression")
+@Suite("Off-main parse regression", .serialized, GloballySerialized())
 struct OffMainParseRegressionTests {
     @Test("Static markdown produces rendered content")
     func staticMarkdownProducesRenderedContent() async {

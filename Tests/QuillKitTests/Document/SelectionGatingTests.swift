@@ -1,10 +1,11 @@
 @testable import QuillKit
 import QuillCore
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("Selection gating during streaming")
+@Suite("Selection gating during streaming", GloballySerialized())
 struct SelectionGatingTests {
     @Test("frozenContentLength nil allows full document selection")
     func nilFrozenContentAllowsFullSelection() throws {
