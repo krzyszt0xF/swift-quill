@@ -1,10 +1,12 @@
 # Changelog
 
-## Quill 1.0.0
+## Quill 0.9.0
 
 *April 2026*
 
-First public release. Quill is a streaming-capable markdown renderer for iOS, built on a single TextKit 2 document surface with native text selection and accessibility.
+First public pre-release. Quill is a streaming-capable markdown renderer for iOS, built on a single TextKit 2 document surface with native text selection and accessibility.
+
+The streaming completion contract (`finish`, `cancelStreaming`, `reset`, static `markdown` setter) is expected to tighten before 1.0 — see the planned async completion contract. A small number of integration tests exercising completion-order behavior under full bundle load are quarantined pending that work; functional behavior is unaffected. Pin to `0.9.x` for stable surface; expect one breaking change before 1.0.
 
 ### Streaming
 

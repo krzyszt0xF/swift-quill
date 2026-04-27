@@ -95,7 +95,7 @@ Add Quill with Swift Package Manager:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/krzyszt0xF/swift-quill.git", from: "1.0.0"),
+    .package(url: "https://github.com/krzyszt0xF/swift-quill.git", from: "0.9.0"),
 ]
 ```
 
