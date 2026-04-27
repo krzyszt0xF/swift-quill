@@ -1,10 +1,11 @@
 @testable import QuillKit
 import QuillCore
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("ImageBlockView", .tags(.rendering))
+@Suite("ImageBlockView", GloballySerialized(), .tags(.rendering))
 struct ImageBlockViewTests {
     @Test("Configure shows loading state")
     func configureShowsLoadingState() {

@@ -3,6 +3,7 @@ import QuillCore
 
 @MainActor
 final class BufferedVisualFeeder {
+    private var activeChunk: QueuedChunk?
     private var drainContinuations: [CheckedContinuation<Void, Never>] = []
     private var drainTask: Task<Void, Never>?
     private var nextPendingChunkIndex = 0
@@ -57,6 +58,23 @@ final class BufferedVisualFeeder {
             policy: policy,
             to: streamController
         )
+    }
+
+    func flushRemaining(to streamController: MarkdownStreamController) async {
+        guard drainTask != nil || nextPendingChunkIndex < pendingChunks.count else { return }
+
+        drainTask?.cancel()
+        drainTask = nil
+
+        let remainingText = ([activeChunk?.text] + pendingChunks[nextPendingChunkIndex...].map(\.text))
+            .compactMap { $0 }
+            .joined()
+        activeChunk = nil
+        clearPendingChunks()
+        resumeDrainContinuations()
+
+        guard remainingText.isEmpty == false else { return }
+        await streamController.append(remainingText)
     }
 
     func waitUntilDrained() async {
@@ -174,6 +192,7 @@ private extension BufferedVisualFeeder {
     }
 
     func clearPendingChunks() {
+        activeChunk = nil
         nextPendingChunkIndex = 0
         pendingChunks.removeAll(keepingCapacity: true)
     }
@@ -204,14 +223,17 @@ private extension BufferedVisualFeeder {
 
     func drainPendingChunks(to streamController: MarkdownStreamController) async {
         while let pendingChunk = dequeuePendingChunk() {
+            activeChunk = pendingChunk
             if let delay = pendingChunk.delay {
                 await sleep(delay)
             }
 
             guard !Task.isCancelled else { break }
+            activeChunk = nil
             await streamController.append(pendingChunk.text)
         }
 
+        activeChunk = nil
         drainTask = nil
         resumeDrainContinuations()
     }

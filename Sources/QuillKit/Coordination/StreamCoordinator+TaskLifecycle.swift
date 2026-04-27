@@ -21,6 +21,7 @@ extension StreamCoordinator {
         streamTask = nil
         finishTask?.cancel()
         finishTask = nil
+        // Reset drops any text still buffered in ModuleStreamGate instead of flushing it.
         bufferedStreamCommitScheduler.reset()
         controller = nil
         streamGeneration += 1
@@ -81,13 +82,13 @@ extension StreamCoordinator {
     }
 
     func startStreamIfNeeded(
-        currentMarkdown: String?,
+        accumulatedMarkdown: String?,
         configuration: QuillConfiguration,
         needsRestart: Bool
     ) {
         guard needsRestart else { return }
         startStream(
-            bootstrap: currentMarkdown,
+            bootstrap: accumulatedMarkdown,
             configuration: configuration
         )
     }

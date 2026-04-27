@@ -17,7 +17,7 @@ struct PlaygroundConfig: Equatable, Sendable {
         syntaxHighlightingEnabled: true,
         imageLoadingEnabled: true,
         streamingMode: .bufferedModules,
-        chunkDelayMs: 100
+        chunkDelayMs: 200
     )
 }
 

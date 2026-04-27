@@ -4,7 +4,15 @@ import UIKit
 extension UIView {
     @MainActor
     func firstCodeBlockView() -> CodeBlockView? {
-        firstSubview()
+        setNeedsLayout()
+        layoutIfNeeded()
+        firstDocumentTextView()?.setNeedsLayout()
+        firstDocumentTextView()?.layoutIfNeeded()
+        if let documentTextView = firstDocumentTextView() {
+            documentTextView.textLayoutManager?.ensureLayout(for: documentTextView.bounds)
+        }
+
+        return firstSubview()
     }
 
     @MainActor

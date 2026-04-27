@@ -4,19 +4,19 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("QuillView Lifecycle", .tags(.integration, .streaming))
+@Suite("QuillView Lifecycle", GloballySerialized(), .tags(.integration, .streaming))
 struct QuillViewLifecycleTests {
     private static let timingTolerance: TimeInterval = 0.0001
 
-    @Test("append accumulates currentMarkdown")
+    @Test("append accumulates accumulatedMarkdown")
     func appendAccumulatesMarkdown() async {
         let view = makeSmoothedTailQuillView()
 
         view.append("Hello ")
-        #expect(view.currentMarkdown == "Hello ")
+        #expect(view.accumulatedMarkdown == "Hello ")
 
         view.append("world")
-        #expect(view.currentMarkdown == "Hello world")
+        #expect(view.accumulatedMarkdown == "Hello world")
     }
 
     @Test("cancelStreaming is idempotent")
@@ -30,7 +30,7 @@ struct QuillViewLifecycleTests {
         view.cancelStreaming()
         view.cancelStreaming()
 
-        #expect(view.currentMarkdown == "After cancel\n\n")
+        #expect(view.accumulatedMarkdown == "After cancel\n\n")
     }
 
     @Test("cancelStreaming then append auto-restarts stream")
@@ -41,7 +41,7 @@ struct QuillViewLifecycleTests {
         view.cancelStreaming()
 
         view.append(" continued\n\n")
-        #expect(view.currentMarkdown == "First chunk continued\n\n")
+        #expect(view.accumulatedMarkdown == "First chunk continued\n\n")
 
         let renderedContent = await eventually {
             view.hasDocumentContent
@@ -97,7 +97,7 @@ struct QuillViewLifecycleTests {
         view.finish()
 
         view.append("Second paragraph\n\n")
-        #expect(view.currentMarkdown == "First paragraph\n\nSecond paragraph\n\n")
+        #expect(view.accumulatedMarkdown == "First paragraph\n\nSecond paragraph\n\n")
 
         let renderedContent = await eventually {
             view.hasDocumentContent
@@ -114,7 +114,7 @@ struct QuillViewLifecycleTests {
         view.finish()
         view.finish()
 
-        #expect(view.currentMarkdown == "Content\n\n")
+        #expect(view.accumulatedMarkdown == "Content\n\n")
     }
 
     @Test("preset change applies without crash")
@@ -127,29 +127,29 @@ struct QuillViewLifecycleTests {
         #expect(view.configuration.streaming.preset == .balanced)
     }
 
-    @Test("reset clears currentMarkdown and rendered content")
+    @Test("reset clears accumulatedMarkdown and rendered content")
     func resetClearsContent() async {
         let view = makeSmoothedTailQuillView()
 
         view.append("Some content\n\nMore content\n\n")
 
         view.reset()
-        #expect(view.currentMarkdown == nil)
+        #expect(view.accumulatedMarkdown == nil)
         #expect(view.hasDocumentContent == false)
     }
 
-    @Test("static markdown assignment syncs currentMarkdown")
-    func markdownAssignmentSyncsCurrentMarkdown() {
+    @Test("static markdown assignment syncs accumulatedMarkdown")
+    func markdownAssignmentSyncsaccumulatedMarkdown() {
         let view = makeSmoothedTailQuillView()
 
         view.markdown = "# Title"
-        #expect(view.currentMarkdown == "# Title")
+        #expect(view.accumulatedMarkdown == "# Title")
 
         view.markdown = "Updated"
-        #expect(view.currentMarkdown == "Updated")
+        #expect(view.accumulatedMarkdown == "Updated")
 
         view.markdown = nil
-        #expect(view.currentMarkdown == nil)
+        #expect(view.accumulatedMarkdown == nil)
     }
 
     @Test("static markdown assignment resets active streaming")

@@ -5,7 +5,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("HighlightCoordinator", .tags(.rendering))
+@Suite("HighlightCoordinator", GloballySerialized(), .tags(.rendering))
 struct HighlightCoordinatorTests {
     @Test("reapplying highlighter keeps stored results visible")
     func reapplyingHighlighterKeepsStoredResultsVisible() async {
@@ -116,7 +116,12 @@ struct HighlightCoordinatorTests {
         coordinator.registerSink(sink, for: blockID)
         coordinator.scheduleHighlight(blockID: blockID, code: "let x = 1", language: "swift")
 
-        await Task.detached { highlighter.startedSignal.wait() }.value
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global().async {
+                highlighter.startedSignal.wait()
+                continuation.resume()
+            }
+        }
 
         coordinator.cancelAll()
         highlighter.allowFinishSignal.signal()

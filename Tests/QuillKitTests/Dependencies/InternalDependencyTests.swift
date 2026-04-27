@@ -5,7 +5,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("Internal Dependencies", .tags(.streaming))
+@Suite("Internal Dependencies", GloballySerialized(), .tags(.streaming))
 struct InternalDependencyTests {
     @Test("StreamCoordinator uses injected stream controller factory")
     func streamCoordinatorUsesInjectedStreamControllerFactory() {
@@ -37,7 +37,7 @@ struct InternalDependencyTests {
 
         coordinator.append(
             "hello",
-            currentMarkdown: nil,
+            accumulatedMarkdown: nil,
             configuration: configuration,
             needsRestart: true
         )
@@ -104,7 +104,7 @@ struct InternalDependencyTests {
         )
         dependencies.streamCoordinator.append(
             "hello",
-            currentMarkdown: nil,
+            accumulatedMarkdown: nil,
             configuration: configuration,
             needsRestart: true
         )

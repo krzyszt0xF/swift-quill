@@ -5,7 +5,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("ImageLoadingCoordinator", .tags(.rendering))
+@Suite("ImageLoadingCoordinator", GloballySerialized(), .tags(.rendering))
 struct ImageLoadingCoordinatorTests {
     @Test("scheduleLoad with valid URL stores loaded result and notifies sink")
     func scheduleLoadStoresLoadedResult() async {

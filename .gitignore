@@ -21,6 +21,7 @@ xcuserdata/
 # .swiftpm
 
 .build/
+build/
 
 # Generated files
 */Generated/*.swift

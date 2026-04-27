@@ -1,10 +1,11 @@
 @testable import QuillKit
 import QuillCore
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("Document text view copy")
+@Suite("Document text view copy", GloballySerialized())
 struct DocumentTextViewCopyTests {
     @Test("makeSelectionPlainText replaces attachment character with plain text")
     func replacesAttachmentCharacter() {

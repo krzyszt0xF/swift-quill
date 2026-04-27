@@ -86,23 +86,23 @@
       shouldUseLaunchSchemeArgsEnv = "YES">
       <TestPlans>
          <TestPlanReference
-            reference = "container:Parity.xctestplan">
+            reference = "container:Tests/TestPlans/Parity.xctestplan">
          </TestPlanReference>
          <TestPlanReference
-            reference = "container:Rendering.xctestplan">
+            reference = "container:Tests/TestPlans/Rendering.xctestplan">
          </TestPlanReference>
          <TestPlanReference
-            reference = "container:Integration.xctestplan">
+            reference = "container:Tests/TestPlans/Integration.xctestplan">
          </TestPlanReference>
          <TestPlanReference
-            reference = "container:AllTests.xctestplan"
+            reference = "container:Tests/TestPlans/AllTests.xctestplan"
             default = "YES">
          </TestPlanReference>
          <TestPlanReference
-            reference = "container:Core.xctestplan">
+            reference = "container:Tests/TestPlans/Core.xctestplan">
          </TestPlanReference>
          <TestPlanReference
-            reference = "container:Performance.xctestplan">
+            reference = "container:Tests/TestPlans/Performance.xctestplan">
          </TestPlanReference>
       </TestPlans>
       <Testables>

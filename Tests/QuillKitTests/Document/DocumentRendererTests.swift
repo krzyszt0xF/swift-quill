@@ -7,7 +7,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("DocumentRenderer", .tags(.rendering))
+@Suite("DocumentRenderer", GloballySerialized(), .tags(.rendering))
 struct DocumentRendererTests {
     @Test("First render of static document installs content")
     func staticDocumentRender() {

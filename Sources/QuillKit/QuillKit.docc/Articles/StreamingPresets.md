@@ -25,7 +25,7 @@ The underlying pipeline -- parsing, diff, TextKit 2 fragment updates -- runs ide
 
 ## Choosing a preset
 
-### When to use ``QuillStreamingPreset/balanced``
+### When to use balanced
 
 The default preset, appropriate for the majority of AI chat integrations.
 Tuned for token rates typical of hosted LLMs (50-200 tokens/second from major providers).
@@ -33,7 +33,7 @@ Provides responsive-feeling tail updates without over-mutating the rendered docu
 
 Use balanced unless you have specific reason to change.
 
-### When to use ``QuillStreamingPreset/snappy``
+### When to use snappy
 
 Tail updates apply more aggressively, producing a character-by-character "typewriter" feel.
 Best for:
@@ -46,7 +46,7 @@ The tradeoff is more frequent TextKit 2 fragment updates.
 On older devices, this may be visible as a slight frame-time increase (still within the main thread budget, but closer to it).
 For most modern iOS hardware, snappy is indistinguishable from balanced in frame time.
 
-### When to use ``QuillStreamingPreset/longForm``
+### When to use longForm
 
 Tail updates apply less frequently, favoring block-level reveal over per-chunk updates.
 Best for:
@@ -58,7 +58,7 @@ Best for:
 The tradeoff is a perceptual delay between chunk arrival and visible update.
 For fast LLM streams, this can feel like the model is "thinking" before writing -- in some contexts, this is a feature.
 
-### When to use ``QuillStreamingPreset/custom(speedMultiplier:bufferingDelay:)``
+### When to use custom
 
 Use `.custom` when none of the named presets match your use case.
 Two parameters control pacing:
@@ -69,7 +69,7 @@ Two parameters control pacing:
 See ``QuillStreamingPreset`` for accepted value ranges and default guidance.
 Custom presets are useful for A/B testing different feels or matching a very specific UX design; for production integrations, one of the three named presets usually fits.
 
-### When to use ``QuillStreamingPreset/bufferedCustom(speedMultiplier:bufferingDelay:minModuleLength:)``
+### When to use bufferedCustom
 
 A custom preset with an additional guard on minimum module length before a complete block flushes out of the tail.
 Useful when working with streams that emit small incremental modules (very short paragraphs, code fragments) where forcing a larger minimum chunk keeps the reveal rhythm steady.

@@ -3,15 +3,15 @@ import UIKit
 
 @MainActor
 public final class QuillView: UIView {
-    public private(set) var currentMarkdown: String?
+    public private(set) var accumulatedMarkdown: String?
     public var configuration = QuillConfiguration.default {
         didSet {
             guard
                 streamCoordinator.hasActiveController == false,
-                markdown != nil || currentMarkdown != nil
+                markdown != nil || accumulatedMarkdown != nil
             else { return }
 
-            renderStatic(source: markdown ?? currentMarkdown)
+            renderStatic(source: markdown ?? accumulatedMarkdown)
         }
     }
 
@@ -48,7 +48,7 @@ public final class QuillView: UIView {
     private let heightCoordinator: HeightCoordinator
     private let markdownParser: MarkdownParser
     private var staticParseTask: Task<Void, Never>?
-    private let streamCoordinator: StreamCoordinator
+    let streamCoordinator: StreamCoordinator
 
     deinit {
         staticParseTask?.cancel()
@@ -100,16 +100,23 @@ public final class QuillView: UIView {
         staticParseTask?.cancel()
         staticParseTask = nil
         let needsRestart = !streamCoordinator.hasActiveController
-        let previousContent = needsRestart ? currentMarkdown : nil
+        let existingContent = accumulatedMarkdown ?? ""
         if needsRestart {
             activeConfiguration = configuration
         }
 
-        currentMarkdown = (currentMarkdown ?? "") + chunk
+        let nextContent = existingContent + chunk
+        let bootstrapContent: String? = if needsRestart, existingContent.isEmpty == false {
+            nextContent
+        } else {
+            nil
+        }
+        let streamedChunk = bootstrapContent == nil ? chunk : ""
+        accumulatedMarkdown = nextContent
 
         streamCoordinator.append(
-            chunk,
-            currentMarkdown: previousContent,
+            streamedChunk,
+            accumulatedMarkdown: bootstrapContent,
             configuration: activeConfiguration,
             needsRestart: needsRestart
         )
@@ -126,7 +133,7 @@ public final class QuillView: UIView {
     public func reset() {
         staticParseTask?.cancel()
         staticParseTask = nil
-        currentMarkdown = nil
+        accumulatedMarkdown = nil
         streamCoordinator.reset()
         heightCoordinator.resetLastNotifiedHeight()
     }
@@ -154,7 +161,7 @@ private extension QuillView {
     func renderStatic(source: String?) {
         staticParseTask?.cancel()
         staticParseTask = nil
-        currentMarkdown = source
+        accumulatedMarkdown = source
         activeConfiguration = configuration
 
         guard let source, !source.isEmpty else {

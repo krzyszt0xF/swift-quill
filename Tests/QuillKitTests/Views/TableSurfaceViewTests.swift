@@ -5,7 +5,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("TableSurfaceView", .tags(.rendering))
+@Suite("TableSurfaceView", GloballySerialized(), .tags(.rendering))
 struct TableSurfaceViewTests {
     @Test("copy clears custom selection after writing TSV")
     func copyClearsSelectionAfterWritingTSV() {

@@ -1,28 +1,52 @@
-![Quill wordmark](Docs/Assets/quill-wordmark.png)
-
-[![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org) ![Platform](https://img.shields.io/badge/platform-iOS%2017+-blue.svg) ![SPM](https://img.shields.io/badge/SPM-compatible-brightgreen.svg) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![CI](https://github.com/krzyszt0xF/swift-quill/actions/workflows/ci.yml/badge.svg) [![SPI](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fkrzyszt0xF%2Fswift-quill%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/krzyszt0xF/swift-quill) [![SPI Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fkrzyszt0xF%2Fswift-quill%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/krzyszt0xF/swift-quill)
+# Quill
 
 **Render streaming Markdown in iOS chat UIs without rebuilding the document on every token.**
 
-Quill is a streaming-first Markdown renderer for iOS, built for AI chat, assistants, coding tools, and any UI where Markdown arrives one chunk at a time. Native TextKit 2 rendering, no WebKit fallback.
+<p>
+  <a href="https://swift.org"><img src="https://img.shields.io/badge/Swift-6.0-orange.svg" alt="Swift 6.0"></a>
+  <img src="https://img.shields.io/badge/platform-iOS%2017+-blue.svg" alt="iOS 17+">
+  <img src="https://img.shields.io/badge/SPM-compatible-brightgreen.svg" alt="SPM compatible">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License"></a>
+  <img src="https://github.com/krzyszt0xF/swift-quill/actions/workflows/ci.yml/badge.svg" alt="CI">
+  <a href="https://swiftpackageindex.com/krzyszt0xF/swift-quill">
+    <img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fkrzyszt0xF%2Fswift-quill%2Fbadge%3Ftype%3Dswift-versions" alt="Swift Package Index Swift versions">
+  </a>
+  <a href="https://swiftpackageindex.com/krzyszt0xF/swift-quill">
+    <img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fkrzyszt0xF%2Fswift-quill%2Fbadge%3Ftype%3Dplatforms" alt="Swift Package Index platforms">
+  </a>
+</p>
 
-## Table of Contents
+![Quill streaming Markdown demo](Docs/Assets/quill-in-action.gif)
 
-- [Why Quill](#why-quill)
-- [How Quill compares](#how-quill-compares)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Supported Markdown](#supported-markdown)
-- [Streaming](#streaming)
-- [Customization](#customization)
-- [Optional Integrations](#optional-integrations)
-- [Performance](#performance)
-- [Documentation](#documentation)
-- [Examples](#examples)
-- [Non-Goals](#non-goals)
-- [Requirements](#requirements)
-- [Contributing](#contributing)
-- [License](#license)
+Streaming-first Markdown renderer for AI chat and real-time UIs.  
+Built on TextKit 2. No WebView. No full re-rendering.
+
+<details>
+<summary>Table of contents</summary>
+
+- [Quill](#quill)
+  - [In 30 seconds](#in-30-seconds)
+  - [Why Quill](#why-quill)
+  - [How Quill compares](#how-quill-compares)
+  - [Installation](#installation)
+  - [Quick Start](#quick-start)
+    - [SwiftUI](#swiftui)
+    - [UIKit](#uikit)
+  - [Supported Markdown](#supported-markdown)
+  - [Streaming](#streaming)
+  - [Customization](#customization)
+  - [Optional Integrations](#optional-integrations)
+  - [Performance](#performance)
+  - [Documentation](#documentation)
+  - [Examples](#examples)
+  - [Non-Goals](#non-goals)
+  - [Requirements](#requirements)
+  - [Contributing](#contributing)
+  - [Security](#security)
+  - [Code of Conduct](#code-of-conduct)
+  - [License](#license)
+
+</details>
 
 ## In 30 seconds
 
@@ -30,24 +54,30 @@ Quill is a streaming-first Markdown renderer for iOS, built for AI chat, assista
 import QuillSwiftUI
 
 QuillStreamView(
-    chunks: myOpenAIStream,   // AsyncStream<String>
+    chunks: openAIStream, // AsyncStream<String>
     streamID: message.id
 )
 ```
 
-That's it. No manual state management, no invalidation, no ScrollView tricks.
+That’s it. Stream in, render out - no state management required.
 
 For UIKit, full setup, and more advanced usage, see [Quick Start](#quick-start) below.
 
 ## Why Quill
 
+Most Markdown renderers rebuild the entire document on every update.
+
+Quill doesn’t.
+
+It updates only the active tail, keeping everything above stable.
+
 | Strength | What it means in an app |
 |----------|-------------------------|
-| Streaming-first pipeline | Incoming chunks render progressively without rebuilding the whole document. Only the active tail of the stream mutates on each chunk; complete blocks stay frozen. |
-| Native iOS rendering | TextKit 2, UIKit selection, VoiceOver behavior, and Dynamic Type through customizable theme fonts. No WebKit fallback, no JavaScript. |
-| Small integration surface | `QuillView` in UIKit, `QuillStreamView` in SwiftUI. Four methods for streaming: `append`, `finish`, `reset`, `cancelStreaming`. |
-| Custom where it matters | Themes, link handling, syntax highlighting, image loading, and streaming presets. Bring your own or use the bundled defaults. |
-| Evidence-backed performance | README numbers link to methodology, not marketing. Sub-millisecond main-thread work, zero dropped frames in extended streaming. |
+| Streaming-first pipeline | Only the active tail updates as content streams in; completed blocks stay stable. |
+| Native iOS rendering | TextKit 2 with native selection, accessibility, and Dynamic Type - no WebKit or JavaScript. |
+| Small integration surface | Drop-in `QuillView` (UIKit) or `QuillStreamView` (SwiftUI) with 4 simple streaming methods. |
+| Custom where it matters | Easily customize themes, links, syntax highlighting, and images - or use sensible defaults. |
+| Evidence-backed performance | ~1 ms per update with zero dropped frames, even during long streaming sessions. |
 
 ## How Quill compares
 
@@ -65,7 +95,7 @@ Add Quill with Swift Package Manager:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/krzyszt0xF/swift-quill.git", from: "1.0.0"),
+    .package(url: "https://github.com/krzyszt0xF/swift-quill.git", from: "0.9.0"),
 ]
 ```
 
@@ -119,7 +149,7 @@ quillView.finish()
 
 ## Supported Markdown
 
-Quill supports GFM (paragraphs, headings H1--H6, emphasis, inline code, links, images, unordered/ordered/task lists, blockquotes, fenced code blocks with highlighting, GFM tables, and thematic breaks). All inline content streams incrementally; tables and code blocks render after their closing token.
+Quill supports GFM (paragraphs, headings H1-H6, emphasis, inline code, links, images, unordered/ordered/task lists, blockquotes, fenced code blocks with highlighting, GFM tables, and thematic breaks). All inline content streams incrementally; tables and code blocks render after their closing token.
 
 [Full support matrix and streaming caveats](https://swiftpackageindex.com/krzyszt0xF/swift-quill/documentation/quillkit/supportedmarkdown)
 
@@ -181,7 +211,19 @@ Bring your own by conforming to `SyntaxHighlighting` or `ImageLoading`. [Integra
 
 ## Performance
 
-Measured on iPhone 15 Pro Max, iOS 26.4, Release build. Static render: under 1ms main-thread work (~870us). Streaming: 1.43ms average render, **zero dropped frames** across 2,552 updates. Memory: 0.75 MiB max variance across 3 stream-reset cycles. Parsing runs off the main thread; frozen-prefix architecture keeps per-chunk work bounded to the active tail. [Full methodology and raw measurements](Docs/Performance.md)
+*Measured on iPhone 15 Pro Max · iOS 26.4 · Release build*
+
+| Metric | Result |
+|--------|--------|
+| Static render | ~0.87 ms (main thread) |
+| Streaming render | ~1.43 ms avg |
+| Frame drops | **0 across 2,552 updates** |
+| Memory variance | ~0.75 MiB (3 stream cycles) |
+
+Parsing runs off the main thread.  
+Frozen-prefix architecture keeps per-chunk work bounded to the active tail.
+
+[Full methodology and raw measurements](Docs/Performance.md)
 
 ## Documentation
 
@@ -189,18 +231,16 @@ Measured on iPhone 15 Pro Max, iOS 26.4, Release build. Static render: under 1ms
 
 ## Examples
 
-- **[QuillDemo](Examples/QuillDemo/)** — interactive playground app demonstrating configuration, streaming presets, themes, and integrations. Clone and run on iOS Simulator.
+**[QuillDemo](Examples/QuillDemo/README.md)** — interactive playground app demonstrating configuration, streaming presets, themes, and integrations. Clone and run on iOS Simulator.
 
 ## Non-Goals
 
 In v1.x:
 
-- No Markdown editing -- Quill renders, it does not write.
+- No Markdown editing - Quill renders, it does not write.
 - No WebKit fallback.
 - No custom block plugin system.
 - No LaTeX or math rendering.
-- No row-by-row streamed tables (tables render after the closing row).
-- No incremental code highlighting before the closing fence.
 - No macOS, tvOS, watchOS, or visionOS support.
 
 These are deliberate scope decisions. If you need any of these, see [How Quill compares](#how-quill-compares) above, or [Docs/CompetitiveResearch.md](Docs/CompetitiveResearch.md) for the full comparison.

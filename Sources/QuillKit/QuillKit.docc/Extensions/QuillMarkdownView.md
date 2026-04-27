@@ -1,4 +1,4 @@
-# ``QuillMarkdownView``
+# QuillMarkdownView
 
 A SwiftUI view that renders complete, static Markdown.
 
@@ -38,15 +38,9 @@ This matters for features like displaying saved chat history.
 A rendered archive looks the same as the streamed original.
 Swapping from ``QuillStreamView`` to ``QuillMarkdownView`` after a stream completes is visually indistinguishable; readers cannot tell the difference.
 
-## Topics
+### Initializer
 
-### Creating a view
-
-- ``init(markdown:configuration:)``
-
-## ``init(markdown:configuration:)``
-
-Creates a static Markdown view.
+`init(markdown: String, configuration: QuillConfiguration = .default)` creates a static Markdown view.
 
 - Parameter markdown: The complete Markdown content to render.
 - Parameter configuration: Configuration controlling theme, streaming behavior, and image handling. Defaults to ``QuillConfiguration/default``. The streaming settings are ignored for static content but remain part of the configuration type for consistency with streaming views.

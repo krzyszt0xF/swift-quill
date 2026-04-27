@@ -1,10 +1,11 @@
 @testable import QuillKit
 import QuillCore
+import QuillSharedTestSupport
 import Testing
 import UIKit
 
 @MainActor
-@Suite("ImageAttachment", .tags(.rendering))
+@Suite("ImageAttachment", GloballySerialized(), .tags(.rendering))
 struct ImageAttachmentTests {
     @Test("Attachment stores block ID source and alt text")
     func identityAndPayload() {

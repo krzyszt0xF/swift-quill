@@ -7,7 +7,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("DocumentStreaming", .tags(.rendering, .streaming))
+@Suite("DocumentStreaming", GloballySerialized(), .tags(.rendering, .streaming))
 struct DocumentStreamingTests {
     @Test("Frozen prefix text is not mutated across updates")
     func frozenPrefixStability() {

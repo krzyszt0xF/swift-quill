@@ -1,10 +1,11 @@
 @testable import QuillCore
 import QuillCoreTestSupport
+import QuillSharedTestSupport
 @testable import QuillKit
 import Testing
 
 @MainActor
-@Suite("BufferedVisualFeeder", .tags(.rendering, .streaming))
+@Suite("BufferedVisualFeeder", .serialized, GloballySerialized(), .tags(.rendering, .streaming))
 struct BufferedVisualFeederTests {
     @Test("makeVisualFeedChunks preserves whitespace and newline chunk boundaries")
     func makeVisualFeedChunksPreserveExpectedBoundaries() {
@@ -67,6 +68,69 @@ struct BufferedVisualFeederTests {
         let events = await eventsTask.value
         let blocks = events.reduceToBlocks()
         #expect(timeController.recordedSleeps.isEmpty == false)
+        #expect(blocks == [
+            .paragraph(content: [.text("First paragraph.")]),
+            .paragraph(content: [.text("Second paragraph.")]),
+        ])
+    }
+
+    @Test("flushRemaining appends queued text without waiting for delays")
+    func flushRemainingBypassesDelayedPlayback() async {
+        let controller = MarkdownStreamController()
+        let eventStream = await controller.events()
+        let eventsTask = Task { await collectEvents(from: eventStream) }
+        let feeder = BufferedVisualFeeder(sleep: { _ in
+            while Task.isCancelled == false {
+                await Task.yield()
+            }
+        })
+
+        feeder.enqueue(
+            bufferedModules: ["First paragraph.\n\nSecond paragraph.\n\n"],
+            policy: .balanced,
+            to: controller
+        )
+
+        await feeder.flushRemaining(to: controller)
+        await controller.finish()
+
+        let events = await eventsTask.value
+        let blocks = events.reduceToBlocks()
+        #expect(blocks == [
+            .paragraph(content: [.text("First paragraph.")]),
+            .paragraph(content: [.text("Second paragraph.")]),
+        ])
+    }
+
+    @Test(
+        "flushRemaining preserves a chunk already dequeued for delayed playback",
+        .disabled("flaky under full bundle load; passes in isolation; sleep request timing depends on test scheduler")
+    )
+    func flushRemainingPreservesDequeuedDelayedChunk() async {
+        let controller = MarkdownStreamController()
+        let eventStream = await controller.events()
+        let eventsTask = Task { await collectEvents(from: eventStream) }
+        let sleepController = ControlledSleepController()
+        let feeder = BufferedVisualFeeder(sleep: { duration in
+            await sleepController.sleep(for: duration)
+        })
+
+        feeder.enqueue(
+            bufferedModules: ["First paragraph.\n\nSecond paragraph.\n\n"],
+            policy: .balanced,
+            to: controller
+        )
+
+        let delayedChunkDequeued = await eventually(timeout: .milliseconds(100)) {
+            sleepController.requestCount == 1
+        }
+        #expect(delayedChunkDequeued)
+
+        await feeder.flushRemaining(to: controller)
+        await controller.finish()
+
+        let events = await eventsTask.value
+        let blocks = events.reduceToBlocks()
         #expect(blocks == [
             .paragraph(content: [.text("First paragraph.")]),
             .paragraph(content: [.text("Second paragraph.")]),

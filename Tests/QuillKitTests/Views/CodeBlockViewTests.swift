@@ -4,7 +4,7 @@ import Testing
 import UIKit
 
 @MainActor
-@Suite("CodeBlockView", .tags(.rendering))
+@Suite("CodeBlockView", GloballySerialized(), .tags(.rendering))
 struct CodeBlockViewTests {
     private static let minimumVisibleHeight: CGFloat = 36
     private static let testWidth: CGFloat = 320

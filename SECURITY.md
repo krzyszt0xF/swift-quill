@@ -4,10 +4,10 @@
 
 | Version | Supported |
 |---------|-----------|
-| 1.0.x   | Yes (after 1.0.0 release) |
-| < 1.0   | Pre-release — use latest `main` |
+| 0.9.x   | Yes (pre-release; expect one API change before 1.0) |
+| < 0.9   | No — please upgrade or pin to latest `main` |
 
-After 1.0, the latest minor version receives security fixes. Older minor versions are not backported unless explicitly stated in the release notes.
+After 1.0, the latest minor version will receive security fixes. Older minor versions will not be backported unless explicitly stated in the release notes.
 
 ## Reporting a vulnerability
 

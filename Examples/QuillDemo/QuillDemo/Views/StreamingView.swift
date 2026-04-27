@@ -8,6 +8,7 @@ struct StreamingView: View {
     let config: PlaygroundConfig
 
     @State private var streamID = UUID()
+    @State private var streamHandle = QuillStreamHandle()
     @State private var chunkStream: AsyncStream<String> = emptyStream
     @State private var runState: RunState = .idle
     @State private var showInspector = false
@@ -63,42 +64,72 @@ struct StreamingView: View {
 }
 
 private extension StreamingView {
+    static let bottomAnchorID = "bottom"
+
     static var emptyStream: AsyncStream<String> {
         AsyncStream { $0.finish() }
     }
 
     var controlBar: some View {
-        Button {
-            start()
-        } label: {
-            Label("Restart", systemImage: "arrow.clockwise")
-                .frame(maxWidth: .infinity)
+        HStack(spacing: 12) {
+            Button {
+                start()
+            } label: {
+                Label("Restart", systemImage: "arrow.clockwise")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+
+            Button {
+                cancelCurrentStream()
+            } label: {
+                Label("Cancel", systemImage: "stop.circle")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(runState != .streaming)
         }
-        .buttonStyle(.borderedProminent)
         .padding()
         .background(.bar)
     }
 
     var renderedArea: some View {
-        ScrollView {
-            QuillStreamView(
-                chunks: chunkStream,
-                streamID: streamID,
-                configuration: config.makeQuillConfiguration()
-            )
-            .quill.setHighlighter(config.syntaxHighlightingEnabled ? SyntaxHighlighter.default : nil)
-            .quill.setImageLoader(config.imageLoadingEnabled ? ImageLoader.default : nil)
-            .quill.onStreamFinished {
-                if runState == .streaming {
-                    runState = .completed
+        ScrollViewReader { proxy in
+            ScrollView {
+                QuillStreamView(
+                    chunks: chunkStream,
+                    streamID: streamID,
+                    configuration: config.makeQuillConfiguration(),
+                    handle: streamHandle
+                )
+                .quill.setHighlighter(config.syntaxHighlightingEnabled ? SyntaxHighlighter.default : nil)
+                .quill.setImageLoader(config.imageLoadingEnabled ? ImageLoader.default : nil)
+                .quill.onStreamFinished {
+                    if runState == .streaming {
+                        runState = .completed
+                    }
                 }
+                .padding(.horizontal)
+
+                Color.clear
+                    .frame(height: 0)
+                    .id(Self.bottomAnchorID)
             }
-            .padding(.horizontal)
+            .onChange(of: elapsed) { _, _ in
+                guard runState == .streaming else { return }
+                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+            }
         }
     }
 }
 
 private extension StreamingView {
+    func cancelCurrentStream() {
+        streamHandle.cancelStreaming()
+        runState = .completed
+        streamStartedAt = nil
+    }
+
     func start() {
         streamID = UUID()
         chunkStream = ChunkStream.stream(
