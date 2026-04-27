@@ -53,7 +53,7 @@ The frozen prefix never needs to re-parse because, by definition, nothing in it 
 
 The streaming API exposes four methods on ``QuillView``. SwiftUI wrappers (``QuillStreamView``) drive the same lifecycle automatically from an `AsyncSequence<String>`.
 
-### `append(_:)`
+### append(_:)
 
 ``QuillView/append(_:)`` delivers a Markdown chunk to the stream.
 The chunk is appended to the tail buffer.
@@ -64,7 +64,7 @@ Chunks can be any size.
 A single character, a word, a full paragraph, or an entire code block -- the pipeline handles all of them.
 For an AsyncSequence-backed SwiftUI integration, ``QuillStreamView`` calls ``QuillView/append(_:)`` once per element in the sequence.
 
-### `finish()`
+### finish()
 
 ``QuillView/finish()`` signals that the stream has ended.
 Any content still in the tail buffer flushes as final blocks.
@@ -72,14 +72,14 @@ Enrichment tasks (syntax highlighting, image loading) continue in the background
 
 Call ``QuillView/finish()`` when your upstream `AsyncSequence` completes, when the LLM API signals `[DONE]`, or when you want to commit whatever has arrived so far as the final render.
 
-### `reset()`
+### reset()
 
 ``QuillView/reset()`` clears all rendered content and cancels any in-flight work -- parsing, highlighting, image loading.
 The view returns to an empty state, ready to accept a new stream.
 
 Call ``QuillView/reset()`` when starting a new response that should replace the current one entirely. In SwiftUI, changing the `streamID` on ``QuillStreamView`` performs an equivalent reset automatically.
 
-### `cancelStreaming()`
+### cancelStreaming()
 
 ``QuillView/cancelStreaming()`` cancels active work without clearing already-rendered content.
 The frozen prefix stays visible.

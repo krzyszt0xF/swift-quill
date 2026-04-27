@@ -39,14 +39,14 @@ private extension ConfigView {
             }
         }
     }
-    
+
     var integrationsSection: some View {
         Section("Integrations") {
             Toggle("Syntax highlighting", isOn: $config.syntaxHighlightingEnabled)
             Toggle("Image loading", isOn: $config.imageLoadingEnabled)
         }
     }
-    
+
     var renderingSection: some View {
         Section("Rendering") {
             Picker("Preset", selection: $config.preset) {
@@ -61,7 +61,7 @@ private extension ConfigView {
             }
         }
     }
-    
+
     var scenarioSection: some View {
         Section("Scenario") {
             Picker("Scenario", selection: $config.scenario) {

@@ -81,7 +81,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Verify .spi.yml present
-        run: test -f .spi.yml
+        run: |
+          test -f .spi.yml
+          test -s .spi.yml
 
       - name: Validate YAML syntax
-        run: python3 -c "import yaml; yaml.safe_load(open('.spi.yml'))"
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 -c "import yaml; yaml.safe_load(open('.spi.yml'))"

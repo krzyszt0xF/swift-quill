@@ -1,4 +1,4 @@
-# ``QuillStreamView``
+# QuillStreamView
 
 A SwiftUI view that renders streaming Markdown from an `AsyncSequence`.
 
@@ -61,19 +61,9 @@ Pair `onError` with your app's error UI to surface failures to the user.
 Do not call ``QuillView/finish()`` in response to an error -- the partial content has already rendered, and `finish` semantics ("stream completed normally") do not apply.
 The preserved partial content is Quill's way of handling the "stream stopped unexpectedly" case.
 
-## Topics
+### Initializer
 
-### Creating a stream view
-
-- ``init(chunks:streamID:configuration:onError:)``
-
-### Internal coordination
-
-- ``Coordinator``
-
-## ``init(chunks:streamID:configuration:onError:)``
-
-Creates a streaming Markdown view.
+`init(chunks:streamID:configuration:onError:)` creates a streaming Markdown view.
 
 - Parameter chunks: The source of Markdown chunks. Any `AsyncSequence<String>` conforming to `Sendable`. Can be finite (completes when the sequence ends) or effectively infinite (runs until `streamID` changes or the view is deallocated).
 - Parameter streamID: A stable identifier for this stream. When the ID changes, the view resets and subscribes to the new stream. Defaults to `nil`.
@@ -88,15 +78,15 @@ It is not invoked for normal completion (non-throwing end of sequence) -- for co
 
 For user-driven stop actions in SwiftUI, create a ``QuillStreamHandle``, pass it into the initializer, and call `cancelStreaming()` on the handle.
 
-## ``Coordinator``
+### Coordinator
 
 The coordinator managing the underlying ``QuillView`` instance and stream subscription.
 
-``Coordinator`` is an implementation detail exposed because SwiftUI's `UIViewRepresentable` protocol surfaces it.
+`Coordinator` is an implementation detail exposed because SwiftUI's `UIViewRepresentable` protocol surfaces it.
 It manages the lifetime of the chunk subscription and delivers chunks to the underlying ``QuillView``.
 The coordinator also handles `streamID` changes by cancelling the previous subscription and starting a new one on the existing underlying view.
 
-Applications typically do not interact with ``Coordinator`` directly.
+Applications typically do not interact with `Coordinator` directly.
 It is documented here because it appears in the public symbol graph.
 
 The coordinator holds a reference to the ``QuillView`` it manages, allowing SwiftUI to re-use the same underlying UIKit view across state updates.

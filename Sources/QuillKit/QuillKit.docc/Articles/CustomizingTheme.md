@@ -34,7 +34,7 @@ Body has just font and text color; code block has eleven properties covering the
 
 ## Built-in presets
 
-### ``QuillTheme/default``
+### default
 
 The neutral baseline.
 Body text uses `.systemFont(ofSize: 16)`; heading font weights descend from bold (H1, H2) to semibold (H3, H4) to medium (H5, H6), scaled via `heading.fontScales` relative multipliers.
@@ -43,7 +43,7 @@ Code blocks use Menlo 14 (falling back to `.monospacedSystemFont`) on a `systemB
 
 Use the default preset when your app has no strong visual brand, or as a starting point before overriding specific tokens.
 
-### ``QuillTheme/github``
+### github
 
 Mirrors GitHub's rendered Markdown style.
 All six heading levels use `.semibold` weight; link color uses a `UIColor` dynamic provider that adapts between a light-mode blue and a dark-mode brighter blue.

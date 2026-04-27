@@ -324,7 +324,7 @@ Pair recorded streams with ``QuillStreamingPreset/snappy`` to ensure every chunk
 
 ## Protocol reference summary
 
-### ``SyntaxHighlighting``
+### SyntaxHighlighting
 
 ```swift
 public protocol SyntaxHighlighting: Sendable {
@@ -336,7 +336,7 @@ One method.
 `language` is the fence tag as written in the Markdown (may be empty).
 Return `nil` to fall back to plain code block rendering when the language is unrecognized or highlighting fails.
 
-### ``ImageLoading``
+### ImageLoading
 
 ```swift
 public protocol ImageLoading: Sendable {

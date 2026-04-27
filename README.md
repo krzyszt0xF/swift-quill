@@ -231,7 +231,7 @@ Frozen-prefix architecture keeps per-chunk work bounded to the active tail.
 
 ## Examples
 
-**[QuillDemo](Examples/QuillDemo/)** — interactive playground app demonstrating configuration, streaming presets, themes, and integrations. Clone and run on iOS Simulator.
+**[QuillDemo](Examples/QuillDemo/README.md)** — interactive playground app demonstrating configuration, streaming presets, themes, and integrations. Clone and run on iOS Simulator.
 
 ## Non-Goals
 
