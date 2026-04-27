@@ -51,7 +51,12 @@ jobs:
 
       - name: Fail on DocC warnings
         run: |
-          if grep -Ei "warning:.*(docc|documentation|unresolved|does not resolve|doesn't resolve|could not resolve|couldn't resolve|could not be resolved|couldn't be resolved|cannot resolve|unable to resolve|unknown symbol|no symbol matched|broken reference)" docbuild.log; then
+          # Filter out vendored dependencies (build/SourcePackages/checkouts/...) so we only
+          # gate on warnings emitted from our own sources. The grep pattern is intentionally
+          # broad and would otherwise match transitive deps' Swift doc comments such as
+          # "Remove return value documentation."
+          if grep -Ei "warning:.*(docc|documentation|unresolved|does not resolve|doesn't resolve|could not resolve|couldn't resolve|could not be resolved|couldn't be resolved|cannot resolve|unable to resolve|unknown symbol|no symbol matched|broken reference)" docbuild.log \
+              | grep -v "/build/SourcePackages/checkouts/"; then
             echo "DocC emitted warnings (broken references or syntax issues)"
             exit 1
           fi
