@@ -1,6 +1,3 @@
-// Internal configuration; not part of public API despite the API/ path segment.
-// Scheduled for relocation post-1.0.0 (see Docs/ExternalAudit.md).
-
 import Foundation
 
 struct BufferedStreamConfiguration: Equatable, Sendable {
