@@ -147,10 +147,21 @@ public final class QuillView: UIView {
 }
 
 private extension QuillView {
+    /// Inputs at or below this UTF-8 byte size parse synchronously so content is applied before
+    /// SwiftUI measures (Issue 01). Internal heuristic, not consumer-configurable.
+    static let synchronousInitialParseThreshold = 16_384
+
     nonisolated static func makeStaticBlocks(
         from source: String,
         parser: MarkdownParser
     ) async -> [BlockNode] {
+        parseBlocks(from: source, parser: parser)
+    }
+
+    nonisolated static func parseBlocks(
+        from source: String,
+        parser: MarkdownParser
+    ) -> [BlockNode] {
         let signpostID = QuillSignpost.parse.makeSignpostID()
         let signpostState = QuillSignpost.parse.beginInterval("parseStatic", id: signpostID)
         let blocks = parser.parse(source)
@@ -172,6 +183,15 @@ private extension QuillView {
 
         let parser = markdownParser
         let config = activeConfiguration
+
+        // Parse small inputs synchronously so content is applied before SwiftUI's `.fixedSize`
+        // measure; larger inputs stay on the background task (Issue 01).
+        if source.utf8.count <= Self.synchronousInitialParseThreshold {
+            let blocks = Self.parseBlocks(from: source, parser: parser)
+            streamCoordinator.renderStatic(blocks: blocks, configuration: config)
+            return
+        }
+
         staticParseTask = Task {
             let blocks = await Self.makeStaticBlocks(from: source, parser: parser)
 
