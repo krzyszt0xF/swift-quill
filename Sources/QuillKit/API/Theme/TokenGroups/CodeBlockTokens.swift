@@ -3,7 +3,7 @@ import UIKit
 public extension QuillTheme {
     // @unchecked Sendable: UIFont and UIColor are not Sendable; CodeBlock values are immutable snapshots once constructed and carried across actor boundaries without mutation.
     /// Code block is a mutable value treated as read-only after cross-actor handoff.
-    struct CodeBlock: @unchecked Sendable {
+    struct CodeBlock: @unchecked Sendable, Equatable {
         public var backgroundColor: UIColor
         public var borderColor: UIColor
         public var borderWidth: CGFloat

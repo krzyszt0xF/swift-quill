@@ -6,6 +6,7 @@ public final class QuillView: UIView {
     public private(set) var accumulatedMarkdown: String?
     public var configuration = QuillConfiguration.default {
         didSet {
+            guard configuration != oldValue else { return }
             guard
                 streamCoordinator.hasActiveController == false,
                 markdown != nil || accumulatedMarkdown != nil

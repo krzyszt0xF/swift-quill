@@ -3,7 +3,7 @@ import UIKit
 // @unchecked Sendable: composed of token groups that hold non-Sendable UIKit types (UIFont, UIColor);
 // the theme value is treated as an immutable snapshot once constructed and is never mutated across actor boundaries.
 /// Product-facing visual theme for Quill rendering, treated as an immutable sendable snapshot.
-public struct QuillTheme: @unchecked Sendable {
+public struct QuillTheme: @unchecked Sendable, Equatable {
     public var blockquote: Blockquote
     public var body: Body
     public var codeBlock: CodeBlock

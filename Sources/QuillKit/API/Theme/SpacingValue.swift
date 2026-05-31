@@ -1,7 +1,7 @@
 import CoreGraphics
 
 /// Spacing token that can be absolute or relative to the body font size.
-public enum SpacingValue: Sendable {
+public enum SpacingValue: Sendable, Equatable {
     case absolute(CGFloat)
     case relative(CGFloat)
 

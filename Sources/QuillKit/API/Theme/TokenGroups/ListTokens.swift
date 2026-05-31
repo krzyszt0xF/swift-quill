@@ -3,7 +3,7 @@ import Foundation
 public extension QuillTheme {
     // @unchecked Sendable: the stored property types (String, SpacingValue) are themselves Sendable, but unchecked conformance is used for consistency with sibling token groups that hold non-Sendable UIKit types. List values are immutable snapshots once constructed.
     /// List is a mutable value treated as read-only after cross-actor handoff.
-    struct List: @unchecked Sendable {
+    struct List: @unchecked Sendable, Equatable {
         public var bulletMarker: String
         public var checkedMarker: String
         public var indentPerLevel: SpacingValue

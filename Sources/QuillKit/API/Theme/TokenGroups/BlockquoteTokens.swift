@@ -3,7 +3,7 @@ import UIKit
 public extension QuillTheme {
     // @unchecked Sendable: UIColor is not Sendable; Blockquote values are immutable snapshots once constructed and carried across actor boundaries without mutation.
     /// Blockquote is a mutable value treated as read-only after cross-actor handoff.
-    struct Blockquote: @unchecked Sendable {
+    struct Blockquote: @unchecked Sendable, Equatable {
         public var barColor: UIColor
         public var barCornerRadius: CGFloat
         public var barLeadingInset: CGFloat
