@@ -192,27 +192,31 @@ private extension TableSurfaceView {
 }
 
 extension TableSurfaceView: UIEditMenuInteractionDelegate {
-    func editMenuInteraction(
+    nonisolated func editMenuInteraction(
         _ interaction: UIEditMenuInteraction,
         menuFor configuration: UIEditMenuConfiguration,
         suggestedActions: [UIMenuElement]
     ) -> UIMenu? {
-        guard selection != nil else { return nil }
+        executeIsolated {
+            guard selection != nil else { return nil }
 
-        let copyAction = UIAction(title: "Copy") { [weak self] _ in
-            self?.copy(nil)
-        }
-        let shareAction = UIAction(title: "Share") { [weak self] _ in
-            self?.share(nil)
-        }
+            let copyAction = UIAction(title: "Copy") { [weak self] _ in
+                self?.copy(nil)
+            }
+            let shareAction = UIAction(title: "Share") { [weak self] _ in
+                self?.share(nil)
+            }
 
-        return UIMenu(children: [copyAction, shareAction])
+            return UIMenu(children: [copyAction, shareAction])
+        }
     }
 
-    func editMenuInteraction(
+    nonisolated func editMenuInteraction(
         _ interaction: UIEditMenuInteraction,
         targetRectFor configuration: UIEditMenuConfiguration
     ) -> CGRect {
-        convert(canvasView.menuTargetRect ?? .zero, from: canvasView)
+        executeIsolated {
+            convert(canvasView.menuTargetRect ?? .zero, from: canvasView)
+        }
     }
 }
