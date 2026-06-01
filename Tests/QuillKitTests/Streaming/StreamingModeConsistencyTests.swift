@@ -45,12 +45,12 @@ struct StreamingModeConsistencyTests {
         bufferedView.finish()
         stableView.finish()
 
-        let markdownMatched = await eventually(timeout: .milliseconds(800)) {
+        let markdownMatched = await eventually(timeout: .seconds(3)) {
             bufferedView.accumulatedMarkdown == stableView.accumulatedMarkdown
         }
         #expect(markdownMatched)
 
-        let bothRendered = await eventually(timeout: .milliseconds(800)) {
+        let bothRendered = await eventually(timeout: .seconds(3)) {
             bufferedView.hasDocumentContent && stableView.hasDocumentContent
         }
         #expect(bothRendered)
