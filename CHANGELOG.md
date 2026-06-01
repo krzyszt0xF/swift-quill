@@ -1,5 +1,22 @@
 # Changelog
 
+## Quill 0.9.1
+
+*May 2026*
+
+Build and rendering fixes from a consumer audit. 0.9.x now builds under Swift strict concurrency (`complete`); 0.9.0 did not.
+
+### Fixed
+
+- Build failure under strict concurrency: `TableSurfaceView`'s `UIEditMenuInteractionDelegate` conformance crossed main-actor isolation (Issue 00).
+- Static `QuillMarkdownView` code blocks rendered without syntax colors — the async highlight result was orphaned when SwiftUI re-applied the highlighter on update (Issue 06).
+
+### Changed
+
+- Small static markdown (≤16 KB) now parses synchronously, so the view reports its real height immediately under SwiftUI `.fixedSize` instead of collapsing (Issue 01).
+- Code-block background and syntax palette now adapt to the light/dark interface style (Issue 03).
+- End-of-stream reveal drains at the normal pace instead of a final burst; consequently `onStreamFinished` now fires after the reveal completes (Issue 04).
+
 ## Quill 0.9.0
 
 *April 2026*

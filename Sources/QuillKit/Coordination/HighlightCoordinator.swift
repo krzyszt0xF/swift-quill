@@ -27,10 +27,15 @@ final class HighlightCoordinator {
         cache.removeAllObjects()
     }
 
-    func scheduleHighlight(blockID: BlockIdentity, code: String, language: String) {
+    func scheduleHighlight(
+        blockID: BlockIdentity,
+        code: String,
+        language: String,
+        userInterfaceStyle: UIUserInterfaceStyle = .unspecified
+    ) {
         guard let highlighter else { return }
 
-        let cacheKey = "\(language):\(code)"
+        let cacheKey = "\(userInterfaceStyle.rawValue):\(language):\(code)"
         if let cached = cache.object(forKey: cacheKey as NSString) {
             let snapshot = HighlightedCodeSnapshot(cached)
             let sink = highlightStoreState.storeResult(snapshot, for: blockID)
@@ -42,7 +47,7 @@ final class HighlightCoordinator {
         pendingBlockRequests[blockID] = requestID
 
         highlightQueue.async {
-            let result = highlighter.highlight(code: code, language: language)
+            let result = highlighter.highlight(code: code, language: language, userInterfaceStyle: userInterfaceStyle)
 
             Task { @MainActor [weak self] in
                 self?.applyBlockHighlightResult(
@@ -58,7 +63,11 @@ final class HighlightCoordinator {
     func set(highlighter: (any SyntaxHighlighting)?) {
         self.highlighter = highlighter
         highlightStoreState.setPresentationEnabled(highlighter != nil)
-        pendingBlockRequests.removeAll()
+        // Only drop in-flight requests when the highlighter is removed; SwiftUI re-applies the same
+        // highlighter every updateUIView, and clearing here would orphan an in-flight static highlight.
+        if highlighter == nil {
+            pendingBlockRequests.removeAll()
+        }
     }
 }
 

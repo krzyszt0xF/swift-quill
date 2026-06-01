@@ -25,7 +25,7 @@ struct BufferedStreamingModeTests {
         #expect(timeController.recordedSleeps.isEmpty == false)
 
         view.append(String(repeating: "b", count: 220) + "\n\n")
-        let renderedContent = await eventually(timeout: .milliseconds(200)) {
+        let renderedContent = await eventually(timeout: .seconds(3)) {
             view.hasDocumentContent
         }
 
@@ -58,7 +58,7 @@ struct BufferedStreamingModeTests {
         #expect(timeController.recordedSleeps.count >= 3)
 
         view.append(String(repeating: "k", count: 220) + "\n\n")
-        let renderedContent = await eventually(timeout: .milliseconds(200)) {
+        let renderedContent = await eventually(timeout: .seconds(3)) {
             view.hasDocumentContent
         }
 

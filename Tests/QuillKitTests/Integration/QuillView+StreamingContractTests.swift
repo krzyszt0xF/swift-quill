@@ -29,7 +29,7 @@ struct QuillViewStreamingContractTests {
         let staticContentRendered = await eventually {
             staticView.hasDocumentContent
         }
-        let codeBlockRendered = await eventually(timeout: .milliseconds(1200)) {
+        let codeBlockRendered = await eventually(timeout: .seconds(3)) {
             streamedView.hasCodeBlockAttachment
         }
 
@@ -153,7 +153,7 @@ struct QuillViewStreamingContractTests {
         view.append(markdown)
         view.finish()
 
-        let highlightedInitially = await eventually(timeout: .milliseconds(1200)) {
+        let highlightedInitially = await eventually(timeout: .seconds(3)) {
             highlightedKeywordColor(in: view) == UIColor.systemRed
         }
         #expect(highlightedInitially)
@@ -163,7 +163,7 @@ struct QuillViewStreamingContractTests {
         let currentConfiguration = view.configuration
         view.configuration = currentConfiguration
 
-        let highlightPreserved = await eventually(timeout: .milliseconds(1200)) {
+        let highlightPreserved = await eventually(timeout: .seconds(3)) {
             highlightedKeywordColor(in: view) == UIColor.systemRed
         }
         #expect(highlightPreserved)

@@ -117,10 +117,13 @@ extension StreamCoordinator {
                 }
             }
 
-            await self.bufferedVisualFeeder.flushRemaining(to: streamController)
+            await self.bufferedVisualFeeder.waitUntilDrained()
+
+            guard !Task.isCancelled, self.streamGeneration == generation else { return }
+
             await streamController.finish()
             await task?.value
-            guard self.streamGeneration == generation else { return }
+            guard !Task.isCancelled, self.streamGeneration == generation else { return }
             self.renderer.updateSelectionGate(isStreaming: false)
             self.invalidateHeight(for: .streamFinished)
             self.onStreamFinished?()

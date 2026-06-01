@@ -1,7 +1,7 @@
 import Foundation
 
 /// Product-facing configuration shared by UIKit and SwiftUI Quill surfaces.
-public struct QuillConfiguration {
+public struct QuillConfiguration: Equatable {
     public var images: Images
     public var streaming: Streaming
     public var theme: QuillTheme
@@ -48,7 +48,7 @@ public extension QuillConfiguration {
         Self()
     }
 
-    struct Images {
+    struct Images: Equatable {
         public var retryEnabled: Bool
 
         public init(retryEnabled: Bool = true) {
@@ -56,7 +56,7 @@ public extension QuillConfiguration {
         }
     }
 
-    struct Streaming {
+    struct Streaming: Equatable {
         public var mode: StreamingMode
         public var preset: QuillStreamingPreset
 

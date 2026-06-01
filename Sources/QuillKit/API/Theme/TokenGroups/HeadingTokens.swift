@@ -3,7 +3,7 @@ import UIKit
 public extension QuillTheme {
     // @unchecked Sendable: UIFont.Weight is not Sendable; Heading values are immutable snapshots once constructed and carried across actor boundaries without mutation.
     /// Heading is a mutable value treated as read-only after cross-actor handoff.
-    struct Heading: @unchecked Sendable {
+    struct Heading: @unchecked Sendable, Equatable {
         public var fontScales: [SpacingValue]
         public var fontWeights: [UIFont.Weight]
         public var spacingBefore: SpacingValue

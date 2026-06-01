@@ -104,79 +104,26 @@ struct QuillMarkdownViewTests {
         #expect(tappedURL == URL(string: "https://example.com"))
     }
 
-    @Test(
-        "stacked static markdown views expand to their rendered content height",
-        .disabled("flaky under full bundle load; passes in isolation; tracked for follow-up")
-    )
-    func stackedStaticMarkdownViewsExpand() async throws {
-        let markdown = """
-        This is a fairly long paragraph that should wrap across several lines when rendered at
-        a typical mobile width. The content needs enough length to prove each bubble expands
-        after the asynchronous static render completes, instead of collapsing to a single line.
-        """
-        let host = UIHostingController(
-            rootView: VStack(spacing: 16) {
-                ForEach(0..<3, id: \.self) { _ in
-                    QuillMarkdownView(markdown: markdown)
-                }
+    @Test("static markdown reports its expanded content height synchronously (Issue 01)")
+    func staticMarkdownReportsHonestFittedHeightSynchronously() {
+        let proposal = ProposedViewSize(width: 320, height: nil)
+
+        func fittedHeight(forMarkdown markdown: String?) -> CGFloat {
+            let view = QuillView(frame: CGRect(x: 0, y: 0, width: 320, height: 0))
+            if let markdown {
+                QuillMarkdownView(markdown: markdown).applyConfiguration(to: view)
             }
-            .frame(width: 375, height: 800, alignment: .topLeading)
-        )
-
-        host.loadViewIfNeeded()
-        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 375, height: 800))
-        window.rootViewController = host
-        window.makeKeyAndVisible()
-        host.view.frame = window.bounds
-        host.view.bounds = window.bounds
-        host.view.setNeedsLayout()
-        host.view.layoutIfNeeded()
-
-        let rendered = await eventually {
-            host.view.setNeedsLayout()
-            host.view.layoutIfNeeded()
-
-            let quillViews = host.view.allSubviews(of: QuillView.self)
-            guard quillViews.count == 3 else { return false }
-
-            return quillViews.allSatisfy { quillView in
-                guard
-                    let textView = quillView.firstSubview(of: DocumentTextView.self),
-                    let attributedString = textView.contentStorage?.attributedString
-                else {
-                    return false
-                }
-
-                return attributedString.length > 0
-            }
-        }
-        #expect(rendered)
-
-        host.view.setNeedsLayout()
-        host.view.layoutIfNeeded()
-
-        let quillViews = host.view
-            .allSubviews(of: QuillView.self)
-            .sorted {
-                $0.convert($0.bounds, to: host.view).minY <
-                    $1.convert($1.bounds, to: host.view).minY
-            }
-        #expect(quillViews.count == 3)
-
-        for quillView in quillViews {
-            let textView = try #require(quillView.firstSubview(of: DocumentTextView.self))
-            textView.invalidateIntrinsicContentSize()
-            let expectedHeight = ceil(textView.intrinsicContentSize.height)
-
-            #expect(quillView.bounds.height >= expectedHeight - 1)
-            #expect(quillView.bounds.height > 40)
+            return view.calculateFittedSize(for: proposal)?.height ?? 0
         }
 
-        for (previous, next) in zip(quillViews, quillViews.dropFirst()) {
-            let previousFrame = previous.convert(previous.bounds, to: host.view)
-            let nextFrame = next.convert(next.bounds, to: host.view)
-            #expect(nextFrame.minY >= previousFrame.maxY)
-        }
+        let multiLine = (1...8).map { "Paragraph number \($0)." }.joined(separator: "\n\n")
+
+        let emptyHeight = fittedHeight(forMarkdown: nil)
+        let oneLineHeight = fittedHeight(forMarkdown: "Single line of content.")
+        let multiLineHeight = fittedHeight(forMarkdown: multiLine)
+
+        #expect(oneLineHeight > emptyHeight)
+        #expect(multiLineHeight > oneLineHeight)
     }
 }
 
@@ -194,21 +141,5 @@ private extension QuillMarkdownViewTests {
     func expectedFallbackWidth(for view: QuillView) -> CGFloat {
         let screenWidth = view.window?.screen.bounds.width ?? UIScreen.main.bounds.width
         return max(view.bounds.width, screenWidth)
-    }
-}
-
-private extension UIView {
-    @MainActor
-    func allSubviews<T: UIView>(of type: T.Type) -> [T] {
-        var matches = subviews.compactMap { $0 as? T }
-        for subview in subviews {
-            matches += subview.allSubviews(of: type)
-        }
-        return matches
-    }
-
-    @MainActor
-    func firstSubview<T: UIView>(of type: T.Type) -> T? {
-        allSubviews(of: type).first
     }
 }

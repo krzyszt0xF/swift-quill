@@ -166,7 +166,7 @@ struct StreamCoordinatorTests {
 
         coordinator.finish(configuration: configuration)
 
-        let rendered = await eventually(timeout: .milliseconds(800)) {
+        let rendered = await eventually(timeout: .seconds(3)) {
             renderer.textView.contentStorage?.attributedString?.string.contains("Buffered content") == true
         }
 
