@@ -16,8 +16,8 @@ public extension QuillTheme {
                 textColor: .label
             ),
             codeBlock: .init(
-                backgroundColor: .systemBackground,
-                borderColor: UIColor.separator.withAlphaComponent(0.14),
+                backgroundColor: .secondarySystemBackground,
+                borderColor: UIColor.separator.withAlphaComponent(0.30),
                 borderWidth: 1,
                 copyButtonTint: .label,
                 cornerRadius: 20,

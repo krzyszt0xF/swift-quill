@@ -1,4 +1,5 @@
 import QuillCore
+import UIKit
 
 extension DocumentRenderer {
     func scheduleHighlightsForNewlyFrozenCodeBlocks(
@@ -8,12 +9,15 @@ extension DocumentRenderer {
     ) {
         guard newFrozenCount > previousFrozenCount else { return }
 
+        let userInterfaceStyle = textView.traitCollection.userInterfaceStyle
+
         for index in previousFrozenCount..<min(newFrozenCount, blocks.count) {
             for codeBlock in makeHighlightedCodeBlocks(from: blocks[index]) {
                 highlightCoordinator.scheduleHighlight(
                     blockID: codeBlock.blockID,
                     code: codeBlock.code,
-                    language: codeBlock.language
+                    language: codeBlock.language,
+                    userInterfaceStyle: userInterfaceStyle
                 )
             }
         }

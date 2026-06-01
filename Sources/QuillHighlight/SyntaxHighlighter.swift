@@ -10,7 +10,15 @@ public struct SyntaxHighlighter: SyntaxHighlighting, Sendable {
     }
 
     public func highlight(code: String, language: String) -> NSAttributedString? {
-        engine.highlight(code: code, language: language)
+        engine.highlight(code: code, language: language, userInterfaceStyle: .unspecified)
+    }
+
+    public func highlight(
+        code: String,
+        language: String,
+        userInterfaceStyle: UIUserInterfaceStyle
+    ) -> NSAttributedString? {
+        engine.highlight(code: code, language: language, userInterfaceStyle: userInterfaceStyle)
     }
 }
 
