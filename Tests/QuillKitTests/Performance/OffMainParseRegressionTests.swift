@@ -26,9 +26,11 @@ struct OffMainParseRegressionTests {
     func rapidMarkdownReassignmentUsesLatestValue() async {
         let latch = OffMainParseLatch()
         let view = makeQuillView(parser: makeLatchParser(latch: latch))
+        let first = makeLargeStaticMarkdown(marker: "FirstDoc")
+        let second = makeLargeStaticMarkdown(marker: "SecondDoc")
 
-        view.markdown = "First"
-        view.markdown = "Second"
+        view.markdown = first
+        view.markdown = second
 
         latch.releaseAll()
 
@@ -36,21 +38,23 @@ struct OffMainParseRegressionTests {
             view.hasDocumentContent
         }
 
-        #expect(view.accumulatedMarkdown == "Second")
+        #expect(view.accumulatedMarkdown == second)
         #expect(rendered)
 
         let documentText = renderedDocumentText(from: view)
-        #expect(documentText?.contains("First") != true)
+        #expect(documentText?.contains("FirstDoc") != true)
     }
 
+    // Still disabled: the >16 KB async fixture pushes the appended chunk past what smoothedTail
+    // reveals within the timeout; needs a reworked assertion.
     @Test(
         "Append cancels in-flight static parse",
-        .disabled("flaky under full bundle load; passes in isolation; tracked for follow-up")
+        .disabled("appended chunk lands past the smoothedTail reveal window for a >16 KB async fixture")
     )
     func appendCancelsInflightStaticParse() async {
         let latch = OffMainParseLatch()
         let view = makeQuillView(parser: makeLatchParser(latch: latch))
-        let longFixture = makeQuillIntegrationLargeMarkdown()
+        let longFixture = makeLargeStaticMarkdown(marker: "AppendDoc")
 
         view.markdown = longFixture
         view.append("streaming chunk\n\n")
@@ -75,7 +79,7 @@ struct OffMainParseRegressionTests {
     func resetCancelsInflightStaticParse() async {
         let latch = OffMainParseLatch()
         let view = makeQuillView(parser: makeLatchParser(latch: latch))
-        let longFixture = makeQuillIntegrationLargeMarkdown()
+        let longFixture = makeLargeStaticMarkdown(marker: "ResetDoc")
 
         view.markdown = longFixture
         view.reset()
@@ -110,8 +114,9 @@ struct OffMainParseRegressionTests {
     func configurationChangeCancelsPendingStaticParse() async {
         let latch = OffMainParseLatch()
         let view = makeQuillView(parser: makeLatchParser(latch: latch))
+        let original = makeLargeStaticMarkdown(marker: "OriginalDoc")
 
-        view.markdown = "# Original"
+        view.markdown = original
 
         var updated = view.configuration
         updated.streaming.preset = .snappy
@@ -124,7 +129,7 @@ struct OffMainParseRegressionTests {
         }
 
         #expect(rendered)
-        #expect(view.accumulatedMarkdown == "# Original")
+        #expect(view.accumulatedMarkdown == original)
     }
 }
 
@@ -196,5 +201,19 @@ private extension OffMainParseRegressionTests {
 
     func renderedDocumentText(from view: QuillView) -> String? {
         view.firstDocumentTextView()?.contentStorage?.attributedString?.string
+    }
+
+    // Larger than QuillView.synchronousInitialParseThreshold (16 KB) so renderStatic takes the
+    // async/off-main parse path these tests exercise. With ≤16 KB content (Issue 01 sync-parse) the
+    // blocking latch parser would run on the main actor and deadlock the test.
+    func makeLargeStaticMarkdown(marker: String) -> String {
+        var markdown = "# \(marker)\n\n"
+        var index = 0
+        while markdown.utf8.count <= 16_384 {
+            markdown += "## \(marker) section \(index)\n\n"
+                + "Paragraph \(index) body text for the \(marker) document with enough length to grow.\n\n"
+            index += 1
+        }
+        return markdown
     }
 }
