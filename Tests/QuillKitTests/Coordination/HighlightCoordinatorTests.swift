@@ -7,6 +7,8 @@ import UIKit
 @MainActor
 @Suite("HighlightCoordinator", GloballySerialized(), .tags(.rendering))
 struct HighlightCoordinatorTests {
+    // NOTE: this re-applies the highlighter AFTER the result has landed (pending already empty); the
+    // in-flight orphaning race (Issue 06) is covered by setSameHighlighterWhileInFlightDeliversResult.
     @Test("reapplying highlighter keeps stored results visible")
     func reapplyingHighlighterKeepsStoredResultsVisible() async {
         let coordinator = makeCoordinator()
@@ -157,6 +159,62 @@ struct HighlightCoordinatorTests {
 
         #expect(retried)
         #expect(highlighter.callCount == 2)
+    }
+
+    // Issue 06: SwiftUI re-applies the same highlighter on every updateUIView. A no-op re-apply must NOT
+    // drop an in-flight request, or the static highlight result is orphaned (the bug fixed in e5fb809).
+    @Test("re-applying the same highlighter mid-flight keeps the in-flight request")
+    func setSameHighlighterWhileInFlightDeliversResult() async {
+        let coordinator = makeCoordinator()
+        let highlighter = GatedHighlighter(result: makeHighlightedCode())
+        let blockID = BlockIdentity(rawValue: 50)
+        let sink = CapturingSink()
+
+        coordinator.set(highlighter: highlighter)
+        coordinator.registerSink(sink, for: blockID)
+        coordinator.scheduleHighlight(blockID: blockID, code: "let x = 1", language: "swift")
+
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global().async {
+                highlighter.startedSignal.wait()
+                continuation.resume()
+            }
+        }
+
+        coordinator.set(highlighter: highlighter)
+        highlighter.allowFinishSignal.signal()
+
+        let applied = await eventually { sink.appliedCount >= 1 }
+
+        #expect(applied)
+        #expect(coordinator.highlightedResult(for: blockID) != nil)
+    }
+
+    @Test("removing the highlighter mid-flight drops the in-flight request")
+    func setNilHighlighterWhileInFlightDiscardsRequest() async {
+        let coordinator = makeCoordinator()
+        let highlighter = GatedHighlighter(result: makeHighlightedCode())
+        let blockID = BlockIdentity(rawValue: 51)
+        let sink = CapturingSink()
+
+        coordinator.set(highlighter: highlighter)
+        coordinator.registerSink(sink, for: blockID)
+        coordinator.scheduleHighlight(blockID: blockID, code: "let x = 1", language: "swift")
+
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global().async {
+                highlighter.startedSignal.wait()
+                continuation.resume()
+            }
+        }
+
+        coordinator.set(highlighter: nil)
+        highlighter.allowFinishSignal.signal()
+
+        try? await Task.sleep(nanoseconds: 150_000_000)
+
+        #expect(sink.appliedCount == 0)
+        #expect(coordinator.highlightedResult(for: blockID) == nil)
     }
 }
 
