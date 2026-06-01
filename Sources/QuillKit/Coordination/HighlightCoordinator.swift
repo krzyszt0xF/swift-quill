@@ -63,7 +63,11 @@ final class HighlightCoordinator {
     func set(highlighter: (any SyntaxHighlighting)?) {
         self.highlighter = highlighter
         highlightStoreState.setPresentationEnabled(highlighter != nil)
-        pendingBlockRequests.removeAll()
+        // Only drop in-flight requests when the highlighter is removed; SwiftUI re-applies the same
+        // highlighter every updateUIView, and clearing here would orphan an in-flight static highlight.
+        if highlighter == nil {
+            pendingBlockRequests.removeAll()
+        }
     }
 }
 
